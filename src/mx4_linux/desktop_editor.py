@@ -248,6 +248,7 @@ class DesktopEditor(Adw.Window):
             self.binding_choices.append((cid, choice))
             bindings.add(row)
         shortcuts = Gtk.Expander(label="Additional button shortcuts")
+        self.shortcuts_expander = shortcuts
         shortcuts.set_child(bindings)
         page.append(shortcuts)
         self.stack.add_titled(scroll, "ring", "Actions Ring")
@@ -866,8 +867,14 @@ class DesktopEditor(Adw.Window):
         return True
 
 
-def present_desktop_editor(parent, store, on_saved):
+def present_desktop_editor(parent, store, on_saved, cid=None):
     """Present a modal editor; call ``on_saved()`` after a validated save."""
     window = DesktopEditor(parent, store, on_saved)
+    if cid is not None:
+        window.stack.set_visible_child_name("ring")
+        window.shortcuts_expander.set_expanded(True)
+        target = next((choice for key, choice in window.binding_choices if key == cid), window.ring_preview)
+        window.connect("map", lambda *_: target.grab_focus())
+        window.window_title.set_subtitle(f"Configure {BUTTON_NAMES.get(cid, f'button {cid}')}")
     window.present()
     return window

@@ -1,0 +1,39 @@
+/* Reference visual tokens are scoped to the control window. */
+.mx4-shell { --mx4-bg: #191919; --mx4-panel: #000000; --mx4-secondary: #333333; --mx4-accent: #00ead0; background: var(--mx4-bg); color: #f6f6f6; font-size: 14px; font-family: "Adwaita Sans", "Cantarell", "DejaVu Sans", sans-serif; }
+.mx4-shell headerbar { background: var(--mx4-bg); box-shadow: none; border: none; }
+.mx4-shell .mx4-heading { font-size: 26px; font-weight: 700; }
+.mx4-shell .mx4-inspector-heading { font-size: 21px; font-weight: 700; }
+.mx4-shell .mx4-subtle { color: #bfc3c3; }
+.mx4-shell .mx4-context { border-bottom: 1px solid alpha(currentColor, .12); padding: 8px 18px; }
+.mx4-shell .mx4-sidebar { padding: 18px 10px 18px 22px; }
+.mx4-shell .mx4-sidebar button { border-radius: 6px; padding: 13px 12px; font-weight: 600; background: transparent; box-shadow: none; }
+.mx4-shell .mx4-sidebar button.active { background: var(--mx4-accent); color: #002b26; border: none; }
+.mx4-shell .mx4-sidebar button:hover { background: #333333; }
+.mx4-shell .mx4-inspector { background: var(--mx4-panel); }
+.mx4-shell .mx4-inspector-header { background: #242424; padding: 18px; }
+.mx4-shell .mx4-inspector .preferences-group { margin-top: 12px; }
+.mx4-shell .mouse-callout { min-height: 24px; min-width: 0; padding: 3px 9px; border: 1px solid #4b4b4b; border-radius: 4px; background: #252525; color: #fff; font-size: 12px; font-weight: 650; box-shadow: 0 3px 8px #00000044; }
+.mx4-shell .mouse-callout:hover { border-color: var(--mx4-accent); }
+.mx4-shell .mouse-callout.selected { background: var(--mx4-accent); border-color: var(--mx4-accent); color: #002b26; }
+.mx4-shell button:focus-visible, .mx4-shell dropdown:focus-visible { outline: 2px solid var(--mx4-accent); outline-offset: 2px; }
+.mx4-shell .device-card { background: transparent; border: 1px solid transparent; border-radius: 18px; box-shadow: none; padding: 12px 24px; }
+.mx4-shell .device-card:hover { background: #ffffff08; border-color: #ffffff20; }
+.mx4-shell .battery-chip { background: #050505; color: var(--mx4-accent); border: 1px solid #424242; border-radius: 4px; padding: 8px 12px; font-weight: 700; }
+.mx4-shell .mx4-home-note { background: #222222; padding: 24px; border-radius: 12px; }
+.mx4-shell .suggested-action { background: var(--mx4-accent); color: #003b34; }
+.mx4-shell .mx4-status { border-top: 1px solid #ffffff12; font-size: 12px; }
+.mx4-shell.mx4-light { --mx4-bg: #f3f5f5; --mx4-panel: #ffffff; --mx4-secondary: #e3e8e7; color: #142523; }
+.mx4-shell.mx4-light headerbar { color: #142523; }
+.mx4-shell.mx4-light .mx4-subtle { color: #51625e; }
+.mx4-shell.mx4-light .mx4-sidebar button.active { background: var(--mx4-accent); color: #002b26; }
+.mx4-shell.mx4-light .mx4-sidebar button:hover { background: #dce8e5; }
+.mx4-shell.mx4-light button:focus-visible, .mx4-shell.mx4-light dropdown:focus-visible { outline-color: #007f70; }
+.mx4-shell.mx4-light .mx4-inspector-header { background: #e7efed; }
+.mx4-shell.mx4-light .mx4-home-note { background: #e4ece9; }
+.mx4-shell.mx4-light .device-card:hover { background: #dce8e5; border-color: #b6cdc7; }
+
+.mx4-shell .surface-marker { min-height: 0; min-width: 0; padding: 0; border: none; border-radius: 999px; background: transparent; box-shadow: none; }
+.mx4-shell .surface-marker:hover { background: #00ead033; }
+.mx4-shell .surface-marker:checked { background: #00ead022; }
+
+.mx4-shell .mx4-sidebar button.active:hover { background: #00d8c0; color: #002b26; }

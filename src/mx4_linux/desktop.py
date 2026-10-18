@@ -758,19 +758,21 @@ class DesktopController:
             return GLib.SOURCE_REMOVE
         future.add_done_callback(lambda _: GLib.idle_add(finished))
 
-    def configure(self):
+    def configure(self, cid=None):
         if self.action_busy:
             self.notify("Wait for or cancel the running routine before editing.")
             return
         self.stop()
         try:
             from .desktop_editor import present_desktop_editor
-            present_desktop_editor(self.window, self.store, self.saved)
+            present_desktop_editor(self.window, self.store, self.saved, cid=cid)
         except (RuntimeError, OSError) as exc:
             self.notify(str(exc))
 
     def saved(self):
         self.reload_config()
+        if hasattr(self.window, "desktop_config_changed"):
+            self.window.desktop_config_changed()
         self.notify(self.error or "Configuration saved. Enable mouse integration to use the new assignments.")
 
     def close(self):

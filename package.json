@@ -13,6 +13,7 @@
   "keywords": ["logitech", "mx-master-4", "linux", "gtk", "hidpp", "wayland"],
   "files": [
     "bin/", "src/mx4_linux/**/*.py", "src/mx4_linux/icons/*.svg",
+    "src/mx4_linux/assets/*.css", "src/mx4_linux/assets/mouse/*.png", "src/mx4_linux/assets/mouse/*.json",
     "data/", "scripts/*.sh", "pyproject.toml",
     "docs/", "CONTRIBUTING.md", "CHANGELOG.md", "SECURITY.md"
   ],

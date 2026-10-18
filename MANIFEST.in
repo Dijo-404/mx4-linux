@@ -5,3 +5,5 @@ recursive-include data *.rules
 recursive-include docs *.md *.png
 recursive-include tests *.py *.js
 recursive-include .github *.yml *.md
+
+recursive-include src/mx4_linux/assets *.css *.png *.json
