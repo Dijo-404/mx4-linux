@@ -795,3 +795,94 @@ def test_recovery_persistence_failure_is_fatal_even_if_later_flags_would_match()
             worker.recover_reporting(dev, api, owner)
         assert owner.path.read_bytes() == before
     assert not dev.writes
+
+
+def test_manual_idle_session_has_no_reporting_writes_but_keeps_ownership():
+    dev, api, commands, events = setup_session()
+    assert run(dev, api, commands, events, controls=[], ring_button=None, raw_xy=False)
+    assert dev.writes == []
+    assert events == [{'type': 'ready', 'controls': [], 'ring_button': None, 'raw_xy': False},
+                      {'type': 'stopped', 'restored': True}]
+
+
+def test_trigger_transitions_to_ordinary_idle_and_new_trigger_restore_exactly():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    phases = []
+    changes = [([416], None, False), ([], None, False), ([83], 83, True), ([416], 416, True)]
+    def read(*_):
+        phases.append(dict(dev.reporting))
+        if len(phases) <= len(changes):
+            controls, trigger, raw = changes[len(phases) - 1]
+            commands.put({'op': 'configure', 'config_id': len(phases), 'controls': controls,
+                          'ring_button': trigger, 'raw_xy': raw})
+        else:
+            commands.put({'op': 'stop'})
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events)
+    assert phases[1][416][0] & 1 and not phases[1][416][0] & 16
+    assert phases[2] == before
+    assert phases[3][83][0] & 17 == 17 and phases[3][416] == before[416]
+    assert dev.reporting == before
+    assert [e['config_id'] for e in events if e['type'] == 'configured'] == [1, 2, 3, 4]
+
+
+def test_null_trigger_cannot_request_raw_motion():
+    dev, api, commands, events = setup_session()
+    assert not run(dev, api, commands, events, controls=[416], ring_button=None, raw_xy=True)
+    assert dev.writes == [] and not api.base.open_path.called
+
+
+def test_idle_manual_session_recovers_orphan_and_refuses_owned_lock():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+    dev.reporting[416] = (0x115, 416)
+    assert run(dev, api, commands, events, controls=[], ring_button=None, raw_xy=False)
+    assert dev.reporting[416] == (0x104, 416)
+    assert len(dev.writes) == 2  # Recovery only; idle acquisition makes no setters.
+    assert Ownership('unit:a1b2c3d4').read() is None
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4'):
+        assert not run(dev, api, commands, events, controls=[], ring_button=None, raw_xy=False)
+    assert dev.writes == [] and events[-1]['restored'] is None
+
+
+def test_trigger_to_manual_ordinary_waits_for_held_release_before_ack():
+    dev, api, commands, events = setup_session()
+    before = dict(dev.reporting)
+    phases = 0
+    def read(*_):
+        nonlocal phases
+        phases += 1
+        if phases == 1:
+            dev.handle.notifications_hook(notification(data=struct.pack('!4H', 416, 0, 0, 0)))
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [416], 'ring_button': None, 'raw_xy': False})
+        elif phases == 2:
+            assert not any(e['type'] == 'configured' for e in events)
+            assert dev.reporting[416][0] & 17 == 17
+            dev.handle.notifications_hook(notification(data=b'\0' * 8))
+        else:
+            assert dev.reporting[416][0] & 1 and not dev.reporting[416][0] & 16
+            commands.put({'op': 'stop'})
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events)
+    types = [e['type'] for e in events]
+    release = next(i for i,e in enumerate(events) if e['type'] == 'button' and not e['pressed'])
+    assert release < types.index('configured')
+    assert dev.reporting == before
+
+
+def test_new_trigger_lost_ack_restores_old_and_new_originals():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    def read(*_):
+        dev.fail_after_write = len(dev.writes) + 1
+        commands.put({'op': 'configure', 'config_id': 1, 'controls': [83], 'ring_button': 83, 'raw_xy': True})
+    api.base.read.side_effect = read
+    assert not run(dev, api, commands, events)
+    assert dev.reporting == before and events[-1]['restored'] is True
+    assert not any(e['type'] == 'configured' for e in events)

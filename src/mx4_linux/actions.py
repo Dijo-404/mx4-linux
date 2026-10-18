@@ -34,6 +34,7 @@ MAX_RUN_SECONDS = 120
 BUTTON_IDS = frozenset({82, 83, 86, 195, 196, 416})
 ACTION_ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
 THEME_ICON = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
+SHOW_RING = object()  # UI-only choice; never persisted as an action ID.
 HAPTIC_SOURCES = frozenset({"open", "hover", "select", "complete"})
 NIRI_ACTION = re.compile(r"[a-z][a-z0-9-]{0,79}\Z")
 
@@ -223,6 +224,11 @@ def _validate_steps(steps, action_id):
         _fail(f"action {action_id} has more than {MAX_TOTAL_DELAY_MS} milliseconds of delays.")
 
 
+def _validate_trigger(value):
+    if value is not None and (type(value) is not int or value not in BUTTON_IDS):
+        _fail("ring_button must be null or one of 82, 83, 86, 195, 196 or 416.")
+
+
 def _validate_assignments(config, actions, ring_button):
     ring = config["ring"]
     if not isinstance(ring, list) or len(ring) != 8 or any(not isinstance(value, str) or value not in actions for value in ring):
@@ -252,7 +258,7 @@ def validate_config(config):
     _fields(config, ("version", "ring", "actions", "button_bindings", "ring_button", "haptic_feedback"),
             ("ring_groups", "assignment_profiles", "active_profiles", "ring_scale", "ring_motion_gain",
              "ring_deadzone", "haptic_events", "haptic_waveforms", "haptic_power_save", "appearance",
-             "autostart", "background", "resume_integration"), location="document")
+             "autostart", "background", "resume_integration", "adapt_to_app"), location="document")
     if type(config["version"]) is not int or config["version"] != 1:
         _fail("only version 1 is supported.")
     actions = config["actions"]
@@ -274,10 +280,9 @@ def validate_config(config):
             for branch, steps in action["adjustment"].items():
                 _validate_steps(steps, f"{action_id} adjustment {branch}")
     ring_button = config["ring_button"]
-    if type(ring_button) is not int or ring_button not in BUTTON_IDS:
-        _fail("ring_button must be one of 82, 83, 86, 195, 196 or 416.")
+    _validate_trigger(ring_button)
     _validate_assignments(config, actions, ring_button)
-    for flag in ("haptic_feedback", "haptic_power_save", "autostart", "background", "resume_integration"):
+    for flag in ("haptic_feedback", "haptic_power_save", "autostart", "background", "resume_integration", "adapt_to_app"):
         if flag in config and type(config[flag]) is not bool:
             _fail(f"{flag} must be true or false.")
     if "ring_scale" in config and (type(config["ring_scale"]) is not int or not 75 <= config["ring_scale"] <= 150):
@@ -307,10 +312,11 @@ def validate_config(config):
         for profile_id, profile in profiles.items():
             if not isinstance(profile_id, str) or not ACTION_ID.fullmatch(profile_id):
                 _fail("assignment profile IDs must use the action ID syntax.")
-            _fields(profile, ("label", "app_id", "ring", "button_bindings"), ("ring_groups",), f"profile {profile_id}")
+            _fields(profile, ("label", "app_id", "ring", "button_bindings"), ("ring_groups", "ring_button"), f"profile {profile_id}")
             if not _plain_string(profile["label"], maximum=80) or not _plain_string(profile["app_id"]):
                 _fail(f"profile {profile_id} needs a printable label of 1–80 and app_id of 1–256 characters.")
-            _validate_assignments(profile, actions, ring_button)
+            _validate_trigger(profile.get("ring_button", ring_button))
+            _validate_assignments(profile, actions, profile.get("ring_button", ring_button))
     if "active_profiles" in config:
         if "assignment_profiles" not in config:
             _fail("active_profiles requires assignment_profiles.")
@@ -330,16 +336,48 @@ def validate_config(config):
     return config
 
 
-def resolve_config(config, app_id=None):
-    """Return a detached document with the active exact or General assignments."""
-    validate_config(config)
-    resolved = deepcopy(config)
+def assignment_scope(config, app_id=None):
+    """Select an explicit editing scope, independently of runtime adaptation."""
     active = config.get("active_profiles", {})
     profile_id = active.get(app_id) if isinstance(app_id, str) else None
     profile_id = profile_id or active.get("*")
-    if profile_id is not None:
-        profile = resolved["assignment_profiles"][profile_id]
-        for field in ("ring", "button_bindings"):
+    return config["assignment_profiles"][profile_id] if profile_id else config
+
+
+def set_button_assignment(document, cid, action_id, app_id=None, *, root=False):
+    """Change one scope, validating the complete copy before replacing anything."""
+    if type(cid) is not int or cid not in BUTTON_IDS:
+        _fail("unsupported assignment button.")
+    candidate = deepcopy(document)
+    target = candidate if root else assignment_scope(candidate, app_id)
+    trigger = target.get("ring_button", candidate["ring_button"])
+    if action_id is SHOW_RING:
+        target["ring_button"] = cid
+        target["button_bindings"].pop(str(cid), None)
+    else:
+        if cid == trigger:
+            target["ring_button"] = None
+        if action_id is None:
+            target["button_bindings"].pop(str(cid), None)
+        else:
+            target["button_bindings"][str(cid)] = action_id
+    validate_config(candidate)
+    document.clear()
+    document.update(candidate)
+
+
+def resolve_config(config, app_id=None, *, for_editing=False):
+    """Return a detached document with the active exact or General assignments."""
+    validate_config(config)
+    resolved = deepcopy(config)
+    profile = assignment_scope(resolved, app_id if for_editing or config.get("adapt_to_app", True) else None)
+    if profile is not resolved:
+        # Other profiles must still inherit the persisted root in this detached
+        # complete document when its effective root takes a profile override.
+        root_trigger = config["ring_button"]
+        for value in resolved.get("assignment_profiles", {}).values():
+            value.setdefault("ring_button", root_trigger)
+        for field in ("ring", "button_bindings", "ring_button"):
             resolved[field] = deepcopy(profile[field])
         resolved.pop("ring_groups", None)
         if "ring_groups" in profile:

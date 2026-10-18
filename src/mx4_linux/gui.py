@@ -7,6 +7,7 @@ from copy import deepcopy
 
 from .gtk_support import Adw, Gdk, Gio, GLib, Gtk
 
+from .actions import assignment_scope, set_button_assignment
 from .backend import Backend, DemoBackend
 from .profiles import ProfileStore, RememberedSettingsStore, apply_profile, replay_remembered
 from .reporting_state import valid_identity
@@ -286,13 +287,7 @@ class ControlWindow(Adw.ApplicationWindow):
             return
         self.desktop.stop()
         def mutate(document):
-            active = document.get("active_profiles", {})
-            profile_id = active.get(app_id) or active.get("*")
-            target = document["assignment_profiles"][profile_id] if profile_id else document
-            if action_id is None:
-                target["button_bindings"].pop(str(cid), None)
-            else:
-                target["button_bindings"][str(cid)] = action_id
+            set_button_assignment(document, cid, action_id, app_id)
         def saved(_result):
             self.local_config_finished("Local assignment saved. Enable mouse integration to use it.")
         def failed(error):
@@ -305,8 +300,7 @@ class ControlWindow(Adw.ApplicationWindow):
     def local_config_finished(self, message):
         # Atomic replacement may already have committed even when completion
         # reports an error. Reconcile from disk, independently of device epochs.
-        self.desktop.reload_config()
-        self.desktop._configure_context()
+        self.desktop.reconcile_config()
         self.shell.sync_local_preferences()
         if self.desktop.config is not None:
             self.shell.apply_appearance(self.desktop.config.get("appearance", "dark"))
@@ -566,7 +560,11 @@ class ControlWindow(Adw.ApplicationWindow):
         previous = setting.get("value")
         if key is not None:
             previous = (previous or {}).get(str(key), (previous or {}).get(key))
-        if setting["name"] != "haptic-play" and previous == value:
+        mapping = setting["name"] == "reprogrammable-keys"
+        app_id = self.shell.context_app
+        local = self.shell.effective_config() if mapping else {}
+        masked = mapping and (key == local.get("ring_button") or str(key) in local.get("button_bindings", {}))
+        if setting["name"] != "haptic-play" and previous == value and not masked:
             return
         device = deepcopy(self.current)
         device_id = device["id"]
@@ -600,12 +598,37 @@ class ControlWindow(Adw.ApplicationWindow):
             self.toasts.add_toast(Adw.Toast(title=text, timeout=2))
         def failed(error):
             self.refresh_after_write(error)
+        def reconcile_local():
+            if not self.closed:
+                self.local_config_finished("Local assignment cleared before applying the mouse function.")
+            return GLib.SOURCE_REMOVE
         def work():
             if self.closed or epoch != self.operation_epoch or self.hardware_cancelled.is_set():
                 raise RuntimeError("Device change cancelled")
-            if self.demo:
-                return self.backend.write(device_id, setting["name"], value, key)
-            return self.backend.write(device_id, setting["name"], value, key, expected_stable_id=device.get("stable_id"))
+            cleared = False
+            if mapping:
+                def clear(document):
+                    nonlocal cleared
+                    target = assignment_scope(document, app_id)
+                    if key == target.get("ring_button", document["ring_button"]) or str(key) in target['button_bindings']:
+                        set_button_assignment(document, key, None, app_id)
+                        cleared = True
+                try:
+                    self.desktop.store.update(clear)
+                except Exception as exc:
+                    raise RuntimeError(f"Local assignment save was not confirmed; mouse mapping was not changed: {exc}") from exc
+                finally:
+                    GLib.idle_add(reconcile_local)
+                if self.closed or epoch != self.operation_epoch or self.hardware_cancelled.is_set():
+                    raise RuntimeError("Local assignment cleared; mouse mapping cancelled." if cleared else "Mouse mapping cancelled.")
+            try:
+                if self.demo:
+                    return self.backend.write(device_id, setting["name"], value, key)
+                return self.backend.write(device_id, setting["name"], value, key, expected_stable_id=device.get("stable_id"))
+            except Exception as exc:
+                if cleared:
+                    raise RuntimeError(f"Local assignment cleared; mouse mapping was not confirmed: {exc}") from exc
+                raise
         if setting["name"] == "reprogrammable-keys":
             self.hardware_job(work, applied, f"Applying {setting['label']}…", failed=failed)
         else:

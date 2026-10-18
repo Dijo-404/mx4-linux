@@ -8,7 +8,7 @@ import math
 import threading
 import time
 
-from .actions import DesktopActions, DesktopConfigStore, focused_context, resolve_config, restore_focus
+from .actions import BUTTON_IDS, DesktopActions, DesktopConfigStore, focused_context, resolve_config, restore_focus
 from .context import NiriFocusObserver
 from .event_session import EventSession
 from .gtk_support import GLib
@@ -22,7 +22,7 @@ class DesktopController:
         self.config = None
         self.actions = None
         self.error = None
-        self.message = "Enable mouse integration to use the haptic panel."
+        self.message = "Enable mouse integration to use configured button assignments."
         self.closed = False
         self.action_busy = False
         self.cancelled = threading.Event()
@@ -37,6 +37,7 @@ class DesktopController:
         self.starting = False
         self._open_token = 0
         self._dispatch_token = 0
+        self._held_ring_button = None
         self._pending_released = False
         self._pending_motion = [0, 0]
         self._opening_motion = deque()
@@ -105,6 +106,26 @@ class DesktopController:
         except RuntimeError as exc:
             self.error = str(exc)
 
+    def reconcile_config(self):
+        """Refresh future assignments without altering a pinned invocation."""
+        try:
+            document = self.store.read()
+            changed = document != self.config
+            self.config = document
+            if self.actions:
+                self.actions.config = deepcopy(document)
+            else:
+                self.actions = DesktopActions(document)
+            self.error = None
+            if changed:
+                self._context_revision += 1
+                if self.session.running:
+                    self._configure_context()
+                else:
+                    self.effective_config = resolve_config(self.config, self.context.get("app_id") if self.context else None)
+        except RuntimeError as exc:
+            self.error = str(exc)
+
     def notify(self, message):
         self.message = message
         if not self.closed:
@@ -143,8 +164,8 @@ class DesktopController:
             self.reconnect_attempt = 0
         self.starting = True
         self._context_token += 1
-        token, revision = self._context_token, self._context_revision
-        device_id, document = self.window.current["id"], deepcopy(self.config)
+        token = self._context_token
+        device_id = self.window.current["id"]
         self.notify("Reading active application before enabling mouse integration…")
         future = self.executor.submit(focused_context)
         def begin():
@@ -156,9 +177,8 @@ class DesktopController:
                 self.notify("The selected mouse changed; refresh and enable integration again.")
                 return GLib.SOURCE_REMOVE
             try:
-                if revision == self._context_revision:
-                    self.context = future.result()
-                self.effective_config = resolve_config(document, self.context.get("app_id") if self.context else None)
+                self.context = future.result()
+                self.effective_config = resolve_config(self.config, self.context.get("app_id") if self.context else None)
                 self._pending_configs.clear()
                 self._context_revision += 1
                 self._active_revision = self._context_revision
@@ -168,7 +188,7 @@ class DesktopController:
                 self.observer = NiriFocusObserver(lambda event: self.queue_event(
                     {**event, "context_token": token, "session_id": session_id}))
                 self.observer.start()
-                self.notify("Enabling haptic panel and configured button shortcuts…")
+                self.notify("Enabling configured mouse assignments…")
             except (RuntimeError, OSError) as exc:
                 self.notify(str(exc))
             return GLib.SOURCE_REMOVE
@@ -191,6 +211,7 @@ class DesktopController:
         self._open_token += 1
         self._dispatch_token += 1
         self.opening = False
+        self._held_ring_button = None
         self._stop_context()
         self._pending_motion = [0, 0]
         self._opening_motion.clear()
@@ -262,7 +283,9 @@ class DesktopController:
             self._cancel_reconnect()
             self.reconnect_attempt = 0
             self.error = None
-            self.notify("Enabled · hold the haptic panel, move, then release. A short click opens the ring.")
+            trigger = (self.effective_config or self.config)["ring_button"]
+            self.notify("Enabled · manual Actions Ring and configured button shortcuts." if trigger is None else
+                        f"Enabled · hold button {trigger}, move, then release. A short click opens the ring.")
             if self.context_available is False:
                 self.notify(self.message + " Application profiles unavailable; General assignments remain active.")
             self._configure_context()
@@ -274,6 +297,7 @@ class DesktopController:
             self._open_token += 1
             self._dispatch_token += 1
             self.opening = False
+            self._held_ring_button = None
             self._pending_motion = [0, 0]
             self._opening_motion.clear()
             self._stop_context()
@@ -290,6 +314,7 @@ class DesktopController:
             self._open_token += 1
             self._dispatch_token += 1
             self.opening = False
+            self._held_ring_button = None
             self._stop_context()
             if self.ring:
                 self.ring.dismiss()
@@ -312,21 +337,34 @@ class DesktopController:
             self._open_token += 1
             self._dispatch_token += 1
             self.opening = False
+            self._held_ring_button = None
             self._pending_motion = [0, 0]
             self._opening_motion.clear()
             if self.ring:
                 self.ring.dismiss()
         elif kind == "button" and self.session.ready and not self.session.stopping:
             cid, pressed = event.get("control"), event.get("pressed")
+            if type(cid) is not int or cid not in BUTTON_IDS or type(pressed) is not bool:
+                return GLib.SOURCE_REMOVE
             active = self.effective_config or self.config
-            if cid == active["ring_button"]:
+            if not pressed and cid == getattr(self, "_held_ring_button", None):
+                self._held_ring_button = None
+                if self.opening:
+                    self._pending_released = True
+                elif self.ring and self.ring.state.visible:
+                    self.ring.release_button()
+            elif cid == active["ring_button"]:
                 if pressed:
+                    if self._active_revision != self._context_revision:
+                        return GLib.SOURCE_REMOVE
                     if self.opening or (self.ring and self.ring.state.visible):
                         self._open_token += 1
                         self.opening = False
+                        self._held_ring_button = None
                         if self.ring:
                             self.ring.dismiss()
                     else:
+                        self._held_ring_button = cid
                         self.open_ring(held=True)
                 elif self.opening:
                     self._pending_released = True
@@ -435,9 +473,12 @@ class DesktopController:
             return
         if self.opening:
             return
-        self.reload_config()
+        self.reconcile_config()
         if self.error:
             self.notify(self.error)
+            return
+        if held and self.session.ready and self._active_revision != self._context_revision:
+            self.notify("Assignments are updating; release and press the configured ring button again.")
             return
         self.opening = True
         self._open_token += 1

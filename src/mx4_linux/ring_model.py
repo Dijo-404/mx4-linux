@@ -52,6 +52,30 @@ class RingGeometry:
         return round(value * self.scale)
 
 
+class HorizontalDrag:
+    """Logical horizontal detents, latched after 10px and spaced 12px apart."""
+
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+        self.recognized = False
+        self.steps = 0
+
+    def move(self, x, y):
+        if any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y)):
+            return 0
+        dx, dy = x - self.x, y - self.y
+        if not self.recognized:
+            if abs(dx) < 10 or abs(dx) < abs(dy):
+                return 0
+            self.recognized = True
+        # A pathological motion callback must not create an unbounded loop or backlog.
+        dx = max(-1e6, min(1e6, dx))
+        steps = int(math.copysign(1 + (abs(dx) - 10) // 12, dx)) if abs(dx) >= 10 else 0
+        delta = max(-4, min(4, steps - self.steps))
+        self.steps = steps
+        return delta
+
+
 class RingState:
     def __init__(self, motion_gain=.45, deadzone=24):
         for name, value, low, high in (("motion gain", motion_gain, .1, 2), ("deadzone", deadzone, 8, 80)):

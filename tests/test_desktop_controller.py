@@ -284,7 +284,7 @@ def test_async_ring_open_pins_application_and_document_before_later_edits(runtim
     future = Future()
     scheduled = []
     runtime.executor = SimpleNamespace(submit=Mock(return_value=future))
-    runtime.reload_config = Mock()
+    runtime.reload_config = runtime.reconcile_config = Mock()
     runtime.ring.show_ring = Mock()
     runtime.ring.preview = False
     monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: scheduled.append(fn))
@@ -328,7 +328,7 @@ def test_ring_open_pending_motion_preserves_radius_clamping(runtime, monkeypatch
     scheduled = []
     state = RingState()
     runtime.executor = SimpleNamespace(submit=Mock(return_value=future))
-    runtime.reload_config = Mock()
+    runtime.reload_config = runtime.reconcile_config = Mock()
     runtime.ring.preview = False
     runtime.ring.show_ring = lambda *_a, **_kw: state.open(held=True)
     runtime.ring.motion = state.motion
@@ -411,7 +411,7 @@ def test_start_asynchronously_resolves_active_profile_before_first_diversion(run
     runtime.session.running = runtime.session.ready = False
     runtime.window.busy = False
     runtime.session.start = Mock()
-    runtime.reload_config = Mock()
+    runtime.reload_config = runtime.reconcile_config = Mock()
     runtime.executor = SimpleNamespace(submit=Mock(return_value=future))
     observer = SimpleNamespace(start=Mock(), stop=Mock())
     monkeypatch.setattr('mx4_linux.desktop.NiriFocusObserver', lambda _cb: observer)
@@ -431,7 +431,7 @@ def test_stop_invalidates_initial_context_query_without_starting_worker(runtime,
     runtime.session.running = runtime.session.ready = False
     runtime.window.busy = False
     runtime.session.start = Mock()
-    runtime.reload_config = Mock()
+    runtime.reload_config = runtime.reconcile_config = Mock()
     runtime.executor = SimpleNamespace(submit=Mock(return_value=future))
     monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: scheduled.append(fn))
     runtime.start()
@@ -498,9 +498,8 @@ def test_unsupported_feedback_warning_keeps_real_worker_context_transitions_aliv
     def configure(config):
         nonlocal config_id
         config_id += 1
-        commands.put({'op': 'configure', 'config_id': config_id,
-            'controls': sorted({config['ring_button'], *map(int, config['button_bindings'])}),
-            'ring_button': config['ring_button'], 'raw_xy': True})
+        from mx4_linux.event_session import _reporting_request
+        commands.put({'op': 'configure', 'config_id': config_id, **_reporting_request(config)})
         return config_id
 
     def emit(event):
@@ -1020,7 +1019,7 @@ def test_explicit_valid_enable_clears_ownership_conflict_latch(runtime, monkeypa
     runtime.reacquire_blocked = True
     runtime.session.running = runtime.session.ready = False
     runtime.window.busy = False
-    runtime.reload_config = Mock()
+    runtime.reload_config = runtime.reconcile_config = Mock()
     runtime.executor = SimpleNamespace(submit=Mock(return_value=Future()))
     runtime.start()
     assert runtime.reacquire_blocked is False
@@ -1036,3 +1035,87 @@ def test_ordinary_transport_error_with_confirmed_cleanup_retains_opt_in_reconnec
     runtime.event({'type': 'stopped', 'restored': True})
     assert runtime.reacquire_blocked is False
     assert [ms for ms, _fn in timers] == [1000]
+
+
+def test_stale_trigger_press_is_suppressed_until_current_ack(controller):
+    controller.ring.state.visible = False
+    controller.open_ring = Mock()
+    controller._context_revision = 2
+    controller._active_revision = 1
+    controller.event({'type': 'button', 'control': 416, 'pressed': True})
+    controller.open_ring.assert_not_called()
+    controller._active_revision = 2
+    controller.event({'type': 'button', 'control': 416, 'pressed': True})
+    controller.open_ring.assert_called_once_with(held=True)
+
+
+def test_adaptation_reconcile_keeps_open_invocation_and_intent(controller):
+    from copy import deepcopy
+    from mx4_linux.actions import default_config
+    document = default_config()
+    document['assignment_profiles'] = {'app': {'label': 'App', 'app_id': 'app.a',
+        'ring': list(reversed(document['ring'])), 'button_bindings': {'83': 'copy'}, 'ring_button': 82}}
+    document['active_profiles'] = {'app.a': 'app'}
+    controller.config = deepcopy(document)
+    controller.context = {'app_id': 'app.a', 'window_id': 10}
+    controller._ring_config = deepcopy(document)
+    pinned = controller._ring_config
+    controller.target = deepcopy(controller.context)
+    controller.requested_enabled = True
+    controller.session.running = True
+    controller.session.configure = Mock(return_value=5)
+    controller.actions = SimpleNamespace(config=deepcopy(document))
+    document['adapt_to_app'] = False
+    controller.store = SimpleNamespace(read=Mock(return_value=document))
+    controller.reconcile_config()
+    assert controller.config['adapt_to_app'] is False
+    assert controller._ring_config is pinned and controller.target == controller.context
+    assert controller.requested_enabled and controller._dispatch_token == 0
+    controller.ring.dismiss.assert_not_called()
+    future, revision = controller._pending_configs[5]
+    assert future['ring_button'] == 416 and revision == controller._context_revision
+    assert controller.context == {'app_id': 'app.a', 'window_id': 10}
+    controller.event({'type': 'configured', 'config_id': 5})
+    assert controller.effective_config['ring_button'] == 416
+
+
+def test_preference_during_start_does_not_discard_actual_focus_query(runtime, monkeypatch):
+    from concurrent.futures import Future
+    future, scheduled = Future(), []
+    runtime.starting = False
+    runtime.session.running = runtime.session.ready = False
+    runtime.window.busy = False
+    runtime.session.start = Mock()
+    runtime.reload_config = Mock()
+    runtime.executor = SimpleNamespace(submit=Mock(return_value=future))
+    observer = SimpleNamespace(start=Mock(), stop=Mock())
+    monkeypatch.setattr('mx4_linux.desktop.NiriFocusObserver', lambda _cb: observer)
+    monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: scheduled.append(fn))
+    runtime.start()
+    runtime.config['adapt_to_app'] = False
+    runtime._context_revision += 1
+    future.set_result({'app_id': 'editor', 'window_id': 7})
+    scheduled.pop()()
+    assert runtime.context == {'app_id': 'editor', 'window_id': 7}
+    assert runtime.session.start.call_args.args[1]['button_bindings'] == {'82': 'copy'}
+
+
+def test_held_old_trigger_release_cleans_up_after_effective_trigger_changes(controller):
+    controller._held_ring_button = 416
+    controller.config['ring_button'] = None
+    controller.config['button_bindings']['416'] = 'copy'
+    controller.event({'type': 'button', 'control': 416, 'pressed': False})
+    controller.ring.release_button.assert_called_once()
+    controller.execute.assert_not_called()
+    assert controller._held_ring_button is None
+
+
+def test_freshly_changed_file_cannot_open_held_ring_before_new_ack(runtime):
+    runtime.ring.state.visible = False
+    runtime.executor = SimpleNamespace(submit=Mock())
+    def changed():
+        runtime._context_revision += 1
+    runtime.reconcile_config = changed
+    runtime.open_ring(held=True)
+    runtime.executor.submit.assert_not_called()
+    assert not runtime.opening

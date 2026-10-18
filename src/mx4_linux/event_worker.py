@@ -93,7 +93,7 @@ def _validate(request):
     if not isinstance(target, str) or not target or len(target) > 1024:
         raise ValueError("A valid device_id from discovery is required")
     controls = request.get("controls", [416])
-    if not isinstance(controls, list) or not controls or len(controls) > len(ALLOWED_CONTROLS):
+    if not isinstance(controls, list) or len(controls) > len(ALLOWED_CONTROLS):
         raise ValueError("Select at least one supported mouse control")
     if any(type(cid) is not int or cid not in ALLOWED_CONTROLS for cid in controls):
         raise ValueError("Only middle, back, forward, gesture, shift, and haptic controls can be diverted")
@@ -101,10 +101,12 @@ def _validate(request):
         raise ValueError("Controls must not contain duplicates")
     ring = request.get("ring_button", 416)
     raw_xy = request.get("raw_xy", True)
-    if type(ring) is not int or ring not in ALLOWED_CONTROLS:
+    if ring is not None and (type(ring) is not int or ring not in ALLOWED_CONTROLS):
         raise ValueError("Invalid ring control")
     if type(raw_xy) is not bool:
         raise ValueError("raw_xy must be a JSON boolean")
+    if not controls and ring is not None:
+        raise ValueError("Select at least one supported mouse control")
     if raw_xy and ring not in controls:
         raise ValueError("The ring control must be selected for raw motion reporting")
     return target, controls, ring, raw_xy

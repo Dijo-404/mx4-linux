@@ -12,9 +12,9 @@ MX4 Linux separates hardware profiles from desktop actions. Both use `$XDG_CONFI
 .venv/bin/mx4-linux actions import desktop.json
 ```
 
-`validate` checks without saving or executing. `import` validates then replaces the saved document. Disable and re-enable mouse integration after importing changed button bindings while the GUI is running. Saving in the GUI stops mouse integration; enable it again afterwards.
+`validate` checks without saving or executing. `import` validates then replaces the saved document. Disable and re-enable mouse integration after importing changed button bindings while the GUI is running. Saving explicit button/ring assignments in the GUI stops mouse integration; enable it again afterwards. Local preferences, including Adapt to App, reconcile future assignments without stopping an open invocation.
 
-All top-level fields except `ring_groups` are required. Unknown fields are rejected. The file and its serialized configuration are limited to 1 MiB.
+The required top-level fields are `version`, `ring`, `actions`, `button_bindings`, `ring_button` and `haptic_feedback`. Additional fields described below are optional. Unknown fields are rejected. The file and its serialized configuration are limited to 1 MiB.
 
 | Field | Type and limits | Default when no file exists |
 | :--- | :--- | :--- |
@@ -23,10 +23,27 @@ All top-level fields except `ring_groups` are required. Unknown fields are rejec
 | `ring_groups` | Optional object mapping decimal ring positions `"0"`–`"7"` to 1–6 distinct existing action IDs in display order | Absent; each position runs its assigned action directly |
 | `actions` | Object containing 1–128 named routines | Eight built-in routines listed below |
 | `button_bindings` | Object mapping supported decimal button IDs to existing action IDs | `{}` |
-| `ring_button` | Integer: one of `82`, `83`, `86`, `195`, `196`, `416` | `416` (haptic panel) |
+| `ring_button` | One of `82`, `83`, `86`, `195`, `196`, `416`, or `null` for manual opening only | `416` (haptic panel) |
 | `haptic_feedback` | Boolean controlling selection feedback | `true` |
+| `adapt_to_app` | Optional boolean: use exact application assignments when enabled | `true` when omitted |
 
 `button_bindings` cannot assign the selected `ring_button`. Supported IDs are a configuration allowlist; the listener also verifies that the connected device supports each selected control. Primary left/right click and scrolling are excluded from diversion.
+
+### Application assignments and ring trigger
+
+Optional `assignment_profiles` maps profile IDs to objects with `label`, exact `app_id` (or `"*"` for General), eight-position `ring`, and `button_bindings`. `ring_groups` and `ring_button` are optional in each profile. `active_profiles` maps exact app IDs and/or `"*"` to an existing profile with the same app ID. Up to 64 profiles are allowed; all profiles, including inactive ones, are validated before saving.
+
+A profile without `ring_button` inherits the persisted root trigger. Explicit `null` disables its physical ring trigger, while an allowed integer overrides it. Each profile's ordinary bindings must exclude its effective trigger. With no physical trigger, all six supported controls may have ordinary bindings; **Open Actions Ring** and the CLI/desktop shortcut still work. An integration session with no trigger or bindings keeps its ownership/recovery checks and makes no new reporting changes.
+
+With `adapt_to_app` enabled (the default), the active exact-app profile wins, then active General, then root assignments. Disabled adaptation uses General/root while retaining the actual focused app and window for action conditions and focus safety. Changing this preference preserves an already-open ring and running routine; future assignments become live after the listener acknowledges its safe control transition.
+
+The device page's context selector edits the selected exact-app/General scope even when adaptation is disabled. Every local button menu offers **Default**, **Show Actions Ring**, and existing actions. Choosing a different trigger releases the old trigger; replacing a trigger with an ordinary action or Default explicitly disables that scope's trigger. Conflicts in any inheriting profile reject the save. The earlier full-window editor labels its default/root scope explicitly; shared routine definitions remain shared.
+
+Built-in mouse functions are global hardware settings. Replacing a local assignment with a built-in function first waits for confirmed reporting restoration, then saves the local clear before attempting the hardware write. If the hardware request fails, the local clear remains saved and the status reports both results.
+
+### Adjusting an action
+
+An action may have an `adjustment` object with nonempty `increase` and `decrease` step arrays, validated with the same limits as its normal `steps`. Scroll over its fully revealed circle to adjust it, or press the primary mouse button on the circle and drag horizontally. Drag capture pins that initial action, including child actions; crossing a gap or another circle does not retarget it. The first detent requires 10 logical pixels of predominantly horizontal motion, followed by 12-pixel detents at every ring size. Small motion preserves a normal click. A recognized drag suppresses the ordinary action on release, including after reversal or a rejected adjustment. One motion callback emits at most 4 steps, and the controller bounds/coalesces pending work. Preview never runs adjustment steps.
 
 ### Action groups
 

@@ -17,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk, Pango
 
-from .actions import ACTION_ID, MAX_ACTIONS, MAX_GROUP_ACTIONS, MAX_STEPS, validate_config
+from .actions import SHOW_RING, set_button_assignment, ACTION_ID, MAX_ACTIONS, MAX_GROUP_ACTIONS, MAX_STEPS, validate_config
 from .ring_preview import RingPreview
 
 
@@ -222,10 +222,11 @@ class DesktopEditor(Adw.Window):
         self.groups_expander.set_child(groups)
         page.append(self.groups_expander)
 
-        behavior = Adw.PreferencesGroup(title="Ring behavior")
+        behavior = Adw.PreferencesGroup(title="Default assignments", description="These are the default/root assignments. Edit application-specific buttons using the device page context selector.")
         ring_button = self.config["ring_button"]
-        behavior.add(Adw.ActionRow(use_markup=False, title="Open Actions Ring",
-                                  subtitle=BUTTON_NAMES.get(ring_button, f"Button {ring_button}")))
+        self.trigger_row = Adw.ActionRow(use_markup=False, title="Open Actions Ring",
+                                        subtitle=BUTTON_NAMES.get(ring_button, "Manual only · use Open Actions Ring"))
+        behavior.add(self.trigger_row)
         feedback = Adw.ActionRow(use_markup=False, title="Haptic feedback",
                                  subtitle="Feel a pulse when the ring opens.")
         self.haptics = Gtk.Switch(active=self.config["haptic_feedback"], valign=Gtk.Align.CENTER)
@@ -238,8 +239,6 @@ class DesktopEditor(Adw.Window):
         bindings = Adw.PreferencesGroup(
                                         description="A shortcut replaces that button's normal function while desktop controls are enabled.")
         for cid, name in BUTTON_NAMES.items():
-            if cid == ring_button:
-                continue
             row = Adw.ActionRow(use_markup=False, title=name)
             choice = _action_dropdown(accessible_name=f"Smart Action for {name.lower()}", valign=Gtk.Align.CENTER)
             choice.set_tooltip_text(f"Smart Action for {name.lower()}")
@@ -411,7 +410,8 @@ class DesktopEditor(Adw.Window):
                 raise ValueError("This action ID already belongs to another routine. Choose a unique ID.")
             steps = (self._form_steps(draft["form_values"]) if draft.get("form_values") is not None
                      else json.loads(draft["steps_text"]))
-            action = {"label": draft["label"], "steps": steps}
+            action = {**deepcopy(self.config["actions"].get(self.selected_id, {})), "label": draft["label"], "steps": steps}
+            action.pop("app_id", None)
             if draft["app_id"]:
                 action["app_id"] = draft["app_id"]
             validate_config({"version": 1, "actions": {"routine": action}, "ring": ["routine"] * 8,
@@ -561,9 +561,12 @@ class DesktopEditor(Adw.Window):
                 choice.set_model(Gtk.StringList.new(["No action"] + labels))
                 choice.set_selected(self.choice_ids.index(children[child]) + 1 if child < len(children) else 0)
         for cid, choice in self.binding_choices:
-            choice.set_model(Gtk.StringList.new(["Normal button function"] + labels))
+            values = ["Normal button function", "Show Actions Ring"] + labels
+            model = choice.get_model()
+            if model is None or values != [model.get_string(i) for i in range(model.get_n_items())]:
+                choice.set_model(Gtk.StringList.new(values))
             binding = self.config["button_bindings"].get(str(cid))
-            choice.set_selected(self.choice_ids.index(binding) + 1 if binding else 0)
+            choice.set_selected(1 if cid == self.config["ring_button"] else self.choice_ids.index(binding) + 2 if binding else 0)
         self.action_choice.set_model(Gtk.StringList.new(labels))
         self.action_choice.set_selected(self.choice_ids.index(self.selected_id))
         self.delete.set_sensitive(len(self.drafts) > 1)
@@ -579,7 +582,7 @@ class DesktopEditor(Adw.Window):
         for choice in self.ring_choices + [self.action_choice]:
             choice.get_model().splice(index, 1, [label])
         for _cid, choice in self.binding_choices:
-            choice.get_model().splice(index + 1, 1, [label])
+            choice.get_model().splice(index + 2, 1, [label])
         for _row, choices in self.group_choices:
             for choice in choices:
                 choice.get_model().splice(index + 1, 1, [label])
@@ -607,12 +610,21 @@ class DesktopEditor(Adw.Window):
         if self.loading:
             return
         selected = choice.get_selected()
-        if selected == 0:
-            self.config["button_bindings"].pop(str(cid), None)
-        elif selected <= len(self.choice_ids):
-            self.config["button_bindings"][str(cid)] = self.choice_ids[selected - 1]
-        else:
+        if selected > len(self.choice_ids) + 1:
             return
+        value = None if selected == 0 else SHOW_RING if selected == 1 else self.choice_ids[selected - 2]
+        current = SHOW_RING if cid == self.config["ring_button"] else self.config["button_bindings"].get(str(cid))
+        if value == current:
+            return
+        try:
+            set_button_assignment(self.config, cid, value, root=True)
+        except RuntimeError as exc:
+            self.error.set_text(str(exc))
+            self.error.set_visible(True)
+            self._refresh_choices()
+            return
+        self.trigger_row.set_subtitle(BUTTON_NAMES.get(self.config["ring_button"], "Manual only · use Open Actions Ring"))
+        self._refresh_choices()
         self._mark_dirty()
 
     def _group_changed(self, _choice, _param, index):
@@ -760,7 +772,8 @@ class DesktopEditor(Adw.Window):
                          else json.loads(draft["steps_text"]))
             except (ValueError, RecursionError) as exc:
                 raise _DraftError(original_id, f"Cannot read steps for {draft['label'] or original_id}: {exc}") from exc
-            action = {"label": draft["label"], "steps": steps}
+            action = {**deepcopy(self.config["actions"].get(original_id, {})), "label": draft["label"], "steps": steps}
+            action.pop("app_id", None)
             if draft["app_id"]:
                 action["app_id"] = draft["app_id"]
             try:
@@ -878,6 +891,6 @@ def present_desktop_editor(parent, store, on_saved, cid=None, page="ring"):
         target = next((choice for key, choice in window.binding_choices if key == cid), window.ring_preview)
         if page == "ring":
             window.connect("map", lambda *_: target.grab_focus())
-        window.window_title.set_subtitle(f"Configure {BUTTON_NAMES.get(cid, f'button {cid}')}")
+        window.window_title.set_subtitle(f"Default/root assignment · {BUTTON_NAMES.get(cid, f'button {cid}')}")
     window.present()
     return window

@@ -5,7 +5,7 @@ This module only builds and routes widgets; no animation performs device I/O.
 """
 from pathlib import Path
 
-from .actions import resolve_config
+from .actions import SHOW_RING, resolve_config
 from .gtk_support import Adw, Gdk, Gtk
 from .mouse_view import ASSETS, BUTTONS, ModelPicture, MouseView
 from gi.repository import Pango
@@ -235,6 +235,14 @@ class ReferenceShell:
         self.preference_widgets[('appearance', None)] = (row, handler, lambda value, row=row: row.set_selected(names.index(value)))
         appearance.add(row)
         body.append(appearance)
+        assignments = Adw.PreferencesGroup(title='Actions Ring')
+        adapt = Adw.SwitchRow(title='Adapt to App', subtitle='Use the active application profile; otherwise use General assignments.',
+                             active=(self.window.desktop.config or {}).get('adapt_to_app', True),
+                             sensitive=self.window.desktop.config is not None)
+        handler = adapt.connect('notify::active', lambda widget, _p: self.window.save_local_preference('adapt_to_app', widget.get_active()))
+        self.preference_widgets[('adapt_to_app', None)] = (adapt, handler, adapt.set_active)
+        assignments.add(adapt)
+        body.append(assignments)
         help_group = Adw.PreferencesGroup(title='Help')
         row = Adw.ActionRow(title='Learn your mouse', subtitle='An optional guide to controls and local actions.')
         row.add_suffix(button('Open guide', lambda: self.window.navigate('guide')))
@@ -326,7 +334,7 @@ class ReferenceShell:
             # Display native functions while preserving the invalid document.
             # This is a UI-only unavailable state, never a runtime config.
             return {'actions': {}, 'button_bindings': {}, 'ring_button': None}
-        return resolve_config(self.window.desktop.config, self.context_app)
+        return resolve_config(self.window.desktop.config, self.context_app, for_editing=True)
 
     def update_devices(self, result):
         self.device_result = result
@@ -530,20 +538,18 @@ class ReferenceShell:
             group.add(Adw.ActionRow(title='Configuration unavailable', subtitle='Fix or import a valid local action configuration before assigning shortcuts.'))
             body.append(group)
             return
-        if cid == config['ring_button']:
-            row = Adw.ActionRow(title='Show Actions Ring', subtitle='Press the haptic panel to open the ring.')
-            row.add_suffix(button('Customize', lambda: self.window.desktop.configure(cid=cid)))
-        else:
-            row = Adw.ActionRow(title='Smart Action', subtitle='Default keeps the built-in mouse function.')
-            keys = [None, *config['actions']]
-            dropdown = bounded_dropdown(['Default', *[config['actions'][key]['label'] for key in keys[1:]]],
-                                        accessible_name=f'Local assignment for {BUTTONS[cid][0]}', max_chars=16)
-            assigned = config['button_bindings'].get(str(cid))
-            dropdown.set_selected(keys.index(assigned) if assigned in keys else 0)
-            dropdown.update_property([Gtk.AccessibleProperty.LABEL], [f'Local assignment for {BUTTONS[cid][0]}'])
-            dropdown.connect('notify::selected', lambda widget, _p: self.window.save_button_assignment(cid, keys[widget.get_selected()], self.context_app))
-            row.add_suffix(dropdown)
-            self.binding_widgets[cid] = (dropdown, keys)
+        row = Adw.ActionRow(title='Local action', subtitle='Default keeps the built-in mouse function.')
+        keys = [None, SHOW_RING, *config['actions']]
+        dropdown = bounded_dropdown(['Default', 'Show Actions Ring', *[action['label'] for action in config['actions'].values()]],
+                                    accessible_name=f'Local assignment for {BUTTONS[cid][0]}', max_chars=16)
+        assigned = SHOW_RING if cid == config['ring_button'] else config['button_bindings'].get(str(cid))
+        dropdown.set_selected(keys.index(assigned) if assigned in keys else 0)
+        def changed(widget, _param):
+            if not getattr(self, 'updating_bindings', False) and widget.get_selected() < len(keys):
+                self.window.save_button_assignment(cid, keys[widget.get_selected()], self.context_app)
+        dropdown.connect('notify::selected', changed)
+        row.add_suffix(dropdown)
+        self.binding_widgets[cid] = (dropdown, keys)
         group.add(row)
         body.append(group)
 
@@ -715,6 +721,14 @@ class ReferenceShell:
             self.art.spin()
 
     def update_readback(self):
+        config = self.effective_config()
+        self.updating_bindings = True
+        try:
+            for cid, (dropdown, keys) in getattr(self, 'binding_widgets', {}).items():
+                assigned = SHOW_RING if cid == config['ring_button'] else config['button_bindings'].get(str(cid))
+                dropdown.set_selected(keys.index(assigned) if assigned in keys else 0)
+        finally:
+            self.updating_bindings = False
         if self.art and self.window.current:
             specs = self.callout_specs()
             self.update_force_state()
@@ -743,7 +757,7 @@ class ReferenceShell:
         if self.window.desktop.config is None:
             return
         config = self.window.desktop.config
-        defaults = {'appearance': 'dark', 'haptic_feedback': True, 'haptic_power_save': False}
+        defaults = {'appearance': 'dark', 'haptic_feedback': True, 'haptic_power_save': False, 'adapt_to_app': True}
         for (name, subkey), (widget, handler, setter) in self.preference_widgets.items():
             value = config.get(name, defaults.get(name)) if subkey is None else config.get(name, {}).get(subkey, subkey == 'hover')
             widget.handler_block(handler)
