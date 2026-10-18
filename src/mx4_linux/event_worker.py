@@ -288,7 +288,7 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
                     try:
                         _play_haptic(dev, api, command.get("waveform"), haptic)
                     except ValueError as error:
-                        emit({"type": "error", "message": str(error)})
+                        emit({"type": "warning", "source": "haptic", "message": str(error)})
                 elif command.get("op") == "configure":
                     if (set(command) != {"op", "config_id", "controls", "ring_button", "raw_xy"}
                             or type(command.get("config_id")) is not int

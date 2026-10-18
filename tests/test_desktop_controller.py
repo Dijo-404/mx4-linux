@@ -463,3 +463,70 @@ def test_feedback_rejects_device_selection_changed_while_session_ready(runtime):
     runtime.window.current['id'] = 'replacement-device'
     runtime.feedback('hover')
     runtime.session.feedback.assert_not_called()
+
+
+def test_unsupported_feedback_warning_keeps_real_worker_context_transitions_alive(runtime):
+    """Exercise the worker protocol, including native restore after the warning."""
+    import struct
+
+    from test_event_worker import INDEX, add_control, run, setup_session
+
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    runtime.observer = SimpleNamespace(stop=Mock())
+    observer = runtime.observer
+    setting = SimpleNamespace(choices=[0], write=Mock())
+    api.settings_templates.SETTINGS = [SimpleNamespace(name='haptic-play')]
+    api.settings_templates.check_feature.return_value = setting
+    commands.put({'op': 'haptic', 'waveform': 1})
+    config_id, reads = 0, 0
+
+    def configure(config):
+        nonlocal config_id
+        config_id += 1
+        commands.put({'op': 'configure', 'config_id': config_id,
+            'controls': sorted({config['ring_button'], *map(int, config['button_bindings'])}),
+            'ring_button': config['ring_button'], 'raw_xy': True})
+        return config_id
+
+    def emit(event):
+        events.append(event)
+        runtime.event(event)
+
+    class Events:
+        append = staticmethod(emit)
+
+    def read(*_args):
+        nonlocal reads
+        reads += 1
+        if reads == 1:
+            assert runtime.error is None
+            observer.stop.assert_not_called()
+            assert runtime._context_token == 0
+            runtime.event({'type': 'context', 'context': {'app_id': 'editor', 'window_id': 7}, 'context_token': 0})
+        elif reads == 2:
+            assert dev.reporting[82] == before[82]
+            assert dev.reporting[83][0] & 1
+            observer.stop.assert_not_called()
+            return 17, 255, bytes([INDEX, 0]) + struct.pack('!4H', 83, 0, 0, 0) + b'\0' * 8
+        else:
+            assert runtime.execute.call_args.args == ('paste',)
+            commands.put({'op': 'stop'})
+
+    runtime.session.configure.side_effect = configure
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, Events(), controls=[82, 416])
+    assert any(e['type'] == 'warning' and e['source'] == 'haptic' for e in events)
+    assert dev.reporting == before
+    setting.write.assert_not_called()
+
+
+def test_fatal_integration_error_requests_restoration_and_stops_observation(runtime):
+    runtime.observer = SimpleNamespace(stop=Mock())
+    observer = runtime.observer
+    runtime.event({'type': 'error', 'message': 'Device did not acknowledge haptic playback'})
+    runtime.session.stop.assert_called_once()
+    observer.stop.assert_called_once()
+    assert runtime.error == 'Device did not acknowledge haptic playback'
+    assert runtime._context_token == 1
