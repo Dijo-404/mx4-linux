@@ -2,6 +2,7 @@
 
 from time import monotonic
 from types import SimpleNamespace
+import math
 
 import pytest
 
@@ -33,9 +34,11 @@ def preview(monkeypatch):
     settings.set_property("gtk-enable-animations", True)
     window.show_ring(default_config(), preview=True)
     window.allocate(ring.WIDTH, ring.HEIGHT, -1, None)
+    window.mapped()  # Simulate map without presenting a desktop overlay.
     yield SimpleNamespace(window=window, selected=selected, dismissed=dismissed, settings=settings)
     settings.set_property("gtk-enable-animations", original_motion)
     window.hide_ring()
+    window.unmapped()
     window.destroy()
 
 
@@ -50,7 +53,7 @@ def main_position(window, index):
 
 
 def settle(window):
-    for transition in (window.reveal, window.group_reveal, window.label_reveal):
+    for transition in window.transitions():
         transition.move(transition.target, animate=False)
     window.apply_frame(monotonic())
 
@@ -255,7 +258,7 @@ def test_reduced_motion_snaps_all_transitions_and_reopen_leaves_no_tick(preview)
     assert window.tick_id == 0
     assert window.surface.get_opacity() == 1
     assert window.spread == 1
-    for transition in (window.reveal, window.group_reveal, window.label_reveal):
+    for transition in window.transitions():
         assert not transition.active()
         assert transition.value() == transition.target
     assert all(window.child_buttons[index].get_opacity() == 1 for index in range(2))
@@ -264,6 +267,24 @@ def test_reduced_motion_snaps_all_transitions_and_reopen_leaves_no_tick(preview)
     assert window.surface.get_opacity() == 1
     assert window.group_slot is None
     assert not window.child_positions
+
+
+def test_unshown_popup_has_no_global_settings_handler_and_unmap_releases_it(preview):
+    window = ring.ActionsRing(None, lambda *_: None, lambda: None)
+    settings = preview.settings
+    try:
+        assert window._settings_handler == 0
+        window.mapped()
+        handler = window._settings_handler
+        assert handler and settings.handler_is_connected(handler)
+        window.mapped()
+        assert window._settings_handler == handler
+        window.unmapped()
+        assert window._settings_handler == 0
+        assert not settings.handler_is_connected(handler)
+    finally:
+        window.unmapped()
+        window.destroy()
 
 
 def test_group_accessibility_does_not_leave_expandable_state_on_regular_actions(preview):
@@ -288,7 +309,7 @@ def test_finite_group_animation_stops_after_all_transitions_finish(preview, monk
     window = show_group(preview)
     window.commit(2)
     assert window.tick_id
-    deadline = max(t.started + t.duration for t in (window.reveal, window.group_reveal, window.label_reveal)) + .01
+    deadline = max(t.started + t.duration for t in window.transitions()) + .01
     monkeypatch.setattr(ring, "monotonic", lambda: deadline)
     window.stop_animation()  # The unmapped fixture has no frame clock to invoke the registered callback.
     assert window.tick(None, None) is False
@@ -548,3 +569,85 @@ def test_switching_group_cancels_captured_child_before_more_adjustment(preview):
     window.open_group(3)
     window.pointer_drag(None, 22, 0)
     assert adjusted == [('copy', 'increase', False)]
+
+
+@pytest.mark.parametrize("elapsed", [0, .03, .10, .22])
+def test_opening_targets_are_visible_and_stay_at_their_final_positions(preview, elapsed):
+    window = preview.window
+    positions = [window.labels.get_child_position(button) for button in window.buttons]
+    window.apply_frame(window.reveal.started + elapsed)
+    assert window.surface.get_opacity() == 1
+    for index, button in enumerate(window.buttons):
+        dx, dy = button_center(index)
+        x, y = ring.CENTER_X + dx, ring.CENTER_Y + dy
+        assert window.pointer_target(x, y) == ("root", index)
+        assert .72 <= button.get_opacity() <= 1
+        assert window.labels.get_child_position(button) == positions[index]
+    window.pointer_click(None, 1, ring.CENTER_X, ring.CENTER_Y - 116)
+    assert preview.selected == [("overview", True)]
+
+
+def test_pointer_and_keyboard_share_the_traveling_orbit_marker(preview):
+    window = preview.window
+    window.pointer_motion(None, *main_position(window, 0))
+    settle(window)
+    assert window.orbit.selected == 0
+    window.key_pressed(None, Gdk.KEY_Left, 0, 0)
+    assert window.orbit.selected == 7
+    assert window.orbit.angle.target == pytest.approx(-math.pi / 4)
+    window.pointer_motion(None, *main_position(window, 6))
+    assert window.orbit.selected == 6
+    assert window.orbit.angle.active()
+
+
+def test_captured_press_feedback_clears_on_cancel_and_never_moves_targets(preview):
+    window = preview.window
+    settle(window)
+    position = main_position(window, 1)
+    before = window.labels.get_child_position(window.buttons[1])
+    window.pointer_press(None, 1, *position)
+    assert window.buttons[1].has_css_class("pressed")
+    window.apply_frame(monotonic())
+    assert window.labels.get_child_position(window.buttons[1]) == before
+    assert window.pointer_target(*position) == ("root", 1)
+    window.cancel_pointer()
+    assert not window.buttons[1].has_css_class("pressed")
+    assert not preview.selected
+
+
+def test_held_motion_tracks_selection_and_hiding_clears_orbit_and_callbacks(preview):
+    window = preview.window
+    window.show_ring(default_config(), held=True, preview=True)
+    window.motion(100, 0)
+    assert window.orbit.selected == window.state.selected == 2
+    assert window.state.x > 0
+    window.hide_ring()
+    assert window.orbit.selected is None
+    assert window.orbit.opacity.value() == 0
+    assert not window.tick_id
+
+
+def test_child_selection_keeps_orbit_pointing_to_its_group_parent(preview):
+    window = show_group(preview)
+    window.commit(2)
+    settle(window)
+    window.focus_child(1)
+    assert window.orbit.selected == 2
+    assert not window.orbit.angle.active()
+    window.key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert window.orbit.selected == 2
+
+
+def test_tick_caps_paint_work_at_sixty_fps_without_extending_duration(preview, monkeypatch):
+    window = preview.window
+    start = window.reveal.started
+    painted = []
+    monkeypatch.setattr(window, "apply_frame", lambda now: painted.append(now))
+    window.stop_animation()
+    for elapsed in (0, .005, .010, .017):
+        monkeypatch.setattr(ring, "monotonic", lambda elapsed=elapsed: start + elapsed)
+        assert window.tick(None, None)
+    assert painted == [start, start + .017]
+    monkeypatch.setattr(ring, "monotonic", lambda: start + 1)
+    assert not window.tick(None, None)
+    assert painted[-1] == start + 1
