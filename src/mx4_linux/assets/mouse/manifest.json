@@ -1,0 +1,195 @@
+{
+  "source": {
+    "path": "/home/dj/Downloads/mxmaster4mac-whitesilver-ar-360.glb",
+    "bytes": 10097632,
+    "sha256": "305d2b776c0c0d064406253e13c9f222b01b55abf68667bb93ceb588e4e4fd35",
+    "provenance": "User supplied file; glTF generator Adobe Substance 3D Painter 11.0.3. No asset license embedded; do not infer redistribution license.",
+    "asset_is_static": true
+  },
+  "tooling": {
+    "version": "0.186.1",
+    "source": "https://registry.npmjs.org/three/-/three-0.186.1.tgz",
+    "sha256": "8cd068708ea44f2c73c944b1cead2ba2f0d5c15c8fc194e5700f4e4f4a033fe7",
+    "npm_dist_integrity": "sha512-blFeqb49wRCSGUGj7gtpfnSGHy2lwDk94RhUmS1c/hTby70kvChbWpkJ4Pm1390LqzzvTmzgXKHPEafJwCb8jA==",
+    "browser": "/home/dj/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
+    "playwright_core": "/home/dj/.npm/_npx/420ff84f11983ee5/node_modules/playwright-core/index.mjs",
+    "renderer": "Three.js WebGLRenderer with Chromium SwiftShader, 768 square, antialias true, alpha true, preserveDrawingBuffer true",
+    "network_during_render": "Only loopback HTTP; Playwright blocks every non-loopback request. All model images embedded.",
+    "color": "SRGBColorSpace output; ACESFilmicToneMapping; exposure 1.0",
+    "lighting": "RoomEnvironment PMREM.fromScene(room,0.04), no background/floor/directional lights"
+  },
+  "cameras": {
+    "common": {
+      "projection": "orthographic",
+      "target_world_m": [
+        -0.012176563841295153,
+        0.02488879603248281,
+        -0.0018088902677734324
+      ],
+      "extent_m": 0.17,
+      "near": 0.001,
+      "far": 10,
+      "up": [
+        0,
+        1,
+        0
+      ]
+    },
+    "overview": {
+      "offset_world_m": [
+        -0.15,
+        0.23,
+        0.13
+      ],
+      "camera_roll_rad": 1.047198
+    },
+    "underside": {
+      "offset_world_m": [
+        -0.04,
+        -0.3,
+        0.07
+      ],
+      "camera_roll_rad": 3.14159265
+    }
+  },
+  "wheel_motion": {
+    "authored": true,
+    "provided_animation_tracks": 0,
+    "pivot_source_mm": [
+      -1.5095460414886475,
+      33.2052001953125,
+      21.771628856658936
+    ],
+    "axis_source": [
+      1,
+      0,
+      0
+    ],
+    "triangles": 14878,
+    "attribute_handling": "Original geometry cloned including every attribute; triangle index subset only, positions translated by pivot; original PBR material reused; no mesh simplification.",
+    "angles_radians": [
+      0.0,
+      0.009053498504649087,
+      0.03464856187869068,
+      0.072359571140902,
+      0.11566595019608276,
+      0.15707963267948966,
+      0.18943981665824744,
+      0.20715113233938665,
+      0.20715113233938667,
+      0.18943981665824747,
+      0.15707963267948968,
+      0.11566595019608288,
+      0.07235957114090204,
+      0.034648561878690656,
+      0.009053498504649087,
+      6.722658724299221e-32
+    ],
+    "timeline": [
+      "overview.png",
+      "wheel-01.png",
+      "wheel-02.png",
+      "wheel-03.png",
+      "wheel-04.png",
+      "wheel-05.png",
+      "wheel-06.png",
+      "wheel-07.png",
+      "wheel-07.png",
+      "wheel-06.png",
+      "wheel-05.png",
+      "wheel-04.png",
+      "wheel-03.png",
+      "wheel-02.png",
+      "wheel-01.png",
+      "overview.png"
+    ],
+    "suggested_duration_ms": 450,
+    "timing_is_authored": true,
+    "finite": true,
+    "reduced_motion": "Use static overview.png",
+    "zero_angle_pixel_difference": 0,
+    "peak_difference_bounds": "49x73+413+215; only main wheel image region",
+    "limitation": "Full/negative rotation reveals dark authored wheel texture sector; deliberately bounded positive ~12 degree movement, no full spin."
+  },
+  "limitations": [
+    "Source underside contains static power green and channel 1 white indicators; real active host and battery state must come from fresh device metadata. Overlay registered dots if depicting live status.",
+    "Source underside text says MX Master 4 for Mac; supplied appearance model, no inference about connected hardware SKU.",
+    "Surface anchors are manually chosen pixels raycast to visible geometry, not semantic HID IDs.",
+    "No actual device behavior, input, host switch or app runtime integration was performed by this asset preparation."
+  ],
+  "files": [
+    {
+      "path": "overview.png",
+      "bytes": 204126,
+      "sha256": "64e889c941ef2955cd87fa3373972d96032d0785053a94a904fcb8c0549af045",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "377x557+168+124"
+    },
+    {
+      "path": "underside.png",
+      "bytes": 194813,
+      "sha256": "a3cc607acc8303c3870f5b2fc3b7ad63885f16ec205f6b6e27366561034bca18",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "458x517+124+99"
+    },
+    {
+      "path": "wheel-01.png",
+      "bytes": 204156,
+      "sha256": "645352279ef5c3176dd0db0980ebbed532420ae5893a376499e17588ebd33051",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "377x557+168+124"
+    },
+    {
+      "path": "wheel-02.png",
+      "bytes": 203970,
+      "sha256": "abb4073c0078e1e1a178045d5887aabc38ebb3096ddc7a936e7370276d655e9d",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "377x557+168+124"
+    },
+    {
+      "path": "wheel-03.png",
+      "bytes": 204130,
+      "sha256": "1b697784b781122fea00f79c0b547e9416509f22e6bbecf3fe2a7372820f8252",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "377x557+168+124"
+    },
+    {
+      "path": "wheel-04.png",
+      "bytes": 204078,
+      "sha256": "5dc991c7cf6ccd1040021fface2913a1cab0f2d9b881097562ed3f5fa5076098",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "377x557+168+124"
+    },
+    {
+      "path": "wheel-05.png",
+      "bytes": 204012,
+      "sha256": "67264c7700bdcc35a4e03b6cd8c4373e681aa6b91dd2926b7e9f8ef59a7f9f85",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "377x557+168+124"
+    },
+    {
+      "path": "wheel-06.png",
+      "bytes": 204038,
+      "sha256": "468c0974b6437fe03d0a7301d015e2dddd9e044d36ceb800ac66c4d432c92d66",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "377x557+168+124"
+    },
+    {
+      "path": "wheel-07.png",
+      "bytes": 203894,
+      "sha256": "ba0ec519236eab484226a6c0a36693ff01569cf99cc8d3db3ed5d93388631d40",
+      "width": 768,
+      "height": 768,
+      "alpha_bounds": "377x557+168+124"
+    }
+  ],
+  "total_png_bytes": 1827217
+}

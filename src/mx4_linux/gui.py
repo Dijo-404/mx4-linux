@@ -14,7 +14,7 @@ from .reporting_state import valid_identity
 
 class ControlWindow(Adw.ApplicationWindow):
     def __init__(self, app, demo=False):
-        super().__init__(application=app, title="MX4 Linux", default_width=820, default_height=820)
+        super().__init__(application=app, title="MX4 Linux", default_width=1100, default_height=800)
         self.demo = demo
         self.backend = DemoBackend() if demo else Backend()
         self.store = ProfileStore()
@@ -45,39 +45,31 @@ class ControlWindow(Adw.ApplicationWindow):
         except GLib.Error:
             pass  # Manual refresh remains available if monitoring is unavailable.
 
-        toolbar = Adw.ToolbarView()
-        header = Adw.HeaderBar()
-        title = Adw.WindowTitle(title="MX4 Linux", subtitle="Preview · no hardware access" if demo else "MX Master 4 controls")
-        header.set_title_widget(title)
+        self.route = "home"
+        self.selected_target = None
+        from .reference_shell import ReferenceShell
+        self.shell = ReferenceShell(self)
+        toolbar = self.shell.toolbar
+        self.stack = self.shell.stack
+        self.controls = self.shell.controls
+        self.profile_controls = self.shell.profile_controls
+        self.actions_box = self.shell.actions_box
+        # Artwork is installed with the first successful device read.
+        from .mouse_view import MouseView
+        self.wheel = MouseView(self.select_target)
+        self.shell.art = self.wheel
+        self.wheel.set_visible(False)
         self.refresh = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="Read device settings")
         self.refresh.connect("clicked", lambda *_: self.reload())
-        header.pack_end(self.refresh)
-        toolbar.add_top_bar(header)
-        self.stack = Gtk.Stack(vexpand=True, transition_type=Gtk.StackTransitionType.CROSSFADE,
-                               transition_duration=150)
-        switcher = Gtk.StackSwitcher(stack=self.stack, halign=Gtk.Align.CENTER,
-                                     margin_top=6, margin_bottom=6)
-        toolbar.add_top_bar(switcher)
-
-        mouse_page = self.add_page("mouse", "Mouse", "Your mouse, your way",
-                                   "Changes in this preview are simulated." if demo
-                                   else "Fine-tune your pointer, scrolling and haptic feedback.")
-        from .wheel import WheelPreview
-        self.wheel = WheelPreview()
-        self.wheel.set_visible(False)
-        mouse_page.append(self.wheel)
-        self.controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        mouse_page.append(self.controls)
-        self.actions_box = self.add_page("actions", "Actions", "A shortcut to your next move",
-                                         "Choose an action from the ring, or build a routine that does more in one press.")
-        self.profiles_box = self.add_page("profiles", "Profiles", "A setup for every task",
-                                          "Save your mouse settings, then switch between them when you need to.")
-        self.profile_controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-        self.profiles_box.append(self.profile_controls)
+        self.shell.header.pack_end(self.refresh)
         self.add_desktop_controls()
+        self.integration_warning = Adw.Banner(button_label="Review integration", revealed=False)
+        self.integration_warning.connect("button-clicked", lambda *_: self.navigate("actions"))
+        toolbar.add_top_bar(self.integration_warning)
 
-        status_bar = Gtk.Box(spacing=12, margin_start=24, margin_end=24,
-                             margin_top=12, margin_bottom=12)
+        status_bar = Gtk.Box(spacing=12, margin_start=18, margin_end=18,
+                             margin_top=8, margin_bottom=8)
+        status_bar.add_css_class("mx4-status")
         self.spinner = Gtk.Spinner(visible=False, valign=Gtk.Align.CENTER)
         status_bar.append(self.spinner)
         self.status = Gtk.Label(label="Reading connected devices…", xalign=0,
@@ -88,27 +80,10 @@ class ControlWindow(Adw.ApplicationWindow):
         self.cancel_device.connect("clicked", lambda *_: self.cancel_hardware())
         status_bar.append(self.cancel_device)
         toolbar.add_bottom_bar(status_bar)
-        toolbar.set_content(self.stack)
         self.toasts = Adw.ToastOverlay(child=toolbar)
         self.set_content(self.toasts)
         self.reload()
         self.battery_source = GLib.timeout_add_seconds(30, self.refresh_battery)
-
-    def add_page(self, name, title, heading, description):
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24,
-                       margin_start=24, margin_end=24, margin_top=24, margin_bottom=24)
-        intro = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        label = Gtk.Label(label=heading, xalign=0, wrap=True)
-        label.add_css_class("title-1")
-        intro.append(label)
-        detail = Gtk.Label(label=description, xalign=0, wrap=True)
-        detail.add_css_class("dim-label")
-        intro.append(detail)
-        page.append(intro)
-        clamp = Adw.Clamp(maximum_size=760, tightening_threshold=620, child=page)
-        scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True, child=clamp)
-        self.stack.add_titled(scroll, name, title)
-        return page
 
     def on_close(self, *_):
         self.closed = True
@@ -119,6 +94,7 @@ class ControlWindow(Adw.ApplicationWindow):
             GLib.source_remove(self.battery_source)
             self.battery_source = 0
         self.wheel.stop()
+        self.shell.close()
         self.desktop.close()
         if self.device_refresh_source:
             GLib.source_remove(self.device_refresh_source)
@@ -229,14 +205,119 @@ class ControlWindow(Adw.ApplicationWindow):
 
     def clear_controls(self):
         self.setting_widgets.clear()
+        self.shell.inspector = None
+        self.shell.targets = {}
         while child := self.controls.get_first_child():
             self.controls.remove(child)
+
+    def navigate(self, route):
+        from .reference_shell import TITLES
+        if route not in TITLES:
+            raise ValueError("Unknown page")
+        self.route = route
+        self.selected_target = None
+        self.shell.update_route()
+
+    def select_target(self, target):
+        if not self.current or not self.current.get("online") or target not in self.shell.targets:
+            return
+        self.selected_target = target
+        self.shell.update_route()
+        self.shell.inspector_stack.child_focus(Gtk.DirectionType.TAB_FORWARD)
+
+    def close_inspector(self):
+        self.selected_target = None
+        if self.route in ("settings", "easy-switch"):
+            self.navigate("buttons")
+        else:
+            self.shell.update_route()
+
+    def go_back(self):
+        if self.selected_target:
+            self.close_inspector()
+        else:
+            self.navigate("home")
+
+    def add_device(self):
+        self.navigate("home")
+        self.status.set_text("Pair in your desktop's Bluetooth settings or connect a Logi Bolt receiver, then wake the mouse. Checking connected devices…")
+        self.reload()
+
+    def open_support(self):
+        launcher = Gtk.UriLauncher.new("https://github.com/Dijo-404/mx4-linux#readme")
+        launcher.launch(self, None, None, None)
+
+    def save_local_preference(self, name, value, subkey=None):
+        if self.desktop.config is None:
+            self.status.set_text(self.desktop.error or "Local action configuration is unavailable.")
+            return
+        if self.busy or self.pending_hardware or self.closed:
+            self.shell.sync_local_preferences()
+            return
+        document = deepcopy(self.desktop.config)
+        if subkey is None:
+            document[name] = value
+        else:
+            document.setdefault(name, {})[subkey] = value
+        def saved(_result):
+            self.desktop.reload_config()
+            self.desktop._configure_context()
+            self.shell.sync_local_preferences()
+            if name == "appearance":
+                self.shell.apply_appearance(value)
+            self.shell.update_readback()
+            self.status.set_text("Local preference saved.")
+        def failed(error):
+            self.shell.sync_local_preferences()
+            self.status.set_text(error)
+        self.job(lambda: self.desktop.store.save(document), saved, "Saving local preference…", failed=failed)
+
+    def save_button_assignment(self, cid, action_id, app_id=None):
+        if self.desktop.config is None:
+            self.status.set_text(self.desktop.error or "Local action configuration is unavailable.")
+            return
+        if self.busy or self.pending_hardware or self.closed:
+            return
+        self.desktop.stop()
+        document = deepcopy(self.desktop.config)
+        active = document.get("active_profiles", {})
+        profile_id = active.get(app_id) or active.get("*")
+        target = document["assignment_profiles"][profile_id] if profile_id else document
+        if action_id is None:
+            target["button_bindings"].pop(str(cid), None)
+        else:
+            target["button_bindings"][str(cid)] = action_id
+        def saved(_result):
+            self.desktop.reload_config()
+            self.shell.update_readback()
+            self.status.set_text("Local assignment saved. Enable mouse integration to use it.")
+        def failed(error):
+            self.status.set_text(error)
+            self.render_workspace()
+        self.job(lambda: self.desktop.store.save(document), saved, "Saving local assignment…", failed=failed)
+
+    def desktop_config_changed(self):
+        self.shell.update_context()
+        if self.current and self.current.get("online"):
+            self.render_workspace()
+
+    def render_workspace(self):
+        self.clear_controls()
+        self.shell.binding_widgets = {}
+        self.shell.build_workspace()
+        if self.selected_target not in self.shell.targets:
+            self.selected_target = None
+        self.shell.update_route()
+        self.update_wheel()
 
     def render(self, result):
         self.clear_controls()
         self.current = None
         self.wheel.set_visible(False)
         if not self.devices:
+            self.selected_target = None
+            self.shell.inspector = None
+            self.shell.targets = {}
             denied = any(d.get("permission_denied") for d in result.get("diagnostics", []))
             title = "Allow access to your mouse" if denied else "Connect an MX Master 4"
             detail = "Apply device access with ./scripts/install-udev-rule.sh, then click Check again." if denied else "Connect with a Logi Bolt receiver or Bluetooth, wake the mouse, then refresh."
@@ -248,53 +329,25 @@ class ControlWindow(Adw.ApplicationWindow):
             self.controls.append(empty)
             diagnostics = "\n".join(f"{d.get('path', '')}: {d['message']}" for d in result.get("diagnostics", []))
             self.status.set_text(diagnostics or "No accessible MX Master 4 found.")
-            self.add_profiles()
-            self.update_desktop_status()
-            return
-
-        self.current = next((d for d in self.devices if d["id"] == self.selected_id), self.devices[0])
-        self.selected_id = self.current["id"]
-        device_group = Adw.PreferencesGroup(title="Device")
-        chooser = Gtk.DropDown.new_from_strings([d["name"] for d in self.devices])
-        chooser.set_selected(self.devices.index(self.current))
-        chooser.set_valign(Gtk.Align.CENTER)
-        row = Adw.ActionRow(use_markup=False, title=self.current["name"], subtitle=self.current.get("battery") or "Battery unavailable")
-        row.add_prefix(Gtk.Image(icon_name="input-mouse-symbolic", pixel_size=32))
-        if len(self.devices) > 1:
-            row.add_suffix(chooser)
-            chooser.connect("notify::selected", self.select_device, result)
-        device_group.add(row)
-        self.controls.append(device_group)
-        if not self.current.get("online"):
-            self.status.set_text("Mouse is asleep or offline. Wake it and refresh.")
-            self.add_profiles()
-            self.update_desktop_status()
-            return
-
-        self.wheel.set_visible(True)
-        self.update_wheel()
-
-        groups = {}
-        names = [("Pointer and scrolling", ("dpi", "smart-shift", "scroll-", "hires-", "thumb-")),
-                 ("Haptic feedback", ("haptic-", "force-sensing")), ("Buttons", ("reprogrammable-keys",))]
-        for setting in self.current["settings"]:
-            group_name = next((title for title, prefixes in names if setting["name"].startswith(prefixes)), "Device settings")
-            if group_name not in groups:
-                group = Adw.PreferencesGroup(title=group_name)
-                groups[group_name] = group
-                self.controls.append(group)
-            self.add_setting(groups[group_name], setting)
-        if not self.current["settings"]:
-            self.controls.append(Gtk.Label(label="The mouse did not report any supported settings. Wake it and refresh.", wrap=True))
-
-        self.add_device_policies()
+        else:
+            self.current = next((d for d in self.devices if d["id"] == self.selected_id), self.devices[0])
+            self.selected_id = self.current["id"]
+            if not self.current.get("online"):
+                self.selected_target = None
+                self.shell.inspector = None
+                self.shell.targets = {}
+                self.controls.append(Adw.StatusPage(title="Wake your mouse", description="The mouse is asleep or offline. Wake it and refresh.", icon_name="input-mouse-symbolic"))
+                self.status.set_text("Mouse is asleep or offline. Wake it and refresh.")
+            else:
+                self.render_workspace()
+                self.wheel.set_visible(True)
+                diagnostic_text = " · ".join(d["message"] for d in result.get("diagnostics", []))
+                self.status.set_text("Preview · all changes are simulated" if self.demo else f"{len(self.current['settings'])} settings reported. Changes apply after confirmed readback." + (f" {diagnostic_text}" if diagnostic_text else ""))
+        self.shell.update_home()
+        self.shell.update_context()
+        self.shell.update_route()
         self.add_profiles()
         self.update_desktop_status()
-        diagnostic_text = " · ".join(d["message"] for d in result.get("diagnostics", []))
-        if self.demo:
-            self.status.set_text("Demo mode · all changes are simulated")
-        else:
-            self.status.set_text(f"{len(self.current['settings'])} settings reported by your mouse. Changes apply immediately." + (f" {diagnostic_text}" if diagnostic_text else ""))
 
     def add_desktop_controls(self):
         group = Adw.PreferencesGroup(title="Actions Ring and Smart Actions",
@@ -332,6 +385,14 @@ class ControlWindow(Adw.ApplicationWindow):
         self.update_desktop_status()
 
     def update_desktop_status(self):
+        if hasattr(self, "shell"):
+            self.shell.update_home()
+        if hasattr(self, "integration_warning"):
+            uncertain = (self.desktop.session.process is not None and not self.desktop.session.running
+                         and not self.desktop.session.stopping and self.desktop.restoration_confirmed is not True)
+            blocked = bool(self.desktop.error or self.desktop.reacquire_blocked or uncertain)
+            self.integration_warning.set_title(self.desktop.message)
+            self.integration_warning.set_revealed(blocked)
         if self.desktop_status:
             self.desktop_status.set_subtitle(self.desktop.message)
         if self.desktop_toggle:
@@ -349,6 +410,7 @@ class ControlWindow(Adw.ApplicationWindow):
             self.hardware_cancelled.set()
             self.desktop.stop()
             self.selected_id = self.devices[index]["id"]
+            self.selected_target = None
             self.render(result)
 
     def add_setting(self, group, setting):
@@ -374,20 +436,63 @@ class ControlWindow(Adw.ApplicationWindow):
             self.setting_widgets[(setting["name"], None)] = (widget, handler, widget.set_active)
             row.set_activatable_widget(widget)
         elif kind == "range":
-            box = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER)
+            # Inspector width is about a third of the window. Stack range
+            # labels above their editor instead of squeezing text beside it.
+            row = Adw.PreferencesRow()
+            content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
+                              margin_start=14, margin_end=14, margin_top=12, margin_bottom=12)
+            heading = Gtk.Label(label=setting["label"], xalign=0, wrap=True)
+            heading.add_css_class("heading")
+            content.append(heading)
+            if setting.get("description"):
+                detail = Gtk.Label(label=setting["description"], xalign=0, wrap=True)
+                detail.add_css_class("dim-label")
+                content.append(detail)
+            scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, setting["minimum"], setting["maximum"], 1)
+            scale.set_draw_value(False)
+            scale.set_round_digits(0)
+            scale.set_value(value if value is not None else setting["minimum"])
+            scale.set_sensitive(value is not None)
+            scale.update_property([Gtk.AccessibleProperty.LABEL], [setting["label"] + " draft value"])
+            content.append(scale)
+            box = Gtk.Box(spacing=8)
             widget = Gtk.SpinButton.new_with_range(setting["minimum"], setting["maximum"], 1)
             widget.set_value(value if value is not None else setting["minimum"])
             widget.set_sensitive(value is not None)
             widget.update_property([Gtk.AccessibleProperty.LABEL], [setting["label"]])
-            self.setting_widgets[(setting["name"], None)] = (widget, None, widget.set_value)
+            scale.connect("value-changed", lambda slider: widget.set_value(slider.get_value()))
+            widget.connect("value-changed", lambda spin: scale.set_value(spin.get_value()))
+            confirmed = Gtk.Label(label=f"Current: {value}" if value is not None else "Current value unavailable",
+                                  xalign=0, wrap=True, hexpand=True)
+            confirmed.add_css_class("dim-label")
+            def update(confirmed_value):
+                widget.set_value(confirmed_value)
+                confirmed.set_text(f"Current: {confirmed_value}")
+            self.setting_widgets[(setting["name"], None)] = (widget, None, update)
             apply_button = Gtk.Button(label="Apply", sensitive=value is not None)
             apply_button.set_tooltip_text(f"Apply {setting['label'].lower()}")
             apply_button.connect("clicked", lambda *_, spin=widget: self.change(setting, spin.get_value_as_int()))
+            content.append(confirmed)
+            widget.set_hexpand(True)
             box.append(widget)
             box.append(apply_button)
-            widget = box
+            content.append(box)
+            row.set_child(content)
+            group.add(row)
+            return
         elif kind == "choice":
             widget = self.choice(setting, setting["choices"], value)
+            if setting["name"] == "haptic-play":
+                row = Adw.PreferencesRow()
+                content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
+                                  margin_start=14, margin_end=14, margin_top=12, margin_bottom=12)
+                heading = Gtk.Label(label=setting["label"], xalign=0, wrap=True)
+                heading.add_css_class("heading")
+                content.append(heading)
+                content.append(widget)
+                row.set_child(content)
+                group.add(row)
+                return
         else:
             return
         widget.update_property([Gtk.AccessibleProperty.LABEL], [setting["label"]])
@@ -395,7 +500,11 @@ class ControlWindow(Adw.ApplicationWindow):
         group.add(row)
 
     def choice(self, setting, choices, value, key=None):
-        dropdown = Gtk.DropDown.new_from_strings([c["label"] for c in choices])
+        labels = [c["label"] for c in choices]
+        if setting["name"] == "reprogrammable-keys":
+            names = {82: "Middle button", 83: "Back", 86: "Forward", 195: "Gesture button", 196: "Shift wheel mode", 416: "Haptic panel"}
+            labels = [names.get(c["value"], c["label"]) if c["label"] == str(c["value"]) else c["label"] for c in choices]
+        dropdown = Gtk.DropDown.new_from_strings(labels)
         dropdown.set_enable_search(True)
         dropdown.set_valign(Gtk.Align.CENTER)
         dropdown.set_selected(next((i for i, c in enumerate(choices) if c["value"] == value), Gtk.INVALID_LIST_POSITION))
@@ -452,6 +561,7 @@ class ControlWindow(Adw.ApplicationWindow):
                     item["value"] = result
                 self.sync_setting(item, key if name == setting["name"] else None)
             self.update_wheel()
+            self.shell.update_readback()
             if self.demo and setting["name"] != "haptic-play":
                 try:
                     self.remembered.update_confirmed(device["stable_id"], confirmed, key=key, demo=True)
@@ -545,6 +655,7 @@ class ControlWindow(Adw.ApplicationWindow):
             if self.current and self.current.get("stable_id") == identity and self.current["id"] == device_id:
                 for name in ("battery", "battery_percent", "battery_observed_at"):
                     self.current[name] = result.get(name)
+                self.shell.update_home()
         def failed(_message):
             loaded({})
         self.job(lambda: self.backend.battery(device_id, identity), loaded, "Reading battery…", failed=failed)
@@ -598,6 +709,9 @@ class ControlWindow(Adw.ApplicationWindow):
                  "Updating remembered settings…", failed=lambda error: self.reload(error))
 
     def set_resume_integration(self, enabled):
+        if self.desktop.config is None:
+            self.status.set_text(self.desktop.error or "Local action configuration is unavailable.")
+            return
         if self.closed or self.busy:
             return
         document = deepcopy(self.desktop.config)
@@ -635,9 +749,11 @@ class ControlWindow(Adw.ApplicationWindow):
             self.job(work, lambda result: self.status.set_text(result["message"]), "Requesting computer switch…")
         self.desktop.wait_stopped(stopped, preserve_intent=True)
 
-    def add_device_policies(self):
+    def add_device_policies(self, parent=None, host_parent=None):
+        parent = parent or self.controls
+        host_parent = host_parent or parent
         group = Adw.PreferencesGroup(title="Remember and reconnect")
-        self.controls.append(group)
+        parent.append(group)
         valid = valid_identity(self.current.get("stable_id"))
         try:
             remembered = self.remembered.get(self.current, demo=self.demo) is not None
@@ -647,7 +763,7 @@ class ControlWindow(Adw.ApplicationWindow):
         row = Adw.SwitchRow(title="Remember settings for this mouse", subtitle="Reapply confirmed hardware settings when the same mouse reconnects.", active=remembered, sensitive=valid)
         row.connect("notify::active", lambda switch, _p: self.remember_current(switch.get_active()))
         group.add(row)
-        resume = Adw.SwitchRow(title="Resume integration on reconnect", subtitle="Resume only for this mouse after a confirmed recovery.", active=self.desktop.config.get("resume_integration", False), sensitive=not self.demo and valid)
+        resume = Adw.SwitchRow(title="Resume integration on reconnect", subtitle="Resume only for this mouse after a confirmed recovery.", active=(self.desktop.config or {}).get("resume_integration", False), sensitive=not self.demo and valid and self.desktop.config is not None)
         resume.connect("notify::active", lambda switch, _p: self.set_resume_integration(switch.get_active()))
         group.add(resume)
         row = Adw.ActionRow(use_markup=False, title="Restore previous button reporting", subtitle="Recover this app's temporary reporting after a disconnect or unexpected exit.")
@@ -657,7 +773,7 @@ class ControlWindow(Adw.ApplicationWindow):
         group.add(row)
         hosts = self.current.get("easy_switch", {})
         host_group = Adw.PreferencesGroup(title="Easy-Switch", description="Switch to a computer already paired with this mouse.")
-        self.controls.append(host_group)
+        host_parent.append(host_group)
         if not hosts.get("supported"):
             host_group.add(Adw.ActionRow(use_markup=False, title="Computer channels unavailable", subtitle="Wake and refresh the mouse to read supported channels."))
         for host in hosts.get("hosts", []):

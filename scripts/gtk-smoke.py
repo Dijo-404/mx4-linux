@@ -10,8 +10,9 @@ from time import monotonic, sleep
 def main():
     with tempfile.TemporaryDirectory(prefix="mx4-gtk-smoke-") as directory:
         os.environ["XDG_CONFIG_HOME"] = directory
+        os.environ["XDG_STATE_HOME"] = str(Path(directory) / "state")
         from mx4_linux.actions import DesktopConfigStore, default_config
-        from mx4_linux.desktop_editor import DesktopEditor
+        from mx4_linux.desktop_editor import present_desktop_editor
         from mx4_linux.gtk_support import Adw, Gdk, Gio, GLib, Gtk
         from mx4_linux.gui import ControlWindow
         from mx4_linux.ring import ActionsRing, CENTER_X, CENTER_Y
@@ -30,6 +31,10 @@ def main():
 
         app = Adw.Application(application_id="io.github.mx4linux.Smoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
         app.register(None)
+        isolated = default_config()
+        for action in isolated["actions"].values():
+            action["steps"] = [{"type": "command", "argv": ["/usr/bin/true"]}]
+        DesktopConfigStore().save(isolated)
         window = ControlWindow(app, demo=True)
         ring = None
         editor = None
@@ -38,11 +43,26 @@ def main():
         try:
             window.present()
             wait_until(lambda: window.current is not None and not window.busy)
+            assert window.route == "home"
+            window.navigate("buttons")
+            window.select_target("button:83")
+            assert window.selected_target == "button:83"
+            window.go_back()
+            assert window.selected_target is None
+            window.navigate("point")
+            wait_until(window.wheel.get_mapped)
             assert window.wheel.get_visible()
             settings.set_property("gtk-enable-animations", True)
             window.wheel.spin(1)
             assert window.wheel.tick_id
             wait_until(lambda: window.wheel.tick_id == 0)
+            window.navigate("haptics")
+            window.wheel.pulse()
+            assert window.wheel.pulse_source
+            window.navigate("home")
+            wait_until(lambda: window.wheel.pulse_source == 0)
+            window.navigate("point")
+            wait_until(window.wheel.get_mapped)
 
             selected = []
             ring = ActionsRing(app, lambda action, preview: selected.append((action, preview)), lambda: None)
@@ -82,11 +102,11 @@ def main():
             window.wheel.spin(1)
             window.wheel.set_visible(False)
             wait_until(lambda: window.wheel.tick_id == 0)
-            editor = DesktopEditor(window, DesktopConfigStore(Path(directory) / "desktop.json"), lambda: None)
-            editor.present()
+            editor = present_desktop_editor(window, DesktopConfigStore(Path(directory) / "desktop.json"), lambda: None, cid=83)
             wait_until(editor.get_mapped)
             assert len(editor.ring_choices) == 8
             assert not editor.dirty
+            assert editor.shortcuts_expander.get_expanded()
             print("GTK smoke passed: demo settings, wheel, ring groups, reduced motion, editor, cleanup.")
         finally:
             settings.set_property("gtk-enable-animations", animations)
