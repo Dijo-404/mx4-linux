@@ -508,3 +508,119 @@ event_worker.main()
         process.stdin.close()
         process.stdout.close()
         process.stderr.close()
+
+
+def add_control(dev, cid):
+    dev.reporting[cid] = (0x104, cid)
+    dev.keys.append(hidpp20.ReprogrammableKeyV4(dev, len(dev.keys), cid, cid, 0x120, 0, 0, 0))
+
+
+def test_profile_transition_restores_native_mapping_and_retains_original_on_reacquire():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    phases = []
+    def read(*_):
+        phases.append(dict(dev.reporting))
+        if len(phases) == 1:
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [83, 416], 'ring_button': 416, 'raw_xy': True})
+        elif len(phases) == 2:
+            commands.put({'op': 'configure', 'config_id': 2, 'controls': [82, 416], 'ring_button': 416, 'raw_xy': True})
+        else:
+            commands.put({'op': 'stop'})
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events, controls=[82, 416])
+    assert phases[0][82] == (0x105, 83) and phases[0][83] == before[83]
+    assert phases[1][82] == before[82] and phases[1][83] == (0x105, 83)
+    assert phases[2][82] == (0x105, 83) and phases[2][83] == before[83]
+    assert dev.reporting == before
+    assert [e['config_id'] for e in events if e['type'] == 'configured'] == [1, 2]
+
+
+def test_profile_transition_defers_until_held_button_released_without_false_edges():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    count = 0
+    def read(*_):
+        nonlocal count
+        count += 1
+        if count == 1:
+            dev.handle.notifications_hook(notification(data=struct.pack('!4H', 82, 0, 0, 0)))
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [83, 416], 'ring_button': 416, 'raw_xy': True})
+        elif count == 2:
+            assert dev.reporting[82][0] & 1
+            assert not any(e['type'] == 'configured' for e in events)
+            dev.handle.notifications_hook(notification(data=b'\0' * 8))
+        else:
+            assert not dev.reporting[82][0] & 1
+            commands.put({'op': 'stop'})
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events, controls=[82, 416])
+    assert [e for e in events if e['type'] == 'button'] == [
+        {'type': 'button', 'control': 82, 'pressed': True},
+        {'type': 'button', 'control': 82, 'pressed': False}]
+
+
+@pytest.mark.parametrize('command', [
+    {'op': 'configure', 'controls': [80], 'config_id': 1},
+    {'op': 'configure', 'controls': [416], 'config_id': True},
+    {'op': 'configure', 'controls': [416], 'config_id': 1, 'raw_xy': 1},
+    {'op': 'configure', 'controls': [416], 'config_id': 1, 'device_id': 'other'},
+])
+def test_invalid_profile_transition_stops_and_restores(command):
+    dev, api, commands, events = setup_session()
+    before = dict(dev.reporting)
+    commands.put(command)
+    assert not run(dev, api, commands, events)
+    assert dev.reporting == before
+    assert events[-2]['type'] == 'error'
+
+
+def test_failed_profile_transition_restores_old_and_newly_touched_controls():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    def read(*_):
+        commands.put({'op': 'configure', 'config_id': 1, 'controls': [83, 416], 'ring_button': 416, 'raw_xy': True})
+        dev.fail_after_write = len(dev.writes) + 2
+    api.base.read.side_effect = read
+    assert not run(dev, api, commands, events, controls=[82, 416])
+    assert dev.reporting == before
+    assert not any(e['type'] == 'configured' for e in events)
+
+
+def test_press_received_during_transition_snapshot_defers_before_any_write():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    original = dev._feature_request
+    trigger = False
+    count = 0
+    def request(feature, function, *data):
+        nonlocal trigger
+        if trigger and function == 0x20:
+            trigger = False
+            dev.handle.notifications_hook(notification(data=struct.pack('!4H', 82, 0, 0, 0)))
+        return original(feature, function, *data)
+    def read(*_):
+        nonlocal count, trigger
+        count += 1
+        if count == 1:
+            trigger = True
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [83, 416], 'ring_button': 416, 'raw_xy': True})
+        elif count == 2:
+            assert dev.reporting[82][0] & 1
+            assert not any(e['type'] == 'configured' for e in events)
+            dev.handle.notifications_hook(notification(data=b'\0' * 8))
+        else:
+            commands.put({'op': 'stop'})
+    dev.feature_request.side_effect = request
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events, controls=[82, 416])
+    assert any(e['type'] == 'configured' for e in events)
+
+
+def test_malformed_configure_requires_explicit_control_and_reporting_fields():
+    dev, api, commands, events = setup_session()
+    commands.put({'op': 'configure', 'config_id': 1})
+    assert not run(dev, api, commands, events)
+    assert dev.reporting[416] == (0x104, 416)

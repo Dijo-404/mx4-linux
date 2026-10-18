@@ -114,6 +114,7 @@ class _Decoder:
         self.number, self.feature_index = number, feature_index
         self.controls, self.ring, self.raw_xy = set(controls), ring, raw_xy
         self.emit, self.held, self.active = emit, set(), False
+        self.pressed = set()
 
     def __call__(self, notification):
         if not self.active or notification.devnumber != self.number or notification.sub_id != self.feature_index:
@@ -128,7 +129,8 @@ class _Decoder:
             if len(data) > 8 and (len(data) != 16 or any(data[8:])):
                 return
             payload = data[:8]
-            pressed = set(struct.unpack(f"!{len(payload) // 2}H", payload)) & self.controls
+            self.pressed = set(struct.unpack(f"!{len(payload) // 2}H", payload)) & ALLOWED_CONTROLS
+            pressed = self.pressed & self.controls
             for cid in sorted(self.held - pressed):
                 self.emit({"type": "button", "control": cid, "pressed": False})
             for cid in sorted(pressed - self.held):
@@ -146,6 +148,7 @@ class _Decoder:
         for cid in sorted(self.held):
             self.emit({"type": "button", "control": cid, "pressed": False, "cancelled": True})
         self.held.clear()
+        self.pressed.clear()
 
 
 def _reporting(dev, api, key):
@@ -208,33 +211,64 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
     original = owner.handle
     handle = _NotificationHandle(original, decoder)
     owner.handle = handle
-    touched = []
+    snapshots = {}
+    active = set()
     diversion = api.hidpp20.MappingFlag.DIVERTED.value
     raw = api.hidpp20.MappingFlag.RAW_XY_DIVERTED.value
     haptic = []
-    try:
-        snapshots = _selected_keys(dev, api, controls, ring, raw_xy)
-        for key, flags, mapped_to in snapshots:
+    def transition(selected, selected_ring, selected_raw):
+        # Read and validate additions AND removals before the first write.
+        live = {int(key._cid): (key, flags, mapping) for key, flags, mapping in
+                _selected_keys(dev, api, selected, selected_ring, selected_raw)}
+        for cid in active - set(selected):
+            key = snapshots[cid][0]
+            flags, mapping = _reporting(dev, api, key)
+            live[cid] = (key, flags, mapping)
+        for cid, (key, flags, mapping) in live.items():
+            if cid in snapshots and mapping != snapshots[cid][2]:
+                raise RuntimeError(f"Control {cid} mapping changed during mouse integration")
+            snapshots.setdefault(cid, [key, flags, mapping, 0])
+        relevant = active | set(selected)
+        if decoder.active and decoder.pressed & relevant:
+            return False
+        for cid, (key, flags, mapped_to) in live.items():
             if stop_event.is_set():
                 raise _StopRequested()
-            # Record BEFORE each write: a timeout can occur after firmware has
-            # already accepted it, and must still trigger restoration.
-            changed = 0
-            touched.append([key, flags, changed])
-            if not flags & diversion:
-                touched[-1][2] |= diversion
-                key.set_diverted(True)
-            if raw_xy and int(key._cid) == ring and not flags & raw:
-                touched[-1][2] |= raw
-                key.set_rawXY_reporting(True)
+            desired = snapshots[cid][1]
+            if cid in selected:
+                desired |= diversion
+                if selected_raw and cid == selected_ring:
+                    desired |= raw
+            setters = ((diversion, key.set_diverted), (raw, key.set_rawXY_reporting))
+            if not desired & diversion:
+                setters = tuple(reversed(setters))
+            for bit, setter in setters:
+                if flags & bit != desired & bit:
+                    # A timed-out write can already have changed the firmware.
+                    snapshots[cid][3] |= bit
+                    setter(bool(desired & bit))
+                    if decoder.active and decoder.pressed & relevant:
+                        raise RuntimeError("A mouse control was pressed during reporting configuration; stopping safely")
             actual_flags, actual_mapping = _reporting(dev, api, key)
-            required = diversion | (raw if raw_xy and int(key._cid) == ring else 0)
-            if actual_flags & required != required or actual_mapping != mapped_to:
+            if decoder.active and decoder.pressed & relevant:
+                raise RuntimeError("A mouse control was pressed during reporting configuration; stopping safely")
+            owned = diversion | raw
+            if actual_flags & owned != desired & owned or actual_mapping != mapped_to:
                 raise RuntimeError(f"Device did not confirm reporting configuration for control {key._cid}")
+        active.clear()
+        active.update(selected)
+        decoder.controls, decoder.ring, decoder.raw_xy = set(selected), selected_ring, selected_raw
+        decoder.active = True
+        return True
+
+    try:
+        transition(controls, ring, raw_xy)
         if stop_event.is_set():
             raise _StopRequested()
         emit({"type": "ready", "controls": controls, "ring_button": ring, "raw_xy": raw_xy})
         decoder.active = True
+        pending = None
+        last_config_id = 0
         heartbeat = time.monotonic() + _HEARTBEAT_SECONDS
         # Feature notifications are delivered by diversion itself. Receiver
         # notification flags govern unrelated connection/legacy events, so no
@@ -255,10 +289,24 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
                         _play_haptic(dev, api, command.get("waveform"), haptic)
                     except ValueError as error:
                         emit({"type": "error", "message": str(error)})
+                elif command.get("op") == "configure":
+                    if (set(command) != {"op", "config_id", "controls", "ring_button", "raw_xy"}
+                            or type(command.get("config_id")) is not int
+                            or command["config_id"] <= last_config_id):
+                        raise ValueError("Invalid configure command")
+                    _, selected, selected_ring, selected_raw = _validate({"device_id": "configure", **command})
+                    last_config_id = command["config_id"]
+                    pending = selected, selected_ring, selected_raw, last_config_id
                 else:
                     emit({"type": "error", "message": command.get("message", "Unknown command; use haptic or stop")})
             if stop_event.is_set():
                 break
+            if pending and not decoder.pressed & (active | set(pending[0])):
+                selected, selected_ring, selected_raw, config_id = pending
+                if transition(selected, selected_ring, selected_raw):
+                    emit({"type": "configured", "config_id": config_id, "controls": selected,
+                          "ring_button": selected_ring, "raw_xy": selected_raw})
+                    pending = None
             reply = api.base.read(handle, _POLL_SECONDS)
             if reply:
                 if len(reply) == 3 and isinstance(reply[2], bytes) and len(reply[2]) >= 2:
@@ -272,7 +320,7 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
     finally:
         decoder.release()
         failures = []
-        for key, flags, changed in reversed(touched):
+        for key, flags, mapping, changed in reversed(tuple(snapshots.values())):
             for bit, setter in ((raw, key.set_rawXY_reporting), (diversion, key.set_diverted)):
                 if changed & bit:
                     try:
@@ -281,8 +329,8 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
                         failures.append(f"control {key._cid}: {error}")
             if changed:
                 try:
-                    actual, _ = _reporting(dev, api, key)
-                    if actual & changed != flags & changed:
+                    actual, actual_mapping = _reporting(dev, api, key)
+                    if actual & changed != flags & changed or actual_mapping != mapping:
                         raise RuntimeError("Reporting restoration was not confirmed")
                 except Exception as error:
                     failures.append(f"control {key._cid}: {error}")
