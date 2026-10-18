@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="110" height="110" viewBox="0 0 110 110" role="img" aria-labelledby="title">
+  <title id="title">MX4 Linux logo</title>
+  <rect x="1" y="1" width="108" height="108" rx="26" fill="#202329" stroke="#697386" stroke-width="2"/>
+  <circle cx="55" cy="55" r="38" fill="none" stroke="#697386" stroke-width="7" stroke-dasharray="23 7"/>
+  <path d="M55 17a38 38 0 0 1 27 11" fill="none" stroke="#3974ef" stroke-width="7"/>
+  <rect x="41" y="33" width="28" height="44" rx="14" fill="#f2f3f7"/>
+  <path d="M55 34v16" stroke="#202329" stroke-width="2"/>
+  <rect x="53" y="40" width="4" height="10" rx="2" fill="#3974ef"/>
+</svg>
