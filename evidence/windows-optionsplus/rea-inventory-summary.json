@@ -1,0 +1,126 @@
+{
+  "evidence_id": "ev_ca416e95d7f5b4a100d9e98f1df475acdae14f606ac2d4b68311740e49f2f201",
+  "subject": {
+    "name": "app.asar",
+    "digest": {
+      "sha256": "8689e5fda6047864abe1c9f89486c03f7e1a4f960cbf0267c2f362f88d303a27"
+    },
+    "local_path": "/home/dj/Projects/mx4-linux/evidence/artifacts/windows-optionsplus/app.asar",
+    "format": "asar",
+    "architecture": null
+  },
+  "provider": {
+    "id": "rea-analysis-view",
+    "name": "REA analysis view projection",
+    "version": "1"
+  },
+  "analysis_profile": null,
+  "predicate_type": "rea.analysis-view",
+  "operation": "inspect_analysis_view",
+  "parameters": {
+    "parent_evidence_id": "ev_8c52d74d0aa49a71a1963250277bc2b548cf7702141cc41970957afa5483ecb4",
+    "view": {
+      "kind": "summary"
+    }
+  },
+  "raw_result": null,
+  "normalized_result": {
+    "kind": "summary",
+    "view": {
+      "kind": "summary"
+    },
+    "parent_evidence_id": "ev_8c52d74d0aa49a71a1963250277bc2b548cf7702141cc41970957afa5483ecb4",
+    "parent_operation": "inspect_artifact",
+    "parent_digest": "8c52d74d0aa49a71a1963250277bc2b548cf7702141cc41970957afa5483ecb4",
+    "view_digest": "079e5a52b0388339c46a4630310b625a40addff11b9a6788af61100225286f90",
+    "artifact": {
+      "path": "/home/dj/Projects/mx4-linux/evidence/artifacts/windows-optionsplus/app.asar",
+      "sha256": "8689e5fda6047864abe1c9f89486c03f7e1a4f960cbf0267c2f362f88d303a27"
+    },
+    "coverage": {
+      "status": "complete-within-view",
+      "examined": 1743,
+      "total": 1743,
+      "next_offset": null,
+      "exhausted": true
+    },
+    "limitations": [
+      "Inspection derives bounded static hypotheses and next probes; it does not execute the artifact or claim format-specific semantics."
+    ],
+    "unknowns": [
+      "Inventory does not establish application runtime behavior or complete format-specific analysis."
+    ],
+    "summary": {
+      "manifest": {
+        "manifest_id": "agm_b6334cdef61efc70c52f3455aa713a90deaa527a2681d198c60813971a62e683",
+        "root_artifact_id": "art_7ea0000770b687bd87dbb11a212188584fa0207599b8dc9dc9db43d9de2a80d0",
+        "root_sha256": "8689e5fda6047864abe1c9f89486c03f7e1a4f960cbf0267c2f362f88d303a27",
+        "root_format": "asar",
+        "graph_sha256": "443acf74cd34092977ec3078b910884498489ca8b31ad64d2c44624f11e94a76",
+        "node_count": 580,
+        "occurrence_count": 582,
+        "edge_count": 581
+      },
+      "available_counts": {
+        "nodes": 580,
+        "occurrences": 582,
+        "edges": 581,
+        "integrity_contradictions": 0
+      },
+      "observed_entry_kind_counts": {
+        "file": 581,
+        "directory": 1,
+        "symlink": 0,
+        "slice": 0
+      },
+      "source_complete": true,
+      "inventory_evidence_ids": [
+        "ev_95160345152fe5eef7858c765fa66da400c04eafb8addece15da18bd483870c7"
+      ],
+      "inspection": {
+        "coverage": {
+          "status": "complete-within-substeps",
+          "substeps_completed": 1,
+          "observations_retained": 1,
+          "observations_omitted": 0,
+          "hypotheses_retained": 1,
+          "hypotheses_omitted": 0,
+          "unexplored_branches_retained": 1,
+          "unexplored_branches_omitted": 0,
+          "next_probes_retained": 1,
+          "next_probes_omitted": 0
+        },
+        "unexplored_branches": [
+          {
+            "branch_id": "aib_00fdd3f7a8b5b67ab867f60c9967736f5de7ba90f02b7cc6e4b5ecd1f37869f0",
+            "reason": "format-specific-analysis-required",
+            "detail": "analyze_javascript_application was not run by provider-neutral artifact inspection.",
+            "next_probe": {
+              "operation": "analyze_javascript_application",
+              "rationale": "Recover bounded JavaScript modules, source maps, Electron boundaries, and application relationships.",
+              "authority": "ast-static-analysis"
+            },
+            "evidence_id": "ev_95160345152fe5eef7858c765fa66da400c04eafb8addece15da18bd483870c7"
+          }
+        ]
+      },
+      "limitation_count": 1
+    }
+  },
+  "confidence": "derived",
+  "authority": "shipped-artifact",
+  "environment": null,
+  "limitations": [
+    "Inspection derives bounded static hypotheses and next probes; it does not execute the artifact or claim format-specific semantics."
+  ],
+  "relationship_coverage": null,
+  "locations": [
+    {
+      "kind": "artifact-path",
+      "path": "/home/dj/Projects/mx4-linux/evidence/artifacts/windows-optionsplus/app.asar"
+    }
+  ],
+  "evidence_links": [
+    "ev_8c52d74d0aa49a71a1963250277bc2b548cf7702141cc41970957afa5483ecb4"
+  ]
+}
