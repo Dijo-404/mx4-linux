@@ -202,14 +202,15 @@ def _play_haptic(dev, api, waveform, cached, expected_stable_id=None):
 
 
 def recover_reporting(dev, api, ownership):
-    """Validate every orphan before restoring only our durable touched bits."""
+    """Restore only durable owned bits, confirming the same unit through cleanup."""
+    require_identity(dev, ownership.stable_id)
     record = ownership.read()
     if record is None:
         return
-    require_identity(dev, ownership.stable_id)
     controls = [item["cid"] for item in record["controls"]]
     selected = {int(key._cid): (key, flags, mapping) for key, flags, mapping in
                 _selected_keys(dev, api, controls, 416, False)}
+    require_identity(dev, ownership.stable_id)
     for item in record["controls"]:
         key, _flags, mapping = selected[item["cid"]]
         if mapping != item["mapping"]:
@@ -219,28 +220,36 @@ def recover_reporting(dev, api, ownership):
     failures = []
     for item in reversed(record["controls"]):
         key = selected[item["cid"]][0]
+        require_identity(dev, ownership.stable_id)
+        flags, mapping = _reporting(dev, api, key)
+        require_identity(dev, ownership.stable_id)
+        if mapping != item["mapping"]:
+            raise OwnershipConflict("Mapping changed during reporting restoration")
+        write_errors = []
+        for bit, setter in ((16, key.set_rawXY_reporting), (1, key.set_diverted)):
+            if item["touched"] & bit and flags & bit != item["flags"] & bit:
+                # Preconditions are fatal. Only a setter's lost acknowledgement
+                # may be resolved by a subsequent same-unit live readback.
+                ownership.touch(item["cid"], item["flags"], item["mapping"], bit)
+                require_identity(dev, ownership.stable_id)
+                try:
+                    setter(bool(item["flags"] & bit))
+                except Exception as exc:
+                    write_errors.append(str(exc))
         try:
-            flags, mapping = _reporting(dev, api, key)
-            if mapping != item["mapping"]:
-                raise OwnershipConflict("Mapping changed during reporting restoration")
-            write_errors = []
-            for bit, setter in ((16, key.set_rawXY_reporting), (1, key.set_diverted)):
-                if item["touched"] & bit and flags & bit != item["flags"] & bit:
-                    try:
-                        ownership.touch(item["cid"], item["flags"], item["mapping"], bit)
-                        require_identity(dev, ownership.stable_id)
-                        setter(bool(item["flags"] & bit))
-                    except Exception as exc:
-                        # Continue restoring other owned bits; addressed readback
-                        # decides whether a lost ACK actually left an orphan.
-                        write_errors.append(str(exc))
             actual, mapping = _reporting(dev, api, key)
-            if actual & item["touched"] != item["flags"] & item["touched"] or mapping != item["mapping"]:
-                raise RuntimeError("Reporting restoration was not confirmed" + (": " + "; ".join(write_errors) if write_errors else ""))
         except Exception as exc:
             failures.append(f"control {item['cid']}: {exc}")
+            continue
+        require_identity(dev, ownership.stable_id)
+        if actual & item["touched"] != item["flags"] & item["touched"] or mapping != item["mapping"]:
+            detail = ": " + "; ".join(write_errors) if write_errors else ""
+            failures.append(f"control {item['cid']}: Reporting restoration was not confirmed{detail}")
     if failures:
         raise RuntimeError("Could not restore mouse reporting; wake/reconnect this mouse and retry recovery. " + "; ".join(failures))
+    # Even an already-native/no-setter path must never clear another unit's
+    # original snapshot after a receiver-slot change during its final GET.
+    require_identity(dev, ownership.stable_id)
     ownership.clear()
 
 

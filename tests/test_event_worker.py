@@ -742,3 +742,56 @@ def test_external_owned_bit_change_is_not_reasserted_by_reconfiguration():
     assert not any(event['type'] == 'configured' for event in events)
     # Cleanup may restore the remaining diverted bit, but never re-enable RAW_XY.
     assert all(not (change & 16) for _cid, change, _mapping in dev.writes[changed_at[0]:])
+
+
+@pytest.mark.parametrize('swap_on_reporting_read', [1, 2, 3])
+def test_recovery_never_clears_original_journal_using_reused_slot_readback(swap_on_reporting_read):
+    from mx4_linux.reporting_state import Ownership
+    dev, api, _commands, _events = setup_session()
+    original = dev._feature_request
+    reporting_reads = 0
+    def request(feature, function, *args):
+        nonlocal reporting_reads
+        if feature == FEATURE and function == 0x20:
+            reporting_reads += 1
+            if reporting_reads == swap_on_reporting_read:
+                # Another mouse now answers the same receiver slot with flags
+                # that coincidentally match the original mouse's baseline.
+                dev.id = dev.unitId = 'd1e2f3a4'
+        return original(feature, function, *args)
+    dev.feature_request.side_effect = request
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+        before = owner.path.read_bytes()
+        with pytest.raises(RuntimeError, match='identity|restore'):
+            worker.recover_reporting(dev, api, owner)
+        assert owner.path.read_bytes() == before
+    assert dev.writes == []
+
+
+def test_even_empty_recovery_requires_fresh_matching_unit_identity():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, _commands, _events = setup_session()
+    dev.id = dev.unitId = 'd1e2f3a4'
+    with Ownership('unit:a1b2c3d4') as owner:
+        with pytest.raises(RuntimeError, match='identity'):
+            worker.recover_reporting(dev, api, owner)
+        assert owner.read() is None
+    assert dev.writes == []
+
+
+def test_recovery_persistence_failure_is_fatal_even_if_later_flags_would_match():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, _commands, _events = setup_session()
+    dev.reporting[416] = (0x115, 416)
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+        before = owner.path.read_bytes()
+        def failed_touch(*_args):
+            dev.reporting[416] = (0x104, 416)
+            raise OSError('Journal fsync failed')
+        owner.touch = failed_touch
+        with pytest.raises(OSError, match='fsync'):
+            worker.recover_reporting(dev, api, owner)
+        assert owner.path.read_bytes() == before
+    assert not dev.writes

@@ -286,3 +286,59 @@ def test_ownership_conflict_blocks_automatic_gui_recovery_until_explicit_recover
     settle(window)
     window.backend.recover.assert_called_once()
     assert window.desktop.reacquire_blocked is False
+
+
+def test_cancel_after_first_confirmed_profile_write_keeps_partial_count_without_stale_callbacks(window):
+    import threading
+    from mx4_linux.profiles import apply_profile
+    first_write, release = threading.Event(), threading.Event()
+    original = window.backend.write
+    writes = []
+    done, failed = Mock(), Mock()
+    def write(*args, **kwargs):
+        writes.append(args)
+        result = original(*args, **kwargs)
+        if len(writes) == 1:
+            first_write.set()
+            assert release.wait(3)
+        return result
+    window.backend.write = write
+    profile = {'model': 'MX Master 4', 'demo': True, 'settings': {'dpi': 1600, 'haptic-level': 60}}
+    device = window.current
+    window.hardware_job(lambda: apply_profile(window.backend, device, profile, demo=True,
+                                              cancelled=window.hardware_cancelled.is_set),
+                        done, 'Applying profile…', failed=failed)
+    context = GLib.MainContext.default()
+    deadline = monotonic() + 3
+    while not first_write.is_set() and monotonic() < deadline:
+        while context.pending():
+            context.iteration(False)
+        sleep(.001)
+    assert first_write.is_set()
+    window.cancel_hardware()
+    release.set()
+    settle(window)
+    assert len(writes) == 1
+    assert '1/2' in window.status.get_text()
+    assert window.current is None and window.setting_widgets == {}
+    done.assert_not_called()
+    failed.assert_not_called()
+
+
+def test_stale_success_retains_confirmed_count_without_applying_old_readback(window):
+    import threading
+    started, release = threading.Event(), threading.Event()
+    done, failed = Mock(), Mock()
+    def work():
+        started.set()
+        assert release.wait(2)
+        return 2
+    window.job(work, done, 'Applying…', failed=failed)
+    assert started.wait(1)
+    window.cancel_hardware()
+    release.set()
+    settle(window)
+    assert '2 confirmed changes' in window.status.get_text()
+    assert window.current is None and window.setting_widgets == {}
+    done.assert_not_called()
+    failed.assert_not_called()
