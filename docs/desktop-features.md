@@ -5,11 +5,15 @@ These features are Linux implementations using the MX4's HID++ event stream and 
 ## Use the ring
 
 1. Open MX4 Linux and wait for your mouse settings to load.
-2. Under **Actions Ring and Smart Actions**, click **Enable**.
+2. Open the **Actions** tab and click **Enable**.
 3. Hold the haptic panel, move the mouse towards a position and release. A short panel click instead leaves the ring open so you can point and click.
-4. Use **Configure** to change positions, create routines or assign additional mouse buttons. Configuration changes stop mouse integration; enable it again after saving.
+4. Use **Edit actions** to change positions, create routines or assign additional mouse buttons. Configuration changes stop mouse integration; enable it again after saving.
 
-The eight positions run clockwise from the top. Keys **1–8** select them; arrow keys move the selection, Enter confirms, and Escape cancels. Moving within the center dead zone does not select an action. A second panel click cancels an open ring. **Preview ring** uses the same interface but prints the chosen steps without executing them or playing feedback.
+The eight circular icon buttons run clockwise from the top. Labels appear beside the hovered or keyboard-selected button; the small center **×** closes the ring. Pointer clicks target the visible circles, so the gaps do not execute actions. Keys **1–8** select them; arrow keys move the selection, Enter confirms, and Escape returns from a group or closes the ring. Moving within the center dead zone does not select an action. A second panel click cancels an open ring. **Try the ring** uses the same interface but prints the chosen steps without executing them or playing feedback. Motion follows the desktop animation preference and stops when the ring settles or closes.
+
+In **Edit actions → Actions Ring**, the live diagram shows the assignments with their labels. Click a diagram button to focus its assignment. Expand **Action groups (optional)** to choose up to six different existing routines for a position. Hovering or choosing that position opens a side menu; it does not run the parent routine. Select a child with the pointer, arrows and Enter, or keys **1–6**. When holding the panel, release over a grouped position to leave its submenu open for selection. The center **×** always cancels. Old configurations remain valid, and groups are optional.
+
+![Native action group with four configured routines](assets/actions-ring-groups.png)
 
 The ring is a centered layer-shell overlay, not a cursor-position popup. It captures the original application before opening and restores that focus before executing an action. A vanished target stops the action. Shortcuts and text triggered while an MX4 configuration window is focused are refused; use the panel from the application you want to control.
 
@@ -19,7 +23,9 @@ Default assignments are Overview, Screenshot, Terminal, Next workspace, Paste, C
 
 ## Create a Smart Action
 
-Open **Configure → Smart Actions**. Choose an existing routine or create one from a shortcut, launch, text or multiple-step template. Edit its ID, display name and JSON steps. An optional `app_id` condition requires an exact match with the focused Niri application. Use `niri msg --json focused-window` to inspect that ID.
+Open **Actions → Edit actions → Smart Actions**. Choose an existing routine or create one from a shortcut, launch, text or multiple-step template. Give it a name, expand a step to edit its fields, and use **Add step** plus the move/remove controls to build the sequence. **Edit steps as JSON** exposes the same data for advanced editing; **Advanced routine settings** contains the action ID. An optional application condition requires an exact match with the focused Niri `app_id`. Use `niri msg --json focused-window` to inspect that ID. Editing and saving do not execute the routine.
+
+![Live Actions Ring assignment preview in the native editor](assets/action-editor-ring.png)
 
 Example steps:
 
@@ -35,7 +41,7 @@ Example steps:
 
 The example copies from the original application, launches a terminal, waits for it to focus, and types text. Launch steps return after starting the application; a delay may be needed before interacting with a newly launched window. Niri steps use `{"type":"niri","action":"toggle-overview","args":[]}`. Commands are explicit argument arrays and are never implicitly passed through a shell.
 
-The whole document is validated before Save or execution. Each routine may have up to 64 steps and 60 seconds of total configured delay; execution is bounded to two minutes. The **Cancel** button stops subsequent steps. Held shortcut keys are released on cancellation/errors. A running routine rejects repeated triggers rather than building an unbounded queue.
+The whole document is validated before **Save changes** or execution. Each routine may have up to 64 steps and 60 seconds of total configured delay; execution is bounded to two minutes. **Stop routine** on the Actions tab stops subsequent steps. Held shortcut keys are released on cancellation/errors. A running routine rejects repeated triggers rather than building an unbounded queue.
 
 The native Wayland keyboard backend uses [wtype](https://github.com/atx/wtype), pinned to release 0.4 / commit `d71be3a7b3f93b534a2823fd68cabd7ac2a02359` in `scripts/setup-wtype.sh`. It supports common modifiers, letters, digits, function keys and navigation/media keys. Unicode text uses the virtual-keyboard protocol and preserves the clipboard. Unsupported Linux key codes fall back to evdev `/dev/uinput`; an optional `scripts/install-input-access.sh` grants active-seat access if needed. The normal Niri path requires no extra privileged setup. A failed native key injection is not replayed through a second backend.
 
@@ -64,7 +70,7 @@ No compositor configuration or login autostart is modified automatically. If imp
 
 ## Verification and remaining interactive checks
 
-The physical MX Master 4 reached listener-ready with haptic-panel diversion and raw XY enabled, then stopped with the exact original reporting flags and mapping restored. [Hardware smoke record](../evidence/desktop-hardware-smoke.json). The GTK ring was opened and selected in preview mode, and native Ctrl+A / Unicode text insertion was tested against an isolated GTK entry. Tests also cover malformed packets, disconnect/cancellation, temporary flag restoration, focus checks, macro execution and session replacement.
+The physical MX Master 4 reached listener-ready with haptic-panel diversion and raw XY enabled, then stopped with the exact original reporting flags and mapping restored. [Hardware smoke record](https://github.com/Dijo-404/mx4-linux/blob/main/evidence/desktop-hardware-smoke.json). The GTK ring was opened and selected in preview mode, and native Ctrl+A / Unicode text insertion was tested against an isolated GTK entry. Tests also cover malformed packets, disconnect/cancellation, temporary flag restoration, focus checks, macro execution and session replacement.
 
 No automated check simulates a physical panel press. Interactive confirmation remains for hold/release selection with the real mouse, haptic feedback during selection, and unplug/reconnect while holding. Bluetooth has not been exercised. See [validation notes](validation.md).
 

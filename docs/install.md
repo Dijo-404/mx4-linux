@@ -1,6 +1,6 @@
 # Installation
 
-MX4 Linux is installed from a source checkout. Version 0.2.0 is unreleased; no distribution package or published binary is documented here. The validated environment is Arch Linux with Python 3.14, GTK 4.24, Libadwaita 1.10 and Niri / Wayland. Other distributions need equivalent packages and remain unverified.
+MX4 Linux supports source installation and a self-contained npm package that launches the native Python/GTK application. Version 0.2.0 is unreleased; the npm archive can be built locally, and no registry publication is implied. The validated environment is Arch Linux with Python 3.14, GTK 4.24, Libadwaita 1.10 and Niri / Wayland. Other distributions need equivalent packages and remain unverified.
 
 ## System dependencies
 
@@ -11,7 +11,7 @@ The GUI requires Python 3.11+, Python GObject, GTK 4.12+ and Libadwaita 1.4+. In
 sudo pacman -S python python-gobject gtk4 libadwaita python-pip
 
 # Debian / Ubuntu; check that your release meets the GTK and Libadwaita minimums
-sudo apt install python3-venv python3-pip python3-gi gir1.2-gtk-4.0 gir1.2-adw-1
+sudo apt install python3-venv python3-pip python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1
 ```
 
 For the Actions Ring overlay, install the system `gtk4-layer-shell` library and its `Gtk4LayerShell-1.0` typelib. Package names vary by distribution. If the library or compositor support is unavailable, the ring can fall back to a normal window.
@@ -32,7 +32,7 @@ cd mx4-linux
 .venv/bin/mx4-linux doctor --json
 ```
 
-`setup.sh` creates `.venv` with `--system-site-packages` so the application can use the distribution's GObject bindings. It installs the editable application, test dependencies and Solaar 1.1.20. If `uv` is installed, setup uses it; otherwise it uses the environment's pip. To select a different compatible interpreter, run `PYTHON=python3.11 ./scripts/setup.sh` with that interpreter's matching system bindings installed.
+`setup.sh` creates `.venv` with `--system-site-packages` so the application can use the distribution's GObject bindings. It installs the editable application, test/lint/build tools and Solaar 1.1.20. If `uv` is installed, setup uses it; otherwise it uses the environment's pip. To select a different compatible interpreter, run `PYTHON=python3.11 ./scripts/setup.sh` with that interpreter's matching system bindings installed.
 
 The optional `scripts/setup-wtype.sh` downloads commit `d71be3a7b3f93b534a2823fd68cabd7ac2a02359` from wtype 0.4, verifies its source checksum and installs the built executable, MIT license and man page inside `.venv`. Download/source/build files stay under `.tools`. An existing local helper is reused only when its stored executable checksum matches.
 
@@ -41,6 +41,44 @@ To build the helper separately:
 ```bash
 ./scripts/setup-wtype.sh
 ```
+
+For a runtime-only Python installation after creating a virtual environment with system site packages, `python -m pip install -r requirements.txt` installs the application and its dependencies. The requirements file delegates to `pyproject.toml` so the Solaar version is declared once. For lint/build/test tools, use `python -m pip install -r requirements-dev.txt`.
+
+## npm package
+
+Install the system dependencies above and Node.js 22 or later. In a source checkout:
+
+```bash
+npm ci --ignore-scripts
+npm run setup
+npm start -- gui --demo
+```
+
+Build and install an archive to launch independently of the checkout:
+
+```bash
+npm pack
+npm install --global --prefix "$HOME/.local" ./mx4-linux-0.2.0.tgz
+~/.local/bin/mx4-linux setup
+~/.local/bin/mx4-linux
+```
+
+The archive includes the Python application, icon, access-rule installers and documentation. npm installation runs no scripts and installs no Node dependencies. Add `~/.local/bin` to your `PATH` if you want to invoke `mx4-linux` without its full path.
+
+`mx4-linux setup` checks Python 3.11+, GTK 4.12+, Libadwaita 1.4+ and Python GObject, creates a virtual environment with system site packages, and installs the application and Solaar using pip. It writes to `$XDG_DATA_HOME/mx4-linux/runtime/0.2.0/` (default `~/.local/share/mx4-linux/runtime/0.2.0/`); it does not need sudo or change device permissions. `PYTHON=/usr/bin/python3 mx4-linux setup` selects the system interpreter whose GObject bindings match the installed libraries. Install system `wtype` separately for keyboard/text actions; npm setup does not build it automatically.
+
+The launcher first honors `MX4_LINUX_PYTHON=/path/to/environment/bin/python`, then a completed per-user runtime, then a checkout's `.venv`. It always loads the source shipped with the selected npm package. Arguments after `npm start --` reach the native CLI unchanged; for example, `npm start -- doctor --json`. Only `setup` is handled by the launcher.
+
+Rerun setup after a Python upgrade or package update. Updating a global package replaces its bundled source; configuration is stored separately. If setup was interrupted, the environment is not considered ready until setup succeeds. The packaged access-rule installers can be found under `$(npm root --global --prefix "$HOME/.local")/mx4-linux/scripts/`; inspect `--dry-run` before installing rules.
+
+To remove a package installed with the prefix above:
+
+```bash
+npm uninstall --global --prefix "$HOME/.local" mx4-linux
+rm -rf -- "${XDG_DATA_HOME:-$HOME/.local/share}/mx4-linux/runtime"
+```
+
+This leaves saved actions/profiles and any explicitly installed desktop launcher or udev rules. Remove them separately using the instructions below.
 
 ## Device access
 
@@ -127,6 +165,7 @@ These removal steps do not undo hardware settings already written to the mouse o
 - **Mouse absent:** wake it, inspect `doctor --json`, verify access, and refresh. A receiver's presence alone does not establish an online MX Master 4.
 - **Intermittent discovery or writes:** close other mouse configuration tools, including Solaar's UI, to avoid competing settings. Device operations can wait up to 90 seconds before reporting a timeout.
 - **Helper build failure:** install system wtype, or install the missing build tools printed by `setup-wtype.sh` and rerun it.
+- **npm says setup is required or Python cannot start:** run `mx4-linux setup` again with the current system Python. An npm installation alone does not create the native runtime.
 - **Settings reset after reconnect:** apply a saved profile manually. There is no automatic hardware-profile reapplication.
 
 See [recorded validation](validation.md) for tested behavior and remaining physical checks.
