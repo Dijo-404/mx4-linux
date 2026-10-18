@@ -86,7 +86,7 @@ jobs:
       - name: Install desktop dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y python3-venv python3-gi python3-gi-cairo python3-cairo python3-dbus gir1.2-gtk-4.0 gir1.2-adw-1 xvfb xauth dbus-x11
+          sudo apt-get install --no-install-recommends -y python3-venv python3-gi python3-gi-cairo python3-cairo python3-dbus gir1.2-gtk-4.0 gir1.2-adw-1 fontconfig xvfb xauth dbus-x11
       - name: Install the npm archive, set up its native runtime, and preview GUI
         env:
           PYTHON: /usr/bin/python3
