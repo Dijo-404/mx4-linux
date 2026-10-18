@@ -1,8 +1,9 @@
 """GTK 4 control panel. Device work is serialized off the UI thread."""
 
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
-from .gtk_support import Adw, Gio, GLib, Gtk
+from .gtk_support import Adw, Gdk, Gio, GLib, Gtk
 
 from .backend import Backend, DemoBackend
 from .profiles import ProfileStore, apply_profile
@@ -357,6 +358,11 @@ class ControlWindow(Adw.ApplicationWindow):
 def run(demo=False, show_ring=False, preview_ring=False):
     app = Adw.Application(application_id="io.github.mx4linux.Control" + (".Demo" if demo else ""),
                           flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+    def startup(_application):
+        icons = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        icons.add_search_path(str(Path(__file__).parent / "icons"))
+        Gtk.Window.set_default_icon_name("io.github.mx4linux.Control")
+    app.connect("startup", startup)
     app.add_main_option("ring", 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE, "Open Actions Ring", None)
     app.add_main_option("preview-ring", 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE, "Preview without executing actions", None)
     def control_window(application):
