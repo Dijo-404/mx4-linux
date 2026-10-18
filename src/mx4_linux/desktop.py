@@ -212,10 +212,14 @@ class DesktopController:
             self._pending_motion = [0, 0]
             self._opening_motion.clear()
             self._stop_context()
+            if self.session.running:
+                self.session.stop()
             if self.ring:
                 self.ring.dismiss()
             self.error = event.get("message", "Mouse integration failed.")
             self.notify(self.error)
+        elif kind == "warning":
+            self.notify(event.get("message", "Mouse feedback is unavailable."))
         elif kind == "stopped":
             self._open_token += 1
             self._dispatch_token += 1
