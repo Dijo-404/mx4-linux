@@ -12,10 +12,12 @@ User-visible changes are recorded here. This project follows semantic versioning
 - Optional side menus containing up to six existing routines, with pointer and keyboard selection and safe held-button release.
 - Finite ring transitions and selection feedback that honor the desktop's reduced-motion preference.
 - GitHub CI for Python 3.11/3.14, Node 22/24, package installation and native GTK smoke checks; validated release archives and checksums.
-- Requirements files, development checks, contribution conventions and issue/PR templates.
+- Development checks, contribution conventions and issue/PR templates.
 
 ### Improved
 
+- Keep Python dependencies in `pyproject.toml` and share the packaged SVG icon with the README.
+- Detect unused imports in development and CI checks.
 - Setting changes update the confirmed value without a complete follow-up discovery scan; saving profiles keeps existing device data.
 - Ring rendering reuses native labels and controls, reducing work during animation.
 - Hardware writes and listener startup address the selected receiver slot; setting writes construct only the needed capabilities while preserving live validation and readback.

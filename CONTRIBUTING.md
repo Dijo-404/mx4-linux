@@ -20,6 +20,10 @@ npm run check
 npm run test:package
 ```
 
+Build outputs (`build/`, `dist/`), pytest/Ruff caches, `__pycache__/` and source `*.egg-info/` directories are generated and can be removed when no longer needed. Keep `.venv/` for the installed development runtime. `.tools/` also holds the installed wtype checksum used by setup; its downloaded source and build directories are disposable.
+
+The tracked records in `evidence/` support the research and validation guides. Current documentation images live in `docs/assets/`; the README shares the application icon from `src/mx4_linux/icons/`.
+
 Use `.venv/bin/mx4-linux gui --demo` to inspect the settings interface without device access, and `actions run ID --dry-run` or `ring --preview` to inspect desktop behavior without executing a routine. Tests use simulated hardware; passing them is not a physical-device verification.
 
 On a graphical session, `GDK_BACKEND=x11 .venv/bin/python scripts/gtk-smoke.py` checks demo loading, finite wheel/ring animations, reduced motion and the editor. For a headless machine with Xvfb installed:
@@ -52,7 +56,7 @@ Do not bundle vendor installers, downloaded proprietary binaries, virtual enviro
 
 ## Code conventions and boundaries
 
-- Use Python 3.11-compatible syntax, four-space indentation, descriptive `snake_case` names and small functions. Match the touched module's style; keep unrelated formatting out of the diff. Ruff checks syntax and definite correctness errors through the checked-in configuration.
+- Use Python 3.11-compatible syntax, four-space indentation, descriptive `snake_case` names and small functions. Match the touched module's style; keep unrelated formatting out of the diff. Ruff checks syntax, definite correctness errors and unused imports through the checked-in configuration.
 - Keep GTK construction and widget updates on the GTK thread. Run device I/O and potentially blocking desktop work off that thread; return results through the existing callbacks. Do not rescan hardware when a confirmed write response is sufficient.
 - Keep Solaar imports and handles in workers. UI modules depend on the backend interface, and animation/state models remain testable without GTK or hardware. Add a layer only when a concrete second caller needs it.
 - Animate on GTK's frame clock using elapsed time. Stop callbacks when motion settles or a widget hides; honor `gtk-enable-animations`. Native labels, keyboard operation and accessible names must remain available.
