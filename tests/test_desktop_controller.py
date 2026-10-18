@@ -289,6 +289,9 @@ def test_async_ring_open_pins_application_and_document_before_later_edits(runtim
     runtime.ring.preview = False
     monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: scheduled.append(fn))
     original = deepcopy(runtime.config)
+    from mx4_linux.actions import resolve_config
+    runtime.context = {'app_id': 'editor', 'window_id': 7}
+    runtime.effective_config = resolve_config(runtime.config, 'editor')
     runtime.open_ring(held=True)
     runtime.config['actions']['copy']['label'] = 'Changed while querying'
     runtime.config['active_profiles'] = {}
@@ -333,6 +336,9 @@ def test_ring_open_pending_motion_preserves_radius_clamping(runtime, monkeypatch
     runtime.ring.show_ring = lambda *_a, **_kw: state.open(held=True)
     runtime.ring.motion = state.motion
     monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: scheduled.append(fn))
+    from mx4_linux.actions import resolve_config
+    runtime.context = {'app_id': 'editor', 'window_id': 7}
+    runtime.effective_config = resolve_config(runtime.config, 'editor')
     runtime.open_ring(held=True)
     runtime.event({'type': 'motion', 'dx': 1000, 'dy': 0})
     runtime.event({'type': 'motion', 'dx': -1000, 'dy': 0})
@@ -1119,3 +1125,103 @@ def test_freshly_changed_file_cannot_open_held_ring_before_new_ack(runtime):
     runtime.open_ring(held=True)
     runtime.executor.submit.assert_not_called()
     assert not runtime.opening
+
+
+def pending_held_context_query(runtime, monkeypatch, trigger=416):
+    """An acknowledged A session, with all action branches harmless/mocked."""
+    from concurrent.futures import Future
+    from copy import deepcopy
+    from mx4_linux.actions import default_config, resolve_config
+    document = default_config()
+    for action in document['actions'].values():
+        action['steps'] = [{'type': 'command', 'argv': ['/usr/bin/true']}]
+    document['assignment_profiles'] = {
+        'a': {'label': 'A', 'app_id': 'app.a', 'ring': document['ring'][:],
+              'button_bindings': {}, 'ring_button': 416},
+        'b': {'label': 'B', 'app_id': 'app.b', 'ring': list(reversed(document['ring'])),
+              'button_bindings': {'416': 'copy'} if trigger != 416 else {}, 'ring_button': trigger}}
+    document['active_profiles'] = {'app.a': 'a', 'app.b': 'b'}
+    runtime.config = deepcopy(document)
+    runtime.context = {'app_id': 'app.a', 'window_id': 1}
+    runtime.effective_config = resolve_config(document, 'app.a')
+    runtime.store = SimpleNamespace(read=lambda: deepcopy(document))
+    future, scheduled = Future(), []
+    runtime.executor = SimpleNamespace(submit=Mock(return_value=future))
+    runtime.ring.show_ring = Mock()
+    runtime.ring.preview = False
+    runtime._watch_ring_context = Mock()
+    monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: scheduled.append(fn))
+    return future, scheduled
+
+
+@pytest.mark.parametrize('trigger', [None, 83, 416])
+def test_async_fresh_focus_must_reconcile_before_old_trigger_can_open(runtime, monkeypatch, trigger):
+    future, scheduled = pending_held_context_query(runtime, monkeypatch, trigger)
+    runtime.requested_enabled = True
+    runtime.event({'type': 'button', 'control': 416, 'pressed': True})
+    future.set_result({'app_id': 'app.b', 'window_id': 2})
+    scheduled.pop()()
+    runtime.ring.show_ring.assert_not_called()
+    assert not runtime.opening and runtime.requested_enabled
+    assert runtime.context == {'app_id': 'app.b', 'window_id': 2}
+    assert runtime._context_revision > runtime._active_revision
+    assert runtime.session.configure.call_args.args[0]['ring_button'] == trigger
+    runtime.execute.assert_not_called()
+    runtime.event({'type': 'button', 'control': 416, 'pressed': False})
+    assert runtime._held_ring_button is None
+    runtime.execute.assert_not_called()
+    runtime.ring.release_button.assert_not_called()
+
+
+@pytest.mark.parametrize('queried_app', ['app.a', 'app.b'])
+@pytest.mark.parametrize('ack_first', [False, True])
+def test_observer_during_held_query_cannot_show_or_be_overwritten(runtime, monkeypatch, queried_app, ack_first):
+    future, scheduled = pending_held_context_query(runtime, monkeypatch, None)
+    runtime.event({'type': 'button', 'control': 416, 'pressed': True})
+    runtime.event({'type': 'context', 'context': {'app_id': 'app.b', 'window_id': 2}, 'context_token': 0})
+    if ack_first:
+        runtime.event({'type': 'configured', 'config_id': 1})
+    revision = runtime._context_revision
+    future.set_result({'app_id': queried_app, 'window_id': 1 if queried_app == 'app.a' else 2})
+    scheduled.pop()()
+    runtime.ring.show_ring.assert_not_called()
+    assert runtime.context == {'app_id': 'app.b', 'window_id': 2}
+    assert runtime._context_revision == revision
+    runtime.execute.assert_not_called()
+
+
+def test_unchanged_held_query_keeps_release_and_detached_document(runtime, monkeypatch):
+    future, scheduled = pending_held_context_query(runtime, monkeypatch)
+    runtime.event({'type': 'button', 'control': 416, 'pressed': True})
+    runtime.event({'type': 'button', 'control': 416, 'pressed': False})
+    future.set_result({'app_id': 'app.a', 'window_id': 1})
+    scheduled.pop()()
+    assert runtime.ring.show_ring.call_args.kwargs['held'] is True
+    assert runtime.ring.show_ring.call_args.args[0]['ring_button'] == 416
+    runtime.ring.release_button.assert_called_once()
+    runtime.execute.assert_not_called()
+
+
+def test_manual_query_can_open_new_manual_only_profile_without_integration(runtime, monkeypatch):
+    future, scheduled = pending_held_context_query(runtime, monkeypatch, None)
+    runtime.session.ready = runtime.session.running = False
+    runtime.open_ring()
+    future.set_result({'app_id': 'app.b', 'window_id': 2})
+    scheduled.pop()()
+    assert runtime.ring.show_ring.call_args.kwargs['held'] is False
+    assert runtime.ring.show_ring.call_args.args[0]['ring_button'] is None
+    assert runtime.target == {'app_id': 'app.b', 'window_id': 2}
+    assert runtime.context == runtime.target
+    runtime.session.configure.assert_not_called()
+    runtime.execute.assert_not_called()
+
+
+def test_newer_observer_also_prevents_stale_manual_query_target(runtime, monkeypatch):
+    future, scheduled = pending_held_context_query(runtime, monkeypatch, None)
+    runtime.open_ring()
+    runtime.event({'type': 'context', 'context': {'app_id': 'app.b', 'window_id': 2}, 'context_token': 0})
+    future.set_result({'app_id': 'app.a', 'window_id': 1})
+    scheduled.pop()()
+    runtime.ring.show_ring.assert_not_called()
+    assert runtime.context == {'app_id': 'app.b', 'window_id': 2}
+    runtime.execute.assert_not_called()
