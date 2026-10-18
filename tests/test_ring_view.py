@@ -404,3 +404,14 @@ def test_emerging_child_face_cannot_scroll_an_underlying_root(preview):
     window.child_positions = [position]
     assert window.child_at(*position) is None
     assert not window.adjust_at(*position, 0, -1)
+
+
+def test_fallback_resume_does_not_request_another_gtk_activation(preview, monkeypatch):
+    from unittest.mock import Mock
+    window = preview.window
+    present = Mock()
+    monkeypatch.setattr(window, 'present', present)
+    window.yield_keyboard()
+    window.resume_keyboard()
+    present.assert_not_called()  # Controller already restored the exact popup through Niri.
+    assert not window._keyboard_yielded
