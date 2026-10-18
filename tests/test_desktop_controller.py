@@ -1225,3 +1225,213 @@ def test_newer_observer_also_prevents_stale_manual_query_target(runtime, monkeyp
     runtime.ring.show_ring.assert_not_called()
     assert runtime.context == {'app_id': 'app.b', 'window_id': 2}
     runtime.execute.assert_not_called()
+
+
+def utility_execution(runtime, monkeypatch, config, context):
+    """Run only mocked effects synchronously; GTK callbacks are explicitly drained."""
+    from concurrent.futures import Future
+    callbacks, futures = [], []
+    def submit(fn):
+        future = Future()
+        try:
+            future.set_result(fn())
+        except Exception as exc:
+            future.set_exception(exc)
+        futures.append(future)
+        return future
+    runtime.execute = DesktopController.execute.__get__(runtime)
+    runtime.executor = SimpleNamespace(submit=submit)
+    runtime.config = config
+    runtime.effective_config = None
+    monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: callbacks.append(fn))
+    monkeypatch.setattr('mx4_linux.desktop.restore_focus', lambda _: context)
+    monkeypatch.setattr('mx4_linux.desktop.focused_context', lambda: context)
+    return callbacks, futures
+
+
+def test_date_in_toggle_branch_obeys_controller_input_guard(runtime, monkeypatch):
+    from mx4_linux.actions import default_config
+    cfg = default_config()
+    cfg['actions']['test'] = {'label': 'Date cycle', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+        'toggle_steps': [[{'type': 'date', 'format': 'iso-date'}]]}
+    own = {'app_id': 'io.github.mx4linux.Control', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, own)
+    typed = Mock()
+    monkeypatch.setattr('mx4_linux.actions.DesktopActions._text', typed)
+    runtime.execute('test', target=own)
+    callbacks.pop()()
+    assert futures[-1].result()['completed'] == 1
+    runtime.execute('test', target=own)
+    callbacks.pop()()
+    assert isinstance(futures[-1].exception(), RuntimeError)
+    typed.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", ["date", "clipboard"])
+def test_date_and_clipboard_abort_when_origin_changes_before_effect(runtime, monkeypatch, kind):
+    from mx4_linux.actions import default_config
+    cfg = default_config()
+    origin = {'app_id': 'editor', 'window_id': 7}
+    step = {'type': 'date', 'format': 'iso-date'} if kind == 'date' else {'type': 'clipboard', 'operation': 'plain'}
+    cfg['actions']['test'] = {'label': 'Utility', 'steps': [step]}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    monkeypatch.setattr('mx4_linux.desktop.focused_context', lambda: {'app_id': 'other', 'window_id': 8})
+    typed = Mock()
+    monkeypatch.setattr('mx4_linux.actions.DesktopActions._text', typed)
+    monkeypatch.setattr('mx4_linux.actions.clipboard_operation', typed)
+    runtime.execute('test', target=origin)
+    callbacks.pop()()
+    assert isinstance(futures[-1].exception(), RuntimeError)
+    typed.assert_not_called()
+
+
+def test_local_switch_fresh_locked_update_preserves_editor_and_reconciles_without_cancel(runtime, monkeypatch, tmp_path):
+    from copy import deepcopy
+    from mx4_linux.actions import DesktopConfigStore, resolve_config
+    origin = {'app_id': 'editor', 'window_id': 7}
+    cfg = deepcopy(runtime.config)
+    cfg['assignment_profiles']['editor-new'] = deepcopy(cfg['assignment_profiles']['editor'])
+    cfg['assignment_profiles']['editor-new']['button_bindings'] = {'86': 'copy'}
+    cfg['actions']['switch'] = {'label': 'Switch', 'steps': [
+        {'type': 'local', 'operation': 'switch-profile', 'profile_id': 'editor-new'},
+        {'type': 'delay', 'milliseconds': 0}]}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime.store = DesktopConfigStore(tmp_path / 'desktop.json')
+    latest = deepcopy(cfg)
+    latest['actions']['copy']['label'] = 'Concurrent editor label'
+    runtime.store.save(latest)
+    runtime.context = origin
+    runtime.effective_config = resolve_config(cfg, 'editor')
+    old = deepcopy(runtime.effective_config)
+    runtime.requested_enabled = True
+    runtime.window.desktop_config_changed = Mock()
+    token = runtime._dispatch_token
+    runtime.execute('switch', target=origin, config=old)
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 2
+    saved = runtime.store.read()
+    assert saved['active_profiles']['editor'] == 'editor-new'
+    runtime.window.desktop_config_changed.assert_called_once()
+    assert saved['actions']['copy']['label'] == 'Concurrent editor label'
+    assert runtime.session.configure.call_args.args[0]['button_bindings'] == {'86': 'copy'}
+    assert runtime._dispatch_token == token and runtime.requested_enabled
+    assert not runtime.cancelled.is_set()
+    assert runtime.effective_config == old  # New assignments wait for matching ACK.
+    runtime.event({'type': 'configured', 'config_id': 1})
+    assert runtime.effective_config['button_bindings'] == {'86': 'copy'}
+
+
+def test_deleted_local_profile_preflight_prevents_earlier_adapt_mutation(runtime, monkeypatch, tmp_path):
+    from copy import deepcopy
+    from mx4_linux.actions import DesktopConfigStore
+    origin = {'app_id': 'editor', 'window_id': 7}
+    cfg = deepcopy(runtime.config)
+    cfg['actions']['switch'] = {'label': 'Switch', 'steps': [
+        {'type': 'local', 'operation': 'adapt-to-app', 'enabled': True},
+        {'type': 'local', 'operation': 'switch-profile', 'profile_id': 'editor'}]}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime.store = DesktopConfigStore(tmp_path / 'desktop.json')
+    latest = deepcopy(cfg)
+    del latest['actions']['switch']
+    del latest['assignment_profiles']['editor']
+    del latest['active_profiles']['editor']
+    runtime.store.save(latest)
+    before = runtime.store.path.read_bytes()
+    runtime.execute('switch', target=origin, config=cfg)
+    while callbacks:
+        callbacks.pop(0)()
+    assert isinstance(futures[-1].exception(), RuntimeError)
+    assert runtime.store.path.read_bytes() == before
+
+
+@pytest.mark.parametrize('kind', ['clipboard', 'date'])
+def test_incompatible_local_preflight_prevents_earlier_utility_effect(runtime, monkeypatch, tmp_path, kind):
+    from copy import deepcopy
+    from mx4_linux.actions import DesktopConfigStore
+    origin = {'app_id': 'editor', 'window_id': 7}
+    cfg = deepcopy(runtime.config)
+    first = {'type': 'clipboard', 'operation': 'upper'} if kind == 'clipboard' else {'type': 'date', 'format': 'iso-date'}
+    cfg['actions']['switch'] = {'label': 'Switch', 'steps': [first,
+        {'type': 'local', 'operation': 'switch-profile', 'profile_id': 'general'}]}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime.store = DesktopConfigStore(tmp_path / 'desktop.json')
+    runtime.store.save(cfg)
+    before = runtime.store.path.read_bytes()
+    effect = Mock(side_effect=AssertionError('An invalid local target must be rejected first'))
+    monkeypatch.setattr('mx4_linux.actions.clipboard_operation', effect)
+    monkeypatch.setattr('mx4_linux.actions.date_text', effect)
+    runtime.execute('switch', target=origin)
+    while callbacks:
+        callbacks.pop(0)()
+    assert 'incompatible' in str(futures[-1].exception())
+    assert runtime.store.path.read_bytes() == before
+    effect.assert_not_called()
+
+
+def test_native_utility_handoff_cancellation_unblocks_and_suppresses_late_show(runtime, monkeypatch):
+    callbacks, failures = [], []
+    posted = threading.Event()
+    def post(callback):
+        callbacks.append(callback)
+        posted.set()
+    monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', post)
+    runtime.utilities = SimpleNamespace(show=Mock())
+    def check():
+        if runtime.cancelled.is_set():
+            raise RuntimeError('cancelled')
+    def request():
+        try:
+            runtime._local_step({'type': 'local', 'operation': 'stopwatch'}, check, None)
+        except RuntimeError as exc:
+            failures.append(str(exc))
+    worker = threading.Thread(target=request)
+    worker.start()
+    assert posted.wait(1)
+    runtime.cancelled.set()
+    worker.join(1)
+    assert not worker.is_alive() and failures == ['cancelled']
+    callbacks.pop()()
+    runtime.utilities.show.assert_not_called()
+
+
+def test_controller_shutdown_closes_native_utility_manager(runtime):
+    runtime.utilities = SimpleNamespace(close=Mock())
+    manager = runtime.utilities
+    runtime.executor = SimpleNamespace(submit=Mock(), shutdown=Mock())
+    runtime.ring.hide_ring = Mock()
+    runtime.ring.destroy = Mock()
+    runtime.close()
+    manager.close.assert_called_once()
+    assert runtime.utilities is None
+
+
+def test_native_utility_success_handoff_runs_on_scheduled_callback(runtime, monkeypatch):
+    runtime.utilities = SimpleNamespace(show=Mock())
+    monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: fn())
+    runtime._local_step({'type': 'local', 'operation': 'tap-tempo'}, lambda: None, None)
+    runtime.utilities.show.assert_called_once_with('tap-tempo')
+
+
+def test_reconcile_resets_changed_toggle_definition_without_cancelling(runtime):
+    from copy import deepcopy
+    old = deepcopy(runtime.config['actions']['copy'])
+    runtime._toggle_state = {'copy': (old, 1), 'removed': (old, 1)}
+    latest = deepcopy(runtime.config)
+    latest['actions']['copy']['label'] = 'Changed'
+    runtime.store = SimpleNamespace(read=lambda: latest)
+    token = runtime._dispatch_token
+    runtime.reconcile_config()
+    assert runtime._toggle_state == {}
+    assert runtime._dispatch_token == token and not runtime.cancelled.is_set()
+
+
+def test_editor_reload_resets_changed_toggle_definition(runtime):
+    from copy import deepcopy
+    old = deepcopy(runtime.config['actions']['copy'])
+    runtime._toggle_state = {'copy': (old, 1)}
+    latest = deepcopy(runtime.config)
+    latest['actions']['copy']['label'] = 'Edited in the existing editor'
+    runtime.store = SimpleNamespace(read=lambda: latest)
+    runtime.reload_config()
+    assert runtime._toggle_state == {}

@@ -8,7 +8,8 @@ import math
 import threading
 import time
 
-from .actions import BUTTON_IDS, DesktopActions, DesktopConfigStore, focused_context, resolve_config, restore_focus
+from .actions import (BUTTON_IDS, DesktopActions, DesktopConfigStore, apply_local_assignment, execution_steps,
+                      focused_context, resolve_config, restore_focus, steps_send_input)
 from .context import NiriFocusObserver
 from .event_session import EventSession
 from .gtk_support import GLib
@@ -25,6 +26,8 @@ class DesktopController:
         self.message = "Enable mouse integration to use configured button assignments."
         self.closed = False
         self.action_busy = False
+        self._toggle_state = {}
+        self.utilities = None
         self.cancelled = threading.Event()
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mx4-actions")
         self._event_lock = threading.Lock()
@@ -88,6 +91,12 @@ class DesktopController:
             self.event(event)
         return GLib.SOURCE_REMOVE
 
+    def _reset_changed_toggles(self, document):
+        state = getattr(self, "_toggle_state", {})
+        for action_id in tuple(state):
+            if state[action_id][0] != document["actions"].get(action_id):
+                del state[action_id]
+
     def reload_config(self):
         self._stop_ring_context()
         self._cancel_adjustments()
@@ -96,6 +105,7 @@ class DesktopController:
             self.ring.dismiss()
         try:
             self.config = self.store.read()
+            self._reset_changed_toggles(self.config)
             if self.actions:
                 self.actions.config = deepcopy(self.config)
             else:
@@ -112,6 +122,7 @@ class DesktopController:
             document = self.store.read()
             changed = document != self.config
             self.config = document
+            self._reset_changed_toggles(document)
             if self.actions:
                 self.actions.config = deepcopy(document)
             else:
@@ -739,6 +750,55 @@ class DesktopController:
                 self._drain_adjustment(token)
         self._dispatch_selection()
 
+    def _preflight_local(self, steps, origin):
+        assignments = [step for step in steps if step["type"] == "local"
+                       and step["operation"] in ("switch-profile", "adapt-to-app")]
+        if assignments:
+            document = self.store.read()
+            for step in assignments:
+                apply_local_assignment(document, step, origin.get("app_id") if origin else None)
+
+    def _local_step(self, step, check, origin):
+        check()
+        if step["operation"] in ("switch-profile", "adapt-to-app"):
+            def mutate(document):
+                check()
+                apply_local_assignment(document, step, origin.get("app_id") if origin else None)
+            self.store.update(mutate)
+            def reconcile():
+                if not self.closed:
+                    self.reconcile_config()
+                    if not self.error and hasattr(self.window, "desktop_config_changed"):
+                        self.window.desktop_config_changed()
+                return GLib.SOURCE_REMOVE
+            GLib.idle_add(reconcile)
+            return
+        done, abandoned = threading.Event(), threading.Event()
+        errors = []
+        def show():
+            try:
+                if self.closed or abandoned.is_set() or self.cancelled.is_set():
+                    raise RuntimeError("Local utility request was cancelled.")
+                if getattr(self, "utilities", None) is None:
+                    from .local_utilities import UtilityWindows
+                    self.utilities = UtilityWindows(self.window)
+                self.utilities.show(step["operation"])
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                done.set()
+            return GLib.SOURCE_REMOVE
+        GLib.idle_add(show)
+        try:
+            while not done.wait(0.02):
+                check()
+            check()
+            if errors:
+                raise RuntimeError("The native utility could not be opened or requested.") from errors[0]
+        except Exception:
+            abandoned.set()
+            raise
+
     def execute(self, action_id, target=None, preview=False, config=None, adjustment=None, completed=None):
         if self.closed:
             return
@@ -759,11 +819,17 @@ class DesktopController:
         def run():
             if self.closed or dispatch_token != self._dispatch_token or self.cancelled.is_set():
                 raise RuntimeError("Action cancelled before dispatch.")
-            runner = DesktopActions(snapshot, dry_run=preview)
+            if not hasattr(self, "_toggle_state"):
+                self._toggle_state = {}
+            origin = None
+            runner = DesktopActions(snapshot, dry_run=preview, toggle_state=self._toggle_state,
+                                    local_handler=lambda step, check: self._local_step(step, check, origin),
+                                    local_preflight=lambda steps: self._preflight_local(steps, origin))
             try:
                 action = snapshot["actions"][action_id]
-                steps = action["adjustment"][adjustment] if adjustment else action["steps"]
-                sends_input = any(step["type"] in ("shortcut", "text") for step in steps)
+                steps = execution_steps(action, adjustment, self._toggle_state, action_id)
+                sends_input = steps_send_input(steps)
+                guarded_utility = any(step["type"] in ("date", "clipboard") for step in steps)
                 if not preview:
                     if adjustment and target:
                         before = focused_context()
@@ -771,6 +837,9 @@ class DesktopController:
                             focus_lost.set()
                             raise RuntimeError("The original window lost focus; the adjustment was cancelled.")
                     context = restore_focus(target["window_id"]) if target else focused_context()
+                    origin = deepcopy(context)
+                    if guarded_utility and not origin:
+                        raise RuntimeError("The originating application context is unavailable; the utility was cancelled.")
                     if sends_input:
                         if (not context or context["app_id"].startswith("io.github.mx4linux")
                                 or (adjustment and not target)):
@@ -778,7 +847,10 @@ class DesktopController:
                 if self.cancelled.is_set() or dispatch_token != self._dispatch_token:
                     raise RuntimeError("Action cancelled before execution.")
                 def cancelled():
-                    if self.cancelled.is_set() or (adjustment and focus_lost.is_set()):
+                    if (self.cancelled.is_set() or dispatch_token != self._dispatch_token or self.closed
+                            or (adjustment and focus_lost.is_set())):
+                        return True
+                    if guarded_utility and focused_context() != origin:
                         return True
                     # This runs on the action worker at every step/delay/input boundary.
                     if adjustment and target and focused_context() != target:
@@ -805,7 +877,9 @@ class DesktopController:
                 elif preview:
                     self.notify("Preview · " + result["label"] + " · " + json.dumps(result["steps"], ensure_ascii=False))
                 else:
-                    self.notify(f"Completed {result['label']} · {result['completed']} steps.")
+                    detail = (" System bell requested; the desktop may suppress sound."
+                              if any(step.get("operation") == "bell" for step in result.get("steps", [])) else "")
+                    self.notify(f"Completed {result['label']} · {result['completed']} steps." + detail)
                     if (result.get("ok", True) and not self.cancelled.is_set() and session_id == self.session.session_id
                             and dispatch_token == self._dispatch_token):
                         self.feedback("complete", config=snapshot)
@@ -835,6 +909,9 @@ class DesktopController:
         self.notify(self.error or "Configuration saved. Enable mouse integration to use the new assignments.")
 
     def close(self):
+        if getattr(self, "utilities", None) is not None:
+            self.utilities.close()
+            self.utilities = None
         self.requested_enabled = False
         self._intent_generation = getattr(self, "_intent_generation", 0) + 1
         self._cancel_reconnect()

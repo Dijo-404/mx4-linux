@@ -3,9 +3,11 @@
 from copy import deepcopy
 import ipaddress
 import re
+import shutil
 from urllib.parse import urlsplit
 
 from .actions import validate_config
+from .action_utilities import DATE_FORMATS, CLIPBOARD_OPERATIONS
 
 
 def _shortcut(*keys):
@@ -41,6 +43,40 @@ _PRESETS = {
     "screenshot": ("Desktop", "Screenshot", "Open the Niri screenshot selector.", "camera-photo-symbolic", [{"type": "niri", "action": "screenshot"}]),
     "lock": ("Desktop", "Lock session", "Ask systemd-logind to lock the current session; requires a running screen locker.", "system-lock-screen-symbolic", [{"type": "command", "argv": ["loginctl", "lock-session"]}]),
 }
+_PRESETS.update({
+    "new-tab": ("Navigation", "New tab", "Open a new tab in a compatible application.", "tab-new-symbolic", _shortcut("CTRL", "T")),
+    "close-tab": ("Navigation", "Close tab", "Close the current tab in a compatible application.", "window-close-symbolic", _shortcut("CTRL", "W")),
+    "next-tab": ("Navigation", "Next tab", "Select the next tab.", "go-next-symbolic", _shortcut("CTRL", "TAB")),
+    "previous-tab": ("Navigation", "Previous tab", "Select the previous tab.", "go-previous-symbolic", _shortcut("CTRL", "SHIFT", "TAB")),
+    "home": ("Navigation", "Home", "Move to the start of the line.", "go-first-symbolic", _shortcut("HOME")),
+    "end": ("Navigation", "End", "Move to the end of the line.", "go-last-symbolic", _shortcut("END")),
+    "page-up": ("Navigation", "Page up", "Move up one page.", "go-up-symbolic", _shortcut("PAGEUP")),
+    "page-down": ("Navigation", "Page down", "Move down one page.", "go-down-symbolic", _shortcut("PAGEDOWN")),
+    "media-stop": ("Media", "Stop media", "Request media playback stop.", "media-playback-stop-symbolic", _shortcut("STOPCD")),
+    "keyboard-layout-next": ("Desktop", "Next keyboard layout", "Select the next configured Niri keyboard layout.", "input-keyboard-symbolic", [{"type": "niri", "action": "switch-layout", "args": ["next"]}]),
+    "do-nothing": ("Custom", "Do nothing", "Complete without input or a desktop request.", "process-stop-symbolic", [{"type": "delay", "milliseconds": 0}]),
+})
+_DATE_LABELS = {"iso-date": "ISO date", "iso-time": "ISO time", "iso-datetime": "ISO date and time",
+                "day-of-year": "Day of year", "iso-week": "ISO week", "moon-phase": "Moon Phase (approximate)"}
+for _format in sorted(DATE_FORMATS):
+    _description = ("Insert an approximate eight-phase Moon name from a mean lunation; not precise phase timing."
+                    if _format == "moon-phase" else "Insert the current local " + _DATE_LABELS[_format] + ".")
+    _PRESETS[_format] = ("Date and time", _DATE_LABELS[_format], _description, "x-office-calendar-symbolic",
+                         [{"type": "date", "format": _format}])
+for _operation in sorted(CLIPBOARD_OPERATIONS):
+    _PRESETS["clipboard-" + _operation] = ("Clipboard", "Clipboard: " + _operation.replace("-", " "),
+        "Update only regular plain-text clipboard contents; does not paste. Sentence case uses deterministic punctuation boundaries.",
+        "edit-paste-symbolic", [{"type": "clipboard", "operation": _operation}])
+for _id, _label, _description in (
+        ("stopwatch", "Stopwatch", "Open a local stopwatch; pauses when hidden."),
+        ("tap-tempo", "Tap Tempo", "Open the local tap-tempo BPM counterpart; last 8 taps, resets after a pause."),
+        ("bell", "System bell", "Request the system bell; the desktop may suppress audible sound.")):
+    _PRESETS[_id] = ("Utilities", _label, _description, "preferences-system-time-symbolic", [{"type": "local", "operation": _id}])
+for _enabled in (True, False):
+    _PRESETS["adapt-on" if _enabled else "adapt-off"] = ("Profiles", "Adapt to App: " + ("on" if _enabled else "off"),
+        "Set local application-profile adaptation for future invocations.", "preferences-system-symbolic",
+        [{"type": "local", "operation": "adapt-to-app", "enabled": _enabled}])
+
 _ADJUSTMENTS = {
     "adjustable-volume": {"increase": _shortcut("VOLUMEUP"), "decrease": _shortcut("VOLUMEDOWN")},
     "adjustable-zoom": {"increase": _shortcut("CTRL", "EQUAL"), "decrease": _shortcut("CTRL", "MINUS")},
@@ -55,6 +91,24 @@ _TEMPLATES = {
     "shortcut": ("Custom", "Keyboard shortcut", "Send a keyboard shortcut to the focused application.", "input-keyboard-symbolic", "shortcut", "Key names"),
     "text": ("Custom", "Insert text", "Type text into the focused application.", "insert-text-symbolic", "text", "Text"),
 }
+
+_TEMPLATES.update({
+    "switch-profile": ("Profiles", "Switch assignment profile", "Select a compatible named local profile for future invocations.", "preferences-system-symbolic", "profile", "Assignment profile"),
+    "multi-toggle": ("Custom", "Multi-toggle", "Cycle 2–8 branches for this controller session; advance only after successful execution.", "view-refresh-symbolic", "toggle", "Branch step lists"),
+    "sound": ("Utilities", "Play local sound", "Launch pw-play with a literal local audio file; reports launch, not confirmed playback.", "audio-x-generic-symbolic", "sound", "Absolute local audio path"),
+})
+
+
+def catalog_availability(preset_id):
+    """Optional read-only hints, separate from pure templates and executable schema."""
+    if preset_id not in _PRESETS.keys() | _TEMPLATES.keys():
+        raise RuntimeError("Unknown action catalog preset.")
+    if preset_id.startswith("clipboard-"):
+        available = bool(shutil.which("wl-copy") and (preset_id == "clipboard-clear" or shutil.which("wl-paste")))
+        return {"available": available, "reason": "Requires wl-clipboard and a compatible Wayland clipboard service."}
+    if preset_id == "sound":
+        return {"available": bool(shutil.which("pw-play")), "reason": "Requires pw-play and a local audio file; playback depends on the audio service."}
+    return {"available": True, "reason": "Desktop input, focus, application support or the native controller may be required at execution."}
 
 
 def catalog_entries():
@@ -93,7 +147,7 @@ def _url(value):
     return value
 
 
-def catalog_action(preset_id, value=None):
+def catalog_action(preset_id, value=None, *, config=None):
     """Create a validated detached action, never discovering or launching applications."""
     if not isinstance(preset_id, str) or preset_id not in _PRESETS.keys() | _TEMPLATES.keys():
         raise RuntimeError(f"Unknown action catalog preset {preset_id!r}.")
@@ -119,6 +173,21 @@ def catalog_action(preset_id, value=None):
         action["steps"] = [{"type": "shortcut", "keys": deepcopy(value)}]
     elif preset_id == "text":
         action["steps"] = [{"type": "text", "text": value}]
-    validate_config({"version": 1, "actions": {"catalog": action}, "ring": ["catalog"] * 8,
-                     "button_bindings": {}, "ring_button": 416, "haptic_feedback": True})
+    elif preset_id == "switch-profile":
+        if config is None:
+            raise RuntimeError("Switch profile requires the current assignment configuration.")
+        action["steps"] = [{"type": "local", "operation": "switch-profile", "profile_id": value}]
+    elif preset_id == "multi-toggle":
+        if not isinstance(value, list) or not 2 <= len(value) <= 8:
+            raise RuntimeError("Multi-toggle needs 2–8 branch step lists.")
+        action["steps"], action["toggle_steps"] = deepcopy(value[0]), deepcopy(value[1:])
+    elif preset_id == "sound":
+        if not isinstance(value, str) or not value.startswith("/") or not value.isprintable() or len(value) > 4096:
+            raise RuntimeError("Sound requires an absolute local audio file path.")
+        action["steps"] = [{"type": "command", "argv": ["pw-play", "--", value]}]
+    document = deepcopy(config) if config is not None else {
+        "version": 1, "actions": {}, "ring": ["catalog"] * 8,
+        "button_bindings": {}, "ring_button": 416, "haptic_feedback": True}
+    document["actions"]["catalog"] = action
+    validate_config(document)
     return action

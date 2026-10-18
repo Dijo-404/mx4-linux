@@ -8,6 +8,7 @@ applications and return after starting them, so an editor can stay open.
 """
 
 from copy import deepcopy
+
 import fcntl
 import json
 import math
@@ -21,6 +22,8 @@ import sys
 import tempfile
 import threading
 import time
+
+from .action_utilities import DATE_FORMATS, CLIPBOARD_OPERATIONS, clipboard_operation, date_text
 
 
 MAX_CONFIG_BYTES = 1024 * 1024
@@ -212,6 +215,28 @@ def _validate_steps(steps, action_id):
             _fields(step, ("type", "text"), location=location)
             if not isinstance(step["text"], str) or not 1 <= len(step["text"]) <= 65_536 or "\0" in step["text"]:
                 _fail(f"{location} needs 1–65536 characters without NUL bytes.")
+        elif kind == "date":
+            _fields(step, ("type", "format"), location=location)
+            if not isinstance(step["format"], str) or step["format"] not in DATE_FORMATS:
+                _fail(f"{location} needs a supported date format.")
+        elif kind == "clipboard":
+            _fields(step, ("type", "operation"), location=location)
+            if not isinstance(step["operation"], str) or step["operation"] not in CLIPBOARD_OPERATIONS:
+                _fail(f"{location} needs a supported clipboard operation.")
+        elif kind == "local":
+            operation = step.get("operation")
+            if operation == "switch-profile":
+                _fields(step, ("type", "operation", "profile_id"), location=location)
+                if not isinstance(step["profile_id"], str) or not ACTION_ID.fullmatch(step["profile_id"]):
+                    _fail(f"{location} needs a profile ID.")
+            elif operation == "adapt-to-app":
+                _fields(step, ("type", "operation", "enabled"), location=location)
+                if type(step["enabled"]) is not bool:
+                    _fail(f"{location} enabled must be true or false.")
+            elif isinstance(operation, str) and operation in ("stopwatch", "tap-tempo", "bell"):
+                _fields(step, ("type", "operation"), location=location)
+            else:
+                _fail(f"{location} needs a supported local operation.")
         elif kind == "delay":
             _fields(step, ("type", "milliseconds"), location=location)
             value = step["milliseconds"]
@@ -222,6 +247,36 @@ def _validate_steps(steps, action_id):
             _fail(f"unsupported step type {kind!r}.")
     if delay > MAX_TOTAL_DELAY_MS:
         _fail(f"action {action_id} has more than {MAX_TOTAL_DELAY_MS} milliseconds of delays.")
+
+
+def action_step_lists(action):
+    """Iterate every executable branch, including session-only toggle choices."""
+    yield action["steps"]
+    yield from action.get("adjustment", {}).values()
+    yield from action.get("toggle_steps", [])
+
+
+def profile_references(action):
+    return {step["profile_id"] for steps in action_step_lists(action) for step in steps
+            if step["type"] == "local" and step["operation"] == "switch-profile"}
+
+
+def steps_send_input(steps):
+    return any(step["type"] in ("shortcut", "text", "date") for step in steps)
+
+
+def execution_steps(action, adjustment=None, toggle_state=None, action_id=None):
+    if adjustment is not None:
+        if not isinstance(adjustment, str) or adjustment not in ("increase", "decrease"):
+            raise RuntimeError("An adjustment must be increase or decrease.")
+        if "adjustment" not in action:
+            raise RuntimeError(f"Smart Action {action_id!r} does not support adjustment.")
+        return action["adjustment"][adjustment]
+    if "toggle_steps" in action and toggle_state is not None:
+        definition, index = toggle_state.get(action_id, (None, 0))
+        index = index if definition == action else 0
+        return [action["steps"], *action["toggle_steps"]][index]
+    return action["steps"]
 
 
 def _validate_trigger(value):
@@ -267,18 +322,24 @@ def validate_config(config):
     for action_id, action in actions.items():
         if not isinstance(action_id, str) or not ACTION_ID.fullmatch(action_id):
             _fail("action IDs must be 1–64 lowercase letters, numbers, hyphens or underscores.")
-        _fields(action, ("label", "steps"), ("app_id", "icon", "adjustment"), f"action {action_id}")
+        _fields(action, ("label", "steps"), ("app_id", "icon", "adjustment", "toggle_steps"), f"action {action_id}")
         if not _plain_string(action["label"], maximum=80):
             _fail(f"action {action_id} needs a label of 1–80 printable characters.")
         if "app_id" in action and not _plain_string(action["app_id"]):
             _fail(f"action {action_id} needs a nonempty exact app_id condition.")
         if "icon" in action and (not isinstance(action["icon"], str) or not THEME_ICON.fullmatch(action["icon"])):
             _fail(f"action {action_id} needs a theme icon name of 1–128 letters, digits, dots, hyphens or underscores.")
-        _validate_steps(action["steps"], action_id)
+        if "toggle_steps" in action and (not isinstance(action["toggle_steps"], list)
+                or not 1 <= len(action["toggle_steps"]) <= 7):
+            _fail(f"action {action_id} needs 1–7 extra toggle step lists.")
         if "adjustment" in action:
             _fields(action["adjustment"], ("increase", "decrease"), location=f"adjustment of {action_id}")
-            for branch, steps in action["adjustment"].items():
-                _validate_steps(steps, f"{action_id} adjustment {branch}")
+        for steps in action_step_lists(action):
+            _validate_steps(steps, action_id)
+        for reference in profile_references(action):
+            if (not isinstance(config.get("assignment_profiles", {}), dict)
+                    or reference not in config.get("assignment_profiles", {})):
+                _fail(f"action {action_id} references a missing assignment profile.")
     ring_button = config["ring_button"]
     _validate_trigger(ring_button)
     _validate_assignments(config, actions, ring_button)
@@ -342,6 +403,24 @@ def assignment_scope(config, app_id=None):
     profile_id = active.get(app_id) if isinstance(app_id, str) else None
     profile_id = profile_id or active.get("*")
     return config["assignment_profiles"][profile_id] if profile_id else config
+
+
+def apply_local_assignment(document, step, app_id):
+    """Mutate only an effective compatible assignment scope (caller holds the lock)."""
+    if step["operation"] == "adapt-to-app":
+        document["adapt_to_app"] = step["enabled"]
+        return
+    profile_id = step["profile_id"]
+    profile = document.get("assignment_profiles", {}).get(profile_id)
+    if profile is None:
+        raise RuntimeError("The assignment profile no longer exists.")
+    adapting = document.get("adapt_to_app", True)
+    scope = profile["app_id"]
+    exact_active = app_id in document.get("active_profiles", {})
+    if not ((adapting and app_id and scope == app_id)
+            or (scope == "*" and (not adapting or not exact_active))):
+        raise RuntimeError("This assignment profile is incompatible with the originating application context.")
+    document.setdefault("active_profiles", {})[scope] = profile_id
 
 
 def set_button_assignment(document, cid, action_id, app_id=None, *, root=False):
@@ -483,10 +562,13 @@ def restore_focus(window_id):
 
 
 class DesktopActions:
-    def __init__(self, config=None, dry_run=False):
+    def __init__(self, config=None, dry_run=False, *, local_handler=None, local_preflight=None, toggle_state=None):
         self.config = deepcopy(config) if config is not None else DesktopConfigStore().read()
         validate_config(self.config)
         self.dry_run = bool(dry_run)
+        self.local_handler = local_handler
+        self.local_preflight = local_preflight
+        self.toggle_state = toggle_state if toggle_state is not None else {}
         self._keyboard = None
         self._lock = threading.RLock()
 
@@ -502,14 +584,7 @@ class DesktopActions:
             if not isinstance(action_id, str) or action_id not in self.config["actions"]:
                 raise RuntimeError(f"Unknown Smart Action {action_id!r}.")
             action = deepcopy(self.config["actions"][action_id])
-            if adjustment is not None:
-                if not isinstance(adjustment, str) or adjustment not in ("increase", "decrease"):
-                    raise RuntimeError("An adjustment must be increase or decrease.")
-                if "adjustment" not in action:
-                    raise RuntimeError(f"Smart Action {action_id!r} does not support adjustment.")
-                steps = action["adjustment"][adjustment]
-            else:
-                steps = action["steps"]
+            steps = execution_steps(action, adjustment, self.toggle_state, action_id)
             result = {"ok": True, "action_id": action_id, "label": action["label"], "completed": 0,
                       "dry_run": self.dry_run, "steps": []}
             if adjustment is not None:
@@ -527,11 +602,24 @@ class DesktopActions:
                     if context is None or context["app_id"] != action["app_id"]:
                         result.update(ok=False, skipped=True, reason=f"Requires focused app_id {action['app_id']!r}.")
                         return result
+                if self.local_preflight and any(step["type"] == "local" for step in steps):
+                    self.local_preflight(steps)
+                    self._check(cancelled, deadline)
                 for step in steps:
                     self._check(cancelled, deadline)
                     performed = self._step(step, cancelled, deadline)
                     result["steps"].append(performed)
                     result["completed"] += 1
+                self._check(cancelled, deadline)
+                if adjustment is None and "toggle_steps" not in action:
+                    self.toggle_state.pop(action_id, None)
+                if adjustment is None and "toggle_steps" in action:
+                    definition, index = self.toggle_state.get(action_id, (None, 0))
+                    index = index if definition == action else 0
+                    self.toggle_state[action_id] = (deepcopy(action), (index + 1) % (1 + len(action["toggle_steps"])))
+                    # The validated document bounds this controller-session map.
+                    for removed in self.toggle_state.keys() - self.config["actions"].keys():
+                        del self.toggle_state[removed]
                 return result
             except (RuntimeError, OSError) as exc:
                 raise RuntimeError(f"Smart Action {action['label']!r} stopped after {result['completed']}/{len(steps)} steps: {exc}") from exc
@@ -608,20 +696,38 @@ class DesktopActions:
         elif kind == "shortcut":
             self._shortcut(step["keys"], cancelled, deadline)
         elif kind == "text":
-            native = _native_wtype()
-            if native:
-                # Small chunks bound cancellation latency and avoid the kernel's
-                # per-argument byte limit for long Unicode text. Each helper's
-                # virtual keyboard is released when the process exits.
-                for start in range(0, len(step["text"]), 256):
-                    self._check(cancelled, deadline)
-                    _run([native, "--", step["text"][start:start + 256]],
-                         timeout=min(5, max(0.1, deadline - time.monotonic())))
-                self._check(cancelled, deadline)
-            else:
-                _run(["wl-copy", "--type", "text/plain;charset=utf-8"], timeout=3, input=step["text"])
-                self._check(cancelled, deadline)
-                self._shortcut(["CTRL", "V"], cancelled, deadline)
+            self._text(step["text"], cancelled, deadline)
+        elif kind == "date":
+            try:
+                self._text(date_text(step["format"]), cancelled, deadline)
+            except (RuntimeError, OSError):
+                raise RuntimeError("Date text could not be inserted; input may be partial.") from None
+        elif kind == "clipboard":
+            clipboard_operation(step["operation"], lambda: self._check(cancelled, deadline))
+        elif kind == "local":
+            if self.local_handler is None:
+                raise RuntimeError("Local utilities require the native controller.")
+            self._check(cancelled, deadline)
+            self.local_handler(deepcopy(step), lambda: self._check(cancelled, deadline))
+            result["operation"] = step["operation"]
+            if step["operation"] == "bell":
+                result["requested"] = True
         elif kind == "delay":
             self._delay(step["milliseconds"] / 1000, cancelled, deadline)
         return result
+
+    def _text(self, value, cancelled, deadline):
+        native = _native_wtype()
+        if native:
+            # Small chunks bound cancellation latency and avoid the kernel's
+            # per-argument byte limit for long Unicode text. Each helper's
+            # virtual keyboard is released when the process exits.
+            for start in range(0, len(value), 256):
+                self._check(cancelled, deadline)
+                _run([native, "--", value[start:start + 256]],
+                     timeout=min(5, max(0.1, deadline - time.monotonic())))
+            self._check(cancelled, deadline)
+        else:
+            _run(["wl-copy", "--type", "text/plain;charset=utf-8"], timeout=3, input=value)
+            self._check(cancelled, deadline)
+            self._shortcut(["CTRL", "V"], cancelled, deadline)

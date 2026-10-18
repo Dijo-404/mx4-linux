@@ -414,8 +414,9 @@ class DesktopEditor(Adw.Window):
             action.pop("app_id", None)
             if draft["app_id"]:
                 action["app_id"] = draft["app_id"]
-            validate_config({"version": 1, "actions": {"routine": action}, "ring": ["routine"] * 8,
-                             "ring_button": 416, "haptic_feedback": True, "button_bindings": {}})
+            document = deepcopy(self.config)
+            document["actions"][draft["id"]] = action
+            validate_config(document)
         except (RuntimeError, ValueError, RecursionError) as exc:
             self._show_step_error(str(exc).removeprefix("Invalid desktop configuration: "))
             return False
@@ -777,8 +778,9 @@ class DesktopEditor(Adw.Window):
             if draft["app_id"]:
                 action["app_id"] = draft["app_id"]
             try:
-                validate_config({"version": 1, "actions": {action_id: action}, "ring": [action_id] * 8,
-                                 "ring_button": 416, "haptic_feedback": True, "button_bindings": {}})
+                document = deepcopy(self.config)
+                document["actions"][action_id] = action
+                validate_config(document)
             except RuntimeError as exc:
                 raise _DraftError(original_id, str(exc)) from exc
             actions[action_id] = action
