@@ -55,6 +55,7 @@ Solaar supplies the underlying device protocol implementation. MX4 Linux adds a 
 | **OS** | Linux; verified environment: Arch Linux on Niri / Wayland. Other distributions and architectures are not validated. |
 | **Runtime** | Python 3.11+; setup uses the distribution's Python GObject bindings. |
 | **GUI** | GTK 4.12+, Libadwaita 1.4+ and Python GObject. Hardware/configuration CLI commands do not need a graphical session. |
+| **Typography** | Fontconfig and JetBrains Mono Regular/Bold. Setup verifies the family and installs the bundled OFL-licensed fonts when missing. |
 | **Mouse access** | MX Master 4 and read/write access to its hidraw interface, through Bolt or Bluetooth. Live discovery has been verified through Bolt. |
 | **Desktop features** | Niri and an active Wayland session; `gtk4-layer-shell` library and typelib for the overlay. |
 | **Optional** | `wtype` for native keyboard input. Setup can build pinned wtype 0.4; `/dev/uinput` is an optional shortcut fallback. |
@@ -106,7 +107,7 @@ The second command uses `sudo`, reloads udev rules and reapplies them to matchin
 
 ### Updating
 
-Close the application, update your checkout and refresh its environment:
+Choose **Quit MX4 Linux** from the application menu, then update your checkout and refresh its environment:
 
 ```bash
 git pull --ff-only
@@ -117,7 +118,7 @@ Recreate `.venv` after a system Python version upgrade. Rerun `./scripts/install
 
 ### Uninstalling
 
-Close MX4 Linux, then remove its environment and optional launcher from the checkout:
+Choose **Quit MX4 Linux** from the application menu, then remove its environment and optional launcher from the checkout:
 
 ```bash
 rm -rf -- .venv .tools
@@ -138,7 +139,11 @@ Saved settings remain in `${XDG_CONFIG_HOME:-$HOME/.config}/mx4-linux/`. See [co
 .venv/bin/mx4-linux                 # open the control panel
 ```
 
-Open the **Actions** tab and click **Enable**, then use the haptic panel from the application you want to control. **Try the ring** previews selection; **Edit actions** opens native forms for routines, eight ring assignments and optional extra-button bindings. Keep MX4 Linux running while using mouse integration; **Disable** or closing the app restores the selected buttons' prior reporting flags.
+Open **Actions Ring** and click **Enable** beside **Mouse integration**, then use the haptic panel from the application you want to control. Opening the editor keeps integration enabled; saved changes update its assignments. Closing the settings window keeps enabled integration running in the background by default. Reopen MX4 Linux from your launcher to return to it. **Disable** stops integration; **Quit** (Ctrl+Q) exits the application and restores the selected buttons' prior reporting flags. Application Settings lets you turn off background operation.
+
+To launch an installed app from the ring, choose **Add application**, select the position under **Replace the action at**, search for the app and select it, then **Save changes**. Choosing or saving an application does not launch it. **Smart Actions** also offers an **Open application** step for longer routines.
+
+Battery labels refresh automatically. An unavailable reading clears the old percentage; background updates preserve the footer's last operation message.
 
 ## Usage
 
@@ -165,6 +170,8 @@ Use `.venv/bin/mx4-linux` in this checkout, or activate `.venv` before using `mx
 Successful CLI requests return `0`; handled runtime/configuration failures return `1`; command-line syntax errors return `2`.
 
 ### Keybindings
+
+In the main window, **Escape** closes the current inspector, then returns to the previous page. It does not close the app from Home. Open dropdowns and dialogs handle Escape first. **Ctrl+Q** quits the application, including background integration. In the action editor, **Ctrl+S** saves and **Escape** closes with an unsaved-changes prompt when needed.
 
 These keys apply while the Actions Ring is open:
 
@@ -382,10 +389,13 @@ The optional shortcut fallback rule is installed with `./scripts/install-input-a
 | [Installation](docs/install.md) | Dependencies, manual setup, access rules and complete removal |
 | [Configuration](docs/configuration.md) | Desktop schema, defaults, profiles and environment variables |
 | [Architecture](docs/architecture.md) | Workers, event lifecycle, focus and action execution |
+| [Interface design](docs/design-system.md) | Monospaced typography, warm neutral themes and native motion |
+| [UI polish verification](docs/ui-polish-validation.md) | Native captures, motion lifecycle, font installation and package checks |
 | [Desktop features](docs/desktop-features.md) | Ring interaction, Smart Actions and Niri bindings |
 | [Validation](docs/validation.md) | Recorded checks and remaining hardware work |
 | [Linux support research](docs/linux-support-research.md) | Protocol sources and implementation constraints |
 | [Installer analysis](docs/installer-analysis.md) | Static artifact investigation and evidence limits |
+| [Installed Windows Options+ analysis](docs/windows-optionsplus-analysis.md) | MX4 interface/agent protocols, haptics, force sensing and remaining gaps |
 | [Changelog](CHANGELOG.md) | User-visible changes and release history |
 
 ## Contributing
