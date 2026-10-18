@@ -74,6 +74,27 @@ def bounded_dropdown(strings, *, accessible_name, max_chars=18):
     return choice
 
 
+def choice_row(title, subtitle, widget):
+    """Use the full inspector width for choices, independently of help text."""
+    row = Adw.PreferencesRow(use_markup=False)
+    row.set_title(title)
+    body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10,
+                   margin_start=12, margin_end=12, margin_top=12, margin_bottom=12)
+    copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    copy.append(label(title))
+    if subtitle:
+        description = label(subtitle, 'mx4-subtle')
+        description.add_css_class('caption')
+        copy.append(description)
+    body.append(copy)
+    widget.set_hexpand(True)
+    widget.set_halign(Gtk.Align.FILL)
+    widget.set_valign(Gtk.Align.CENTER)
+    body.append(widget)
+    row.set_child(body)
+    return row
+
+
 class ReferenceShell:
     def __init__(self, window):
         self.window = window
