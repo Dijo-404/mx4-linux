@@ -1,6 +1,7 @@
 """UI coordination regressions without a display or a physical mouse."""
 
 from collections import deque
+from copy import deepcopy
 import threading
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -8,6 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 from mx4_linux.desktop import DesktopController
+from mx4_linux.actions import default_config
 from mx4_linux.ring_model import RingState
 
 
@@ -1435,3 +1437,129 @@ def test_editor_reload_resets_changed_toggle_definition(runtime):
     runtime.store = SimpleNamespace(read=lambda: latest)
     runtime.reload_config()
     assert runtime._toggle_state == {}
+
+
+def test_branch_selection_must_stay_pinned_across_toggle_reset(runtime, monkeypatch):
+    cfg = default_config()
+    cfg['actions']['test'] = {'label': 'Date cycle', 'steps': [{'type': 'date', 'format': 'iso-date'}],
+                             'toggle_steps': [[{'type': 'delay', 'milliseconds': 0}]]}
+    own = {'app_id': 'io.github.mx4linux.Control', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, own)
+    runtime._toggle_state = {'test': (deepcopy(cfg['actions']['test']), 1)}
+    newer = deepcopy(cfg)
+    newer['actions']['test']['label'] = 'Concurrent definition change'
+    def restore(_):
+        runtime._reset_changed_toggles(newer)
+        return own
+    monkeypatch.setattr('mx4_linux.desktop.restore_focus', restore)
+    typed = Mock()
+    monkeypatch.setattr('mx4_linux.actions.DesktopActions._text', typed)
+    runtime.execute('test', target=own)
+    while callbacks:
+        callbacks.pop(0)()
+    # The classified/selected delay branch must stay pinned for this invocation.
+    typed.assert_not_called()
+    assert futures[-1].result()['steps'] == [{'type': 'delay'}]
+
+
+def test_cancelled_native_utility_callback_rechecks_request_guard(runtime, monkeypatch):
+    runtime.utilities = type('Utilities', (), {'show': Mock()})()
+    token = runtime._dispatch_token
+    def check():
+        if runtime._dispatch_token != token:
+            raise RuntimeError('cancelled')
+    def post(fn):
+        # A stopped session invalidates the dispatch token while the idle is pending.
+        runtime._dispatch_token += 1
+        return fn()
+    monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', post)
+    try:
+        runtime._local_step({'type': 'local', 'operation': 'stopwatch'}, check, None)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError('Expected cancellation')
+    runtime.utilities.show.assert_not_called()
+
+
+def test_old_pinned_completion_must_not_reinsert_reset_toggle_definition(runtime, monkeypatch):
+    cfg = default_config()
+    cfg['actions']['test'] = {'label': 'Old definition', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+                             'toggle_steps': [[{'type': 'delay', 'milliseconds': 1}]]}
+    origin = {'app_id': 'editor', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime._toggle_state = {'test': (deepcopy(cfg['actions']['test']), 0)}
+    newer = deepcopy(cfg)
+    newer['actions']['test']['label'] = 'New definition'
+    runtime.store = type('Store', (), {'read': lambda _: deepcopy(newer)})()
+    def effect(*_):
+        runtime.reconcile_config()
+        assert 'test' not in runtime._toggle_state
+        return {'type': 'delay'}
+    monkeypatch.setattr('mx4_linux.actions.DesktopActions._step', effect)
+    runtime.execute('test', target=origin)
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 1
+    assert 'test' not in runtime._toggle_state
+
+
+def test_missing_local_handler_fails_before_any_earlier_effect(monkeypatch):
+    from mx4_linux.actions import DesktopActions
+    cfg = default_config()
+    cfg['actions']['test'] = {'label': 'Unavailable utility', 'steps': [
+        {'type': 'delay', 'milliseconds': 1}, {'type': 'local', 'operation': 'bell'}]}
+    runner = DesktopActions(cfg)
+    earlier = Mock()
+    monkeypatch.setattr(runner, '_delay', earlier)
+    try:
+        runner.execute('test')
+    except RuntimeError as exc:
+        assert 'native controller' in str(exc)
+    else:
+        raise AssertionError('Expected unavailable native controller')
+    earlier.assert_not_called()
+
+
+def test_changed_back_definition_during_first_run_still_resets_cycle(runtime, monkeypatch):
+    from copy import deepcopy
+    from mx4_linux.actions import default_config
+    cfg = default_config()
+    cfg['actions']['test'] = {'label': 'Original', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+        'toggle_steps': [[{'type': 'delay', 'milliseconds': 1}]]}
+    origin = {'app_id': 'editor', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime._toggle_state = {}
+    newer = deepcopy(cfg)
+    newer['actions']['test']['label'] = 'Edited then restored'
+    def effect(*_):
+        runtime._reset_changed_toggles(newer)
+        runtime._reset_changed_toggles(cfg)
+        return {'type': 'delay'}
+    monkeypatch.setattr('mx4_linux.actions.DesktopActions._step', effect)
+    runtime.execute('test', target=origin)
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 1
+    assert 'test' not in runtime._toggle_state
+
+
+def test_pinned_completion_does_not_overwrite_newer_toggle_index(runtime, monkeypatch):
+    from copy import deepcopy
+    from mx4_linux.actions import default_config
+    cfg = default_config()
+    cfg['actions']['test'] = {'label': 'Original', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+        'toggle_steps': [[{'type': 'delay', 'milliseconds': 1}]]}
+    origin = {'app_id': 'editor', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime._toggle_state = {'test': (deepcopy(cfg['actions']['test']), 0)}
+    newer_entry = (deepcopy(cfg['actions']['test']), 1)
+    def effect(*_):
+        runtime._toggle_state['test'] = newer_entry
+        return {'type': 'delay'}
+    monkeypatch.setattr('mx4_linux.actions.DesktopActions._step', effect)
+    runtime.execute('test', target=origin)
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 1
+    assert runtime._toggle_state['test'] is newer_entry
