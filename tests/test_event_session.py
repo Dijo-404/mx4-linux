@@ -329,3 +329,25 @@ print(json.dumps({'type': 'stopped'}), flush=True)
     finally:
         session.stop()
         process.wait(timeout=3)
+
+
+def test_configure_sends_only_validated_current_controls_and_stops_on_broken_pipe(processes):
+    session = EventSession(lambda _: None)
+    assert session.configure(default_config()) is None
+    session.start('fake', default_config())
+    process = processes[0]
+    process.stdout.put({'type': 'ready'})
+    wait_for(lambda: session.ready)
+    config = default_config()
+    config['button_bindings'] = {'82': 'copy'}
+    assert session.configure(config) == 1
+    assert json.loads(process.stdin.lines[-1]) == {'op': 'configure', 'config_id': 1,
+        'controls': [82, 416], 'ring_button': 416, 'raw_xy': True}
+    config['button_bindings'] = {'80': 'copy'}
+    with pytest.raises(ValueError):
+        session.configure(config)
+    process.stdin.failure = BrokenPipeError()
+    config['button_bindings'] = {}
+    assert session.configure(config) is None
+    assert session.stopping
+    assert session.configure(config) is None

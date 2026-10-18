@@ -8,6 +8,8 @@ import sys
 import threading
 import time
 
+from .event_worker import _validate
+
 
 _LOG = logging.getLogger(__name__)
 _MAX_LINE = 65536
@@ -17,11 +19,13 @@ class EventSession:
     def __init__(self, callback):
         self.callback = callback
         self.process = None
+        self.device_id = None
         self.session_id = 0
         self.ready = False
         self.stopping = False
         self._lock = threading.RLock()
         self._feedback_time = 0
+        self._config_id = 0
 
     @property
     def running(self):
@@ -51,6 +55,7 @@ class EventSession:
     def start(self, device_id, config):
         controls = sorted({config["ring_button"], *map(int, config["button_bindings"])})
         request = {"device_id": device_id, "controls": controls, "ring_button": config["ring_button"], "raw_xy": True}
+        _validate(request)
         with self._lock:
             if self.running:
                 raise RuntimeError("Mouse integration is already running.")
@@ -58,10 +63,12 @@ class EventSession:
                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        text=True, encoding="utf-8", bufsize=1)
             self.process = process
+            self.device_id = device_id
             self.session_id += 1
             session_id = self.session_id
             self.ready, self.stopping = False, False
             self._feedback_time = 0
+            self._config_id = 0
         errors = deque(maxlen=8)
         errors_lock = threading.Lock()
 
@@ -161,6 +168,21 @@ class EventSession:
             if self.process is None:
                 return False
             return self._send(self.process, self.session_id, request)
+
+    def configure(self, config):
+        """Request an exact control set; the worker acknowledges its safe boundary."""
+        controls = sorted({config["ring_button"], *map(int, config["button_bindings"])})
+        request = {"controls": controls, "ring_button": config["ring_button"], "raw_xy": True}
+        _validate({"device_id": "configure", **request})
+        with self._lock:
+            if not self.ready or self.stopping or not self.running:
+                return None
+            self._config_id += 1
+            config_id = self._config_id
+            if self._send(self.process, self.session_id, {"op": "configure", "config_id": config_id, **request}):
+                return config_id
+            self._stop_process(self.process, self.session_id)
+            return None
 
     def feedback(self, waveform=0):
         with self._lock:
