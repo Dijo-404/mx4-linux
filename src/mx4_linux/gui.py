@@ -179,7 +179,18 @@ class ControlWindow(Adw.ApplicationWindow):
                 self.current = None
                 self.clear_controls()
                 self.add_profiles()
-                self.status.set_text("Device operation cancelled; refresh to read current settings.")
+                # Always consume completion, including confirmed partial counts,
+                # while refusing callbacks that could apply an old readback.
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    detail = str(exc).strip()[:1200] or type(exc).__name__
+                    message = f"Previous device operation: {detail}"
+                else:
+                    count = result if type(result) is int else result.get("changes") if isinstance(result, dict) else None
+                    progress = f" with {count} confirmed changes" if type(count) is int and 0 <= count <= 65535 else ""
+                    message = f"Previous device operation finished{progress} before cancellation."
+                self.status.set_text(message + " Refresh to read current settings.")
                 return GLib.SOURCE_REMOVE
             try:
                 result = future.result()
