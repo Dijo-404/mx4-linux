@@ -2,11 +2,14 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import threading
+from copy import deepcopy
 
 from .gtk_support import Adw, Gdk, Gio, GLib, Gtk
 
 from .backend import Backend, DemoBackend
-from .profiles import ProfileStore, apply_profile
+from .profiles import ProfileStore, RememberedSettingsStore, apply_profile, replay_remembered
+from .reporting_state import valid_identity
 
 
 class ControlWindow(Adw.ApplicationWindow):
@@ -15,8 +18,15 @@ class ControlWindow(Adw.ApplicationWindow):
         self.demo = demo
         self.backend = DemoBackend() if demo else Backend()
         self.store = ProfileStore()
+        self.remembered = RememberedSettingsStore()
+        self.hardware_cancelled = threading.Event()
+        self.operation_epoch = 0
+        self._observed_online = set()
+        self.battery_source = 0
+        self.replay_suppressed_identity = None
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mx4-device")
         self.busy = False
+        self.pending_hardware = None
         self.devices = []
         self.selected_id = None
         self.current = None
@@ -73,11 +83,15 @@ class ControlWindow(Adw.ApplicationWindow):
                                  wrap=True, selectable=True, hexpand=True)
         self.status.add_css_class("dim-label")
         status_bar.append(self.status)
+        self.cancel_device = Gtk.Button(label="Cancel operation", visible=False, valign=Gtk.Align.CENTER)
+        self.cancel_device.connect("clicked", lambda *_: self.cancel_hardware())
+        status_bar.append(self.cancel_device)
         toolbar.add_bottom_bar(status_bar)
         toolbar.set_content(self.stack)
         self.toasts = Adw.ToastOverlay(child=toolbar)
         self.set_content(self.toasts)
         self.reload()
+        self.battery_source = GLib.timeout_add_seconds(30, self.refresh_battery)
 
     def add_page(self, name, title, heading, description):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24,
@@ -97,6 +111,11 @@ class ControlWindow(Adw.ApplicationWindow):
 
     def on_close(self, *_):
         self.closed = True
+        self.operation_epoch += 1
+        self.hardware_cancelled.set()
+        if self.battery_source:
+            GLib.source_remove(self.battery_source)
+            self.battery_source = 0
         self.wheel.stop()
         self.desktop.close()
         if self.device_refresh_source:
@@ -128,9 +147,12 @@ class ControlWindow(Adw.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def job(self, work, done, message, failed=None):
-        if self.busy:
+        if self.busy or self.pending_hardware:
             return
         self.busy = True
+        epoch = self.operation_epoch
+        self.hardware_cancelled.clear()
+        self.cancel_device.set_visible(True)
         self.controls.set_sensitive(False)
         self.profile_controls.set_sensitive(False)
         self.refresh.set_sensitive(False)
@@ -144,12 +166,19 @@ class ControlWindow(Adw.ApplicationWindow):
             if self.closed:
                 return GLib.SOURCE_REMOVE
             self.busy = False
+            self.cancel_device.set_visible(False)
             self.controls.set_sensitive(True)
             self.profile_controls.set_sensitive(True)
             self.refresh.set_sensitive(True)
             self.spinner.stop()
             self.spinner.set_visible(False)
             self.update_desktop_status()
+            if epoch != self.operation_epoch:
+                self.current = None
+                self.clear_controls()
+                self.add_profiles()
+                self.status.set_text("Device operation cancelled; refresh to read current settings.")
+                return GLib.SOURCE_REMOVE
             try:
                 result = future.result()
             except Exception as exc:
@@ -167,6 +196,12 @@ class ControlWindow(Adw.ApplicationWindow):
         def loaded(result):
             self.devices = result["devices"]
             self.render(result)
+            online = {(d.get("stable_id"), d["id"]) for d in self.devices if d.get("online") and valid_identity(d.get("stable_id"))}
+            new_connection = bool(self.current and (self.current.get("stable_id"), self.current["id"]) in online - self._observed_online)
+            self._observed_online = online
+            if new_connection and not self.demo and not self.desktop.session.running and not self.desktop._reconnect_busy:
+                epoch = self.operation_epoch
+                GLib.idle_add(lambda: self.recover_current(replay=self.current and self.current.get("stable_id") != self.replay_suppressed_identity) if not self.closed and epoch == self.operation_epoch else GLib.SOURCE_REMOVE)
             if notice:
                 self.status.set_text(notice)
         self.job(self.backend.scan, loaded, "Reading connected devices… Wake the mouse if it is asleep.")
@@ -231,6 +266,7 @@ class ControlWindow(Adw.ApplicationWindow):
         if not self.current["settings"]:
             self.controls.append(Gtk.Label(label="The mouse did not report any supported settings. Wake it and refresh.", wrap=True))
 
+        self.add_device_policies()
         self.add_profiles()
         self.update_desktop_status()
         diagnostic_text = " · ".join(d["message"] for d in result.get("diagnostics", []))
@@ -281,13 +317,16 @@ class ControlWindow(Adw.ApplicationWindow):
             active = self.desktop.session.running
             self.desktop_toggle.set_label("Disable" if active else "Enable")
             self.desktop_toggle.set_sensitive(not self.demo and not self.desktop.session.stopping
-                                                and (active or (not self.busy and bool(self.current and self.current.get("online")))))
+                                                and (active or (not self.busy and not self.pending_hardware and bool(self.current and self.current.get("online")))))
         if self.cancel_action:
             self.cancel_action.set_sensitive(self.desktop.action_busy)
 
     def select_device(self, chooser, _param, result):
         index = chooser.get_selected()
         if index < len(self.devices):
+            self.operation_epoch += 1
+            self.hardware_cancelled.set()
+            self.desktop.stop()
             self.selected_id = self.devices[index]["id"]
             self.render(result)
 
@@ -368,9 +407,13 @@ class ControlWindow(Adw.ApplicationWindow):
             previous = (previous or {}).get(str(key), (previous or {}).get(key))
         if setting["name"] != "haptic-play" and previous == value:
             return
-        device_id = self.current["id"]
+        device = deepcopy(self.current)
+        device_id = device["id"]
+        epoch = self.operation_epoch
         text = "Simulated change." if self.demo else f"Applied {setting['label']}."
         def applied(response):
+            if epoch != self.operation_epoch or not self.current or self.current["id"] != device_id or self.current.get("stable_id") != device.get("stable_id"):
+                return
             if response.get("refresh_required"):
                 self.refresh_after_write(text)
                 return
@@ -385,12 +428,202 @@ class ControlWindow(Adw.ApplicationWindow):
                     item["value"] = result
                 self.sync_setting(item, key if name == setting["name"] else None)
             self.update_wheel()
+            if self.demo and setting["name"] != "haptic-play":
+                try:
+                    self.remembered.update_confirmed(device["stable_id"], confirmed, key=key, demo=True)
+                except Exception as exc:
+                    self.status.set_text(f"{text} Remembered settings were not updated: {exc}")
+                    return
             self.status.set_text(text)
             self.toasts.add_toast(Adw.Toast(title=text, timeout=2))
         def failed(error):
             self.refresh_after_write(error)
-        self.job(lambda: self.backend.write(device_id, setting["name"], value, key),
-                 applied, f"Applying {setting['label']}…", failed=failed)
+        def work():
+            if self.closed or epoch != self.operation_epoch or self.hardware_cancelled.is_set():
+                raise RuntimeError("Device change cancelled")
+            if self.demo:
+                return self.backend.write(device_id, setting["name"], value, key)
+            return self.backend.write(device_id, setting["name"], value, key, expected_stable_id=device.get("stable_id"))
+        if setting["name"] == "reprogrammable-keys":
+            self.hardware_job(work, applied, f"Applying {setting['label']}…", failed=failed)
+        else:
+            self.job(work, applied, f"Applying {setting['label']}…", failed=failed)
+
+    def set_hardware_wait(self, token):
+        self.pending_hardware = token
+        active = bool(token) or self.busy
+        self.cancel_device.set_visible(active)
+        self.controls.set_sensitive(not active)
+        self.profile_controls.set_sensitive(not active)
+        self.refresh.set_sensitive(not active)
+        self.update_desktop_status()
+
+    def cancel_hardware(self):
+        self.set_hardware_wait(None)
+        self.hardware_cancelled.set()
+        self.operation_epoch += 1
+        self.desktop.stop()
+        self.desktop._reconnect_busy = False
+        self.status.set_text("Cancelling device operation after the current request…")
+
+    def hardware_job(self, work, done, message, failed=None, resume=True):
+        """Pause temporary reporting and await confirmed child cleanup before mapping/profile changes."""
+        if self.busy or self.pending_hardware or self.closed:
+            return
+        wait_token = object()
+        self.set_hardware_wait(wait_token)
+        generation = self.desktop._intent_generation
+        epoch = self.operation_epoch
+        wanted = self.desktop.requested_enabled and resume
+        self.desktop.hardware_paused = True
+        def stopped(restored):
+            if self.pending_hardware is wait_token:
+                self.set_hardware_wait(None)
+            if self.closed or epoch != self.operation_epoch or generation != self.desktop._intent_generation:
+                return
+            if restored is not True:
+                self.desktop.hardware_paused = False
+                self.status.set_text("Button restoration was not confirmed. Recover this mouse before changing its mappings or computer.")
+                return
+            def completed(result):
+                self.desktop.hardware_paused = False
+                done(result)
+                if (wanted and not self.busy and not self.closed and epoch == self.operation_epoch
+                        and generation == self.desktop._intent_generation and self.desktop.requested_enabled):
+                    self.desktop.start(automatic=True)
+            def failure(error):
+                self.desktop.hardware_paused = False
+                self.desktop.stop()
+                (failed or self.status.set_text)(error)
+            self.job(work, completed, message, failed=failure)
+        self.desktop.wait_stopped(stopped, preserve_intent=True)
+
+    def refresh_battery(self):
+        if self.closed:
+            return GLib.SOURCE_REMOVE
+        if self.busy or self.pending_hardware or not self.current or not self.current.get("online") or not valid_identity(self.current.get("stable_id")):
+            return GLib.SOURCE_CONTINUE
+        identity, device_id = self.current["stable_id"], self.current["id"]
+        def loaded(result):
+            if self.current and self.current.get("stable_id") == identity and self.current["id"] == device_id:
+                for name in ("battery", "battery_percent", "battery_observed_at"):
+                    self.current[name] = result.get(name)
+        def failed(_message):
+            loaded({})
+        self.job(lambda: self.backend.battery(device_id, identity), loaded, "Reading battery…", failed=failed)
+        return GLib.SOURCE_CONTINUE
+
+    def recover_current(self, replay=False):
+        if self.closed or self.busy or self.desktop.starting or self.desktop.session.running or self.desktop.session.stopping or not self.current:
+            return GLib.SOURCE_REMOVE
+        device = deepcopy(self.current)
+        identity = device.get("stable_id")
+        if not device.get("online") or not valid_identity(identity):
+            self.status.set_text("Wake and refresh this mouse before recovery.")
+            return GLib.SOURCE_REMOVE
+        epoch = self.operation_epoch
+        def cancelled():
+            return self.closed or epoch != self.operation_epoch or self.hardware_cancelled.is_set()
+        def work():
+            if cancelled():
+                raise RuntimeError("Recovery cancelled")
+            result = self.backend.recover(device["id"], identity)
+            if replay and not cancelled():
+                result["changes"] = replay_remembered(self.backend, device, store=self.remembered,
+                                                      demo=self.demo, cancelled=cancelled)
+            return result
+        def loaded(result):
+            if cancelled():
+                return
+            self.desktop.restoration_confirmed = True
+            self.status.set_text("Previous button reporting restored." + (f" Remembered settings applied · {result['changes']} changes." if result.get('changes') else ""))
+            if result.get("changes"):
+                self.reload()
+        self.job(work, loaded, "Recovering this mouse's previous button reporting…")
+        return GLib.SOURCE_REMOVE
+
+    def remember_current(self, enabled):
+        if self.busy or not self.current:
+            return
+        device = deepcopy(self.current)
+        if enabled:
+            self.replay_suppressed_identity = None
+        self.job(lambda: self.remembered.set_enabled(device, enabled, demo=self.demo),
+                 lambda _result: self.status.set_text("Settings will be remembered for this mouse." if enabled else "Remembered settings disabled."),
+                 "Updating remembered settings…", failed=lambda error: self.reload(error))
+
+    def set_resume_integration(self, enabled):
+        if self.closed or self.busy:
+            return
+        document = deepcopy(self.desktop.config)
+        document["resume_integration"] = bool(enabled)
+        def saved(_result):
+            self.desktop.config["resume_integration"] = bool(enabled)
+            if not enabled:
+                self.desktop._cancel_reconnect()
+            self.status.set_text("Reconnect preference saved.")
+        self.job(lambda: self.desktop.store.save(document), saved, "Saving reconnect preference…")
+
+    def request_host_switch(self, index):
+        if self.closed or self.busy or self.pending_hardware or not self.current:
+            return
+        device = deepcopy(self.current)
+        epoch = self.operation_epoch
+        wait_token = object()
+        self.set_hardware_wait(wait_token)
+        self.replay_suppressed_identity = device.get("stable_id")
+        self.desktop.stop()  # Explicit switching suppresses automatic resume and replay.
+        generation = self.desktop._intent_generation
+        def stopped(restored):
+            if self.pending_hardware is wait_token:
+                self.set_hardware_wait(None)
+            if (self.closed or epoch != self.operation_epoch or generation != self.desktop._intent_generation
+                    or not self.current or self.current.get("stable_id") != device.get("stable_id")):
+                return
+            if restored is not True:
+                self.status.set_text("Button restoration was not confirmed. Recover this mouse before switching computers.")
+                return
+            def work():
+                if self.closed or epoch != self.operation_epoch or self.hardware_cancelled.is_set():
+                    raise RuntimeError("Computer switch cancelled")
+                return self.backend.switch_host(device["id"], index, device.get("stable_id"))
+            self.job(work, lambda result: self.status.set_text(result["message"]), "Requesting computer switch…")
+        self.desktop.wait_stopped(stopped, preserve_intent=True)
+
+    def add_device_policies(self):
+        group = Adw.PreferencesGroup(title="Remember and reconnect")
+        self.controls.append(group)
+        valid = valid_identity(self.current.get("stable_id"))
+        try:
+            remembered = self.remembered.get(self.current, demo=self.demo) is not None
+        except Exception as exc:
+            remembered = False
+            group.add(Adw.ActionRow(use_markup=False, title="Remembered settings unavailable", subtitle=str(exc)))
+        row = Adw.SwitchRow(title="Remember settings for this mouse", subtitle="Reapply confirmed hardware settings when the same mouse reconnects.", active=remembered, sensitive=valid)
+        row.connect("notify::active", lambda switch, _p: self.remember_current(switch.get_active()))
+        group.add(row)
+        resume = Adw.SwitchRow(title="Resume integration on reconnect", subtitle="Resume only for this mouse after a confirmed recovery.", active=self.desktop.config.get("resume_integration", False), sensitive=not self.demo and valid)
+        resume.connect("notify::active", lambda switch, _p: self.set_resume_integration(switch.get_active()))
+        group.add(resume)
+        row = Adw.ActionRow(use_markup=False, title="Restore previous button reporting", subtitle="Recover this app's temporary reporting after a disconnect or unexpected exit.")
+        button = Gtk.Button(label="Recover", valign=Gtk.Align.CENTER, sensitive=valid)
+        button.connect("clicked", lambda *_: self.recover_current())
+        row.add_suffix(button)
+        group.add(row)
+        hosts = self.current.get("easy_switch", {})
+        host_group = Adw.PreferencesGroup(title="Easy-Switch", description="Switch to a computer already paired with this mouse.")
+        self.controls.append(host_group)
+        if not hosts.get("supported"):
+            host_group.add(Adw.ActionRow(use_markup=False, title="Computer channels unavailable", subtitle="Wake and refresh the mouse to read supported channels."))
+        for host in hosts.get("hosts", []):
+            current = host["index"] == hosts.get("current")
+            row = Adw.ActionRow(use_markup=False, title=f"{host['index'] + 1} · {host['name']}",
+                                subtitle="Current computer" if current else "Paired computer" if host.get("paired") else "Pairing unavailable" if host.get("paired") is None else "Not paired")
+            button = Gtk.Button(label="Current" if current else "Switch", valign=Gtk.Align.CENTER,
+                                sensitive=valid and not current and host.get("paired") is True)
+            button.connect("clicked", lambda *_, index=host["index"]: self.request_host_switch(index))
+            row.add_suffix(button)
+            host_group.add(row)
 
     def sync_setting(self, setting, key=None):
         entry = self.setting_widgets.get((setting["name"], key))
@@ -463,7 +696,7 @@ class ControlWindow(Adw.ApplicationWindow):
         def apply(*_):
             profile = profiles[names[chooser.get_selected()]]
             device = self.current
-            self.job(lambda: apply_profile(self.backend, device, profile, demo=self.demo, cancelled=lambda: self.closed),
+            self.hardware_job(lambda: apply_profile(self.backend, device, profile, demo=self.demo, cancelled=lambda: self.closed or self.hardware_cancelled.is_set()),
                      lambda count: self.refresh_after_write(f"Profile applied · {count} changes."), "Applying profile…",
                      failed=self.refresh_after_write)
         apply_button.connect("clicked", apply)

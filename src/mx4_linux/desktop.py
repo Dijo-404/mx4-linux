@@ -12,6 +12,7 @@ from .actions import DesktopActions, DesktopConfigStore, focused_context, resolv
 from .context import NiriFocusObserver
 from .event_session import EventSession
 from .gtk_support import GLib
+from .reporting_state import valid_identity
 
 
 class DesktopController:
@@ -54,6 +55,15 @@ class DesktopController:
         self._ring_observer = None
         self._ring_context_token = 0
         self._ring_focus_lost = threading.Event()
+        self.requested_enabled = False
+        self.hardware_paused = False
+        self.target_identity = None
+        self._intent_generation = 0
+        self.reconnect_source = 0
+        self.reconnect_attempt = 0
+        self._reconnect_busy = False
+        self._stop_waiters = []
+        self.restoration_confirmed = None
         self.reload_config()
 
     def queue_event(self, event):
@@ -99,7 +109,7 @@ class DesktopController:
         if not self.closed:
             self.window.update_desktop_status()
 
-    def start(self):
+    def start(self, automatic=False):
         if self.window.demo:
             self.notify("Preview mode does not access mouse buttons. Use Preview ring.")
             return
@@ -116,6 +126,19 @@ class DesktopController:
         if not self.window.current or not self.window.current.get("online"):
             self.notify("Wake and refresh the mouse before enabling integration.")
             return
+        identity = self.window.current.get("stable_id")
+        if not valid_identity(identity) or identity.startswith("demo:"):
+            self.notify("Wake and refresh this mouse to read its identity before enabling integration.")
+            return
+        if automatic and (not self.requested_enabled or identity != self.target_identity):
+            return
+        if not automatic:
+            self.window.replay_suppressed_identity = None
+            self._cancel_reconnect()
+            self._intent_generation += 1
+            self.requested_enabled = True
+            self.target_identity = identity
+            self.reconnect_attempt = 0
         self.starting = True
         self._context_token += 1
         token, revision = self._context_token, self._context_revision
@@ -127,7 +150,7 @@ class DesktopController:
                 return GLib.SOURCE_REMOVE
             self.starting = False
             if (self.window.busy or not self.window.current or not self.window.current.get("online")
-                    or self.window.current["id"] != device_id):
+                    or self.window.current["id"] != device_id or self.window.current.get("stable_id") != identity):
                 self.notify("The selected mouse changed; refresh and enable integration again.")
                 return GLib.SOURCE_REMOVE
             try:
@@ -137,7 +160,8 @@ class DesktopController:
                 self._pending_configs.clear()
                 self._context_revision += 1
                 self._active_revision = self._context_revision
-                self.session.start(device_id, self.effective_config)
+                self.restoration_confirmed = None
+                self.session.start(device_id, self.effective_config, expected_stable_id=identity)
                 session_id = self.session.session_id
                 self.observer = NiriFocusObserver(lambda event: self.queue_event(
                     {**event, "context_token": token, "session_id": session_id}))
@@ -148,7 +172,18 @@ class DesktopController:
             return GLib.SOURCE_REMOVE
         future.add_done_callback(lambda _: GLib.idle_add(begin))
 
-    def stop(self):
+    def _cancel_reconnect(self):
+        if getattr(self, "reconnect_source", 0):
+            GLib.source_remove(self.reconnect_source)
+            self.reconnect_source = 0
+
+    def stop(self, preserve_intent=False):
+        self.cancelled.set()
+        if not preserve_intent:
+            self.hardware_paused = False
+            self.requested_enabled = False
+            self._intent_generation = getattr(self, "_intent_generation", 0) + 1
+            self._cancel_reconnect()
         self._stop_ring_context()
         self._cancel_adjustments()
         self._open_token += 1
@@ -222,6 +257,8 @@ class DesktopController:
                 self._pending_configs = {key: value for key, value in self._pending_configs.items()
                                          if key > event["config_id"]}
         elif kind == "ready":
+            self._cancel_reconnect()
+            self.reconnect_attempt = 0
             self.error = None
             self.notify("Enabled · hold the haptic panel, move, then release. A short click opens the ring.")
             if self.context_available is False:
@@ -251,7 +288,18 @@ class DesktopController:
             self._stop_context()
             if self.ring:
                 self.ring.dismiss()
-            self.notify(self.error or "Mouse integration disabled. Previous button behavior restored.")
+            outcome = event.get("restored")
+            self.restoration_confirmed = outcome if type(outcome) is bool else None
+            if outcome is True:
+                self.notify(self.error or "Mouse integration disabled. Previous button behavior restored.")
+            else:
+                self.notify("Mouse integration stopped; previous button behavior was not confirmed. Wake/reconnect this mouse and retry recovery.")
+            waiters = getattr(self, "_stop_waiters", [])
+            self._stop_waiters = []
+            for callback in waiters:
+                callback(self.restoration_confirmed)
+            if getattr(self, "requested_enabled", False):
+                self._schedule_reconnect()
         elif kind == "button" and event.get("cancelled"):
             self._cancel_adjustments()
             self._open_token += 1
@@ -289,6 +337,83 @@ class DesktopController:
                     self._opening_motion.append((dx, dy))
                 elif self.ring and self.ring.state.visible:
                     self.ring.motion(dx, dy)
+        return GLib.SOURCE_REMOVE
+
+    def wait_stopped(self, callback, preserve_intent=False):
+        """Asynchronously wait for actual child exit and its restoration outcome."""
+        self.stop(preserve_intent=preserve_intent)
+        if self.session.running or self.session.stopping:
+            self._stop_waiters.append(callback)
+            def timeout():
+                if callback in self._stop_waiters:
+                    self._stop_waiters.remove(callback)
+                    callback(None)
+                return GLib.SOURCE_REMOVE
+            GLib.timeout_add(31000, timeout)
+        else:
+            # With no listener, the worker's clean-journal/lock check remains authoritative.
+            callback(True if self.restoration_confirmed is True or not getattr(self.session, "process", None)
+                     else getattr(self.session, "restored", None))
+
+    def _schedule_reconnect(self):
+        if (self.closed or not getattr(self, "requested_enabled", False)
+                or not self.config.get("resume_integration", False)
+                or getattr(self, "hardware_paused", False) or self.reconnect_source or self._reconnect_busy):
+            return
+        delays = (1, 2, 5, 10, 20, 30)
+        if self.reconnect_attempt >= len(delays):
+            self.notify("Mouse unavailable; wake this mouse and enable integration to retry.")
+            return
+        generation = self._intent_generation
+        self.reconnect_source = GLib.timeout_add(delays[self.reconnect_attempt] * 1000,
+                                                 lambda: self._reconnect(generation))
+
+    def _reconnect(self, generation):
+        self.reconnect_source = 0
+        if self.closed or generation != self._intent_generation or not self.requested_enabled:
+            return GLib.SOURCE_REMOVE
+        if self.session.running and not self.session.stopping:
+            return GLib.SOURCE_REMOVE
+        if self.window.busy or self.session.stopping or self.starting or self.hardware_paused:
+            self.reconnect_source = GLib.timeout_add(500, lambda: self._reconnect(generation))
+            return GLib.SOURCE_REMOVE
+        self.reconnect_attempt += 1
+        self._reconnect_busy = True
+        identity = self.target_identity
+        def cancelled():
+            return self.closed or generation != self._intent_generation or not self.requested_enabled
+        def work():
+            from .profiles import replay_remembered
+            result = self.window.backend.scan()
+            device = next((d for d in result["devices"] if d.get("online") and d.get("stable_id") == identity), None)
+            if device is None or cancelled():
+                raise RuntimeError("The same mouse is not awake yet")
+            self.window.backend.recover(device["id"], identity)
+            if cancelled():
+                raise RuntimeError("Reconnect cancelled")
+            replay_remembered(self.window.backend, device, cancelled=cancelled)
+            if cancelled():
+                raise RuntimeError("Reconnect cancelled")
+            return self.window.backend.scan()
+        def loaded(result):
+            self._reconnect_busy = False
+            if cancelled():
+                return
+            device = next((d for d in result["devices"] if d.get("online") and d.get("stable_id") == identity), None)
+            if device is None:
+                self._schedule_reconnect()
+                return
+            self.window.selected_id = device["id"]
+            self.window.devices = result["devices"]
+            self.window.render(result)
+            self.restoration_confirmed = True
+            self.start(automatic=True)
+        def failed(message):
+            self._reconnect_busy = False
+            if not cancelled():
+                self.notify(message)
+                self._schedule_reconnect()
+        self.window.job(work, loaded, "Looking for this mouse and recovering previous button reporting…", failed=failed)
         return GLib.SOURCE_REMOVE
 
     def open_ring(self, preview=False, held=False):
@@ -639,6 +764,10 @@ class DesktopController:
         self.notify(self.error or "Configuration saved. Enable mouse integration to use the new assignments.")
 
     def close(self):
+        self.requested_enabled = False
+        self._intent_generation = getattr(self, "_intent_generation", 0) + 1
+        self._cancel_reconnect()
+        self._stop_waiters = []
         self._stop_ring_context()
         self._cancel_adjustments()
         self.closed = True

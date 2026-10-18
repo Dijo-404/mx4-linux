@@ -154,7 +154,7 @@ def test_stopped_is_delivered_once_only_after_process_exit_and_cleanup(processes
     assert not session.running and not session.stopping and not session.ready
     assert process.stdin.closed and process.stdout.closed and process.stderr.closed
     assert [e["type"] for e in events] == ["ready", "stopped"]
-    assert events[-1] == {"type": "stopped", "exit_code": 0, "session_id": 1}
+    assert events[-1] == {"type": "stopped", "restored": None, "exit_code": 0, "session_id": 1}
     assert process.stderr.close_count == 1
     assert process.stderr.close_thread == "mx4-event-stderr"
 
@@ -351,3 +351,18 @@ def test_configure_sends_only_validated_current_controls_and_stops_on_broken_pip
     assert session.configure(config) is None
     assert session.stopping
     assert session.configure(config) is None
+
+
+@pytest.mark.parametrize('reported,exit_code,expected', [(True, 0, True), (False, 0, False), (None, 0, None), (True, 1, None)])
+def test_restoration_outcome_is_current_session_only_after_child_exit(processes, reported, exit_code, expected):
+    events = []
+    session = EventSession(events.append)
+    session.start('mouse', default_config())
+    process = processes[0]
+    process.stdout.put({'type': 'stopped', 'restored': reported})
+    time.sleep(.01)
+    assert session.restored is None
+    process.exit(exit_code)
+    wait_for(lambda: any(event['type'] == 'stopped' for event in events))
+    assert session.restored is expected
+    assert events[-1]['restored'] is expected

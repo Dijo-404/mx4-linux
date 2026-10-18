@@ -38,7 +38,8 @@ def test_cli_rejects_unparsed_values_before_worker(monkeypatch, capsys):
 
 def test_cli_forwards_numeric_key_and_boolean(monkeypatch, capsys):
     seen = []
-    monkeypatch.setattr(Backend, "write", lambda *args: seen.append(args) or {"ok": True})
+    monkeypatch.setattr(Backend, "scan", lambda _self: {"devices": [{"id": "id", "online": True, "stable_id": "unit:a1b2c3d4"}]})
+    monkeypatch.setattr(Backend, "write", lambda *args, **kw: seen.append(args) or {"ok": True})
     assert main(["set", "id", "reprogrammable-keys", "86", "--key", "83"]) == 0
     assert seen[0][1:] == ("id", "reprogrammable-keys", 86, 83)
 

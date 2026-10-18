@@ -19,6 +19,11 @@ from mx4_linux import event_worker as worker
 from mx4_linux.device_worker import _device_id
 
 
+@pytest.fixture(autouse=True)
+def private_reporting_state(tmp_path, monkeypatch):
+    monkeypatch.setenv('XDG_STATE_HOME', str(tmp_path))
+
+
 FEATURE = 0x1B04
 INDEX = 9
 TARGET = _device_id("/dev/hidraw-test", 255)
@@ -31,6 +36,7 @@ def notification(address=0, data=b"\0" * 8, number=255, index=INDEX):
 class FakeDevice:
     def __init__(self):
         self.name, self.number, self.online = "MX Master 4", 255, True
+        self.id = self.unitId = "a1b2c3d4"
         self.handle, self.receiver = 23, None
         self.features = {FEATURE: INDEX}
         # Persistent and analytics bits deliberately survive temporary changes.
@@ -45,6 +51,8 @@ class FakeDevice:
         self.feature_request = Mock(side_effect=self._feature_request)
 
     def _feature_request(self, feature, function, *data):
+        if feature == 3 and function == 0:
+            return b'\0' + bytes.fromhex(self.id) + b'\0' * 8
         assert feature == FEATURE
         payload = bytes(data)
         cid = int.from_bytes(payload[:2])
@@ -104,7 +112,7 @@ def test_real_solaar_setters_restore_flags_and_keep_all_mappings():
     assert run(dev, api, commands, events, controls=[82, 416])
     assert events == [
         {"type": "ready", "controls": [82, 416], "ring_button": 416, "raw_xy": True},
-        {"type": "stopped"},
+        {"type": "stopped", "restored": True},
     ]
     assert dev.reporting == before
     assert {cid for cid, _, _ in dev.writes} == {82, 416}
@@ -157,7 +165,7 @@ def test_invalid_request_never_changes_any_device(config):
     assert not run(dev, api, commands, events, **config)
     assert dev.writes == []
     assert events[0]["type"] == "error"
-    assert events[-1] == {"type": "stopped"}
+    assert events[-1] == {"type": "stopped", "restored": None}
 
 
 @pytest.mark.parametrize("bad_flags", [0, 0x20, 0x1A0])
@@ -182,7 +190,7 @@ def test_acknowledgement_failure_after_firmware_change_still_restores():
 
 def test_failed_live_snapshot_never_accepts_solaar_fallback_defaults():
     dev, api, commands, events = setup_session()
-    dev.feature_request.side_effect = lambda *_args: None
+    dev.feature_request.side_effect = lambda feature, function, *args: dev._feature_request(feature, function, *args) if feature == 3 else None
     assert not run(dev, api, commands, events)
     assert dev.writes == []
     assert "No live reporting reply" in events[0]["message"]
@@ -309,7 +317,7 @@ def test_sigterm_uses_normal_restore_path_and_restores_signal_handlers():
         assert worker.run({"device_id": TARGET}, api, commands, events.append, stop)
     assert signal.getsignal(signal.SIGTERM) == old_handler
     assert dev.reporting[416] == (0x104, 416)
-    assert events[-1] == {"type": "stopped"}
+    assert events[-1] == {"type": "stopped", "restored": True}
 
 
 def test_unplug_reports_error_and_attempts_all_restoration():
@@ -337,7 +345,7 @@ def test_cleanup_failure_is_reported_and_other_controls_still_restore():
     assert dev.reporting[82] == (0x104, 83)
     assert not dev.reporting[416][0] & 16
     assert "Could not restore mouse reporting" in events[-2]["message"]
-    assert events[-1] == {"type": "stopped"}
+    assert events[-1] == {"type": "stopped", "restored": False}
     dev.close.assert_called_once()
 
 
@@ -624,3 +632,97 @@ def test_malformed_configure_requires_explicit_control_and_reporting_fields():
     commands.put({'op': 'configure', 'config_id': 1})
     assert not run(dev, api, commands, events)
     assert dev.reporting[416] == (0x104, 416)
+
+
+def test_journal_precedes_each_setter_and_clears_only_after_confirmed_stop(monkeypatch):
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    original = dev._feature_request
+    def request(feature, function, *args):
+        if feature == FEATURE and function == 0x30:
+            # Both acquire and restore have a durable original snapshot first.
+            record = Ownership('unit:a1b2c3d4').read()
+            assert record and record['controls'][0]['flags'] == 0x104
+        return original(feature, function, *args)
+    dev.feature_request.side_effect = request
+    assert run(dev, api, commands, events)
+    assert events[-1]['restored'] is True
+    assert Ownership('unit:a1b2c3d4').read() is None
+
+
+def test_persistence_failure_before_setter_does_not_change_firmware(monkeypatch):
+    monkeypatch.setattr('mx4_linux.reporting_state.atomic_json', Mock(side_effect=OSError('disk full')))
+    dev, api, commands, events = setup_session()
+    assert not run(dev, api, commands, events)
+    assert dev.writes == []
+
+
+def test_orphan_recovers_before_new_baseline_and_already_restored_needs_no_write():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+    dev.reporting[416] = (0x115, 416)
+    assert run(dev, api, commands, events)
+    assert dev.reporting[416] == (0x104, 416)
+    assert dev.writes[:2] == [(416, 32, 0), (416, 2, 0)]
+    assert Ownership('unit:a1b2c3d4').read() is None
+    before = list(dev.writes)
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+        worker.recover_reporting(dev, api, owner)
+        assert owner.read() is None
+    assert before == dev.writes
+
+
+def test_orphan_mapping_conflict_validated_before_any_recovery_write():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(82, 0x104, 83, 1)
+        owner.touch(416, 0x104, 416, 17)
+    dev.reporting[82] = (0x105, 83)
+    dev.reporting[416] = (0x115, 86)
+    assert not run(dev, api, commands, events)
+    assert dev.writes == []
+    assert events[-1]['restored'] is False
+    assert Ownership('unit:a1b2c3d4').read()
+
+
+def test_reporting_lock_contention_never_writes():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4'):
+        assert not run(dev, api, commands, events)
+    assert not dev.writes
+    assert events[-1]['restored'] is None
+
+
+def test_fresh_identity_change_stops_before_setter_and_keeps_orphan():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    original = dev._feature_request
+    id_reads = 0
+    def requests(feature, function, *args):
+        nonlocal id_reads
+        if feature == 3:
+            id_reads += 1
+            if id_reads > 2:
+                return b'\0' + bytes.fromhex('d1e2f3a4') + b'\0' * 8
+        return original(feature, function, *args)
+    dev.feature_request.side_effect = requests
+    assert not run(dev, api, commands, events)
+    assert len(dev.writes) <= 1
+    assert Ownership('unit:a1b2c3d4').read()
+
+
+def test_restore_timeout_after_firmware_change_can_be_confirmed_live():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    # Enabling writes two flags; the first restore write changes firmware then
+    # raises. Its live original value still authorizes confirmed cleanup.
+    dev.fail_after_write = 3
+    assert run(dev, api, commands, events)
+    assert events[-1]['restored'] is True
+    assert dev.reporting[416] == (0x104, 416)
+    assert Ownership('unit:a1b2c3d4').read() is None
