@@ -8,7 +8,7 @@ import math
 import threading
 import time
 
-from .actions import (BUTTON_IDS, DesktopActions, DesktopConfigStore, apply_local_assignment, ExecutionSelection,
+from .actions import (BUTTON_IDS, DesktopActions, DesktopConfigStore, apply_local_assignment, ExecutionSelection, ToggleState,
                       focused_context, resolve_config, restore_focus, steps_send_input)
 from .context import NiriFocusObserver
 from .event_session import EventSession
@@ -26,7 +26,7 @@ class DesktopController:
         self.message = "Enable mouse integration to use configured button assignments."
         self.closed = False
         self.action_busy = False
-        self._toggle_state = {}
+        self._toggle_state = ToggleState()
         self.utilities = None
         self.cancelled = threading.Event()
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mx4-actions")
@@ -91,14 +91,20 @@ class DesktopController:
             self.event(event)
         return GLib.SOURCE_REMOVE
 
+    def _toggle_session(self):
+        if not isinstance(getattr(self, "_toggle_state", None), ToggleState):
+            self._toggle_state = ToggleState(getattr(self, "_toggle_state", None))
+        return self._toggle_state
+
     def _reset_changed_toggles(self, document):
-        selection = getattr(self, "_action_selection", None)
-        if selection is not None and selection.action != document["actions"].get(selection.action_id):
-            selection.current = False
-        state = getattr(self, "_toggle_state", {})
-        for action_id in tuple(state):
-            if state[action_id][0] != document["actions"].get(action_id):
-                del state[action_id]
+        state = self._toggle_session()
+        with state.lock:
+            selection = getattr(self, "_action_selection", None)
+            if selection is not None and selection.action != document["actions"].get(selection.action_id):
+                selection.current = False
+            for action_id in tuple(state):
+                if state[action_id][0] != document["actions"].get(action_id):
+                    del state[action_id]
 
     def reload_config(self):
         self._stop_ring_context()
@@ -815,15 +821,15 @@ class DesktopController:
             return
         self.action_busy = True
         snapshot = deepcopy(config or self.effective_config or self.config)
-        if not hasattr(self, "_toggle_state"):
-            self._toggle_state = {}
+        state = self._toggle_session()
         try:
-            selection = ExecutionSelection(action_id, snapshot["actions"][action_id], adjustment, self._toggle_state)
+            with state.lock:
+                selection = ExecutionSelection(action_id, snapshot["actions"][action_id], adjustment, state)
+                self._action_selection = selection
         except (KeyError, RuntimeError) as exc:
             self.action_busy = False
             self.notify(str(exc))
             return
-        self._action_selection = selection
         session_id, dispatch_token = self.session.session_id, self._dispatch_token
         self.cancelled.clear()
         focus_lost = getattr(self, "_ring_focus_lost", threading.Event())
@@ -874,8 +880,9 @@ class DesktopController:
         future = self.executor.submit(run)
         def finished():
             self.action_busy = False
-            if getattr(self, "_action_selection", None) is selection:
-                self._action_selection = None
+            with state.lock:
+                if getattr(self, "_action_selection", None) is selection:
+                    self._action_selection = None
             if self.closed:
                 if completed:
                     completed(False)
