@@ -7,7 +7,7 @@ from .gtk_support import Gdk, Gtk, Layer
 from gi.repository import GObject, Pango
 from .motion import Transition
 from .ring_icons import action_icon
-from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, RingState, button_center
+from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, RingGeometry, RingState, button_at, button_center
 
 
 WIDTH, HEIGHT = 720, 460
@@ -16,10 +16,15 @@ CHILD_RADIUS = 23
 
 
 class ActionsRing(Gtk.Window):
-    def __init__(self, application, selected, dismissed, hovered=None):
+    def __init__(self, application, selected, dismissed, hovered=None, adjusted=None):
         super().__init__(application=application, title="MX4 Actions Ring", decorated=False,
                          resizable=False, default_width=WIDTH, default_height=HEIGHT)
         self.state = RingState()
+        self.geometry = RingGeometry()
+        self.on_adjusted = adjusted
+        self._adjusted_in_hold = False
+        self._keyboard_yielded = False
+        self._saved_focus = None
         self.on_selected, self.on_dismissed, self.on_hover = selected, dismissed, hovered
         self.config = None
         self.preview = False
@@ -63,6 +68,7 @@ class ActionsRing(Gtk.Window):
             }
         """)
         Gtk.StyleContext.add_provider_for_display(display, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.scale_css = Gtk.CssProvider()
         self.canvas = Gtk.DrawingArea(content_width=WIDTH, content_height=HEIGHT, focusable=True)
         self.canvas.update_property([Gtk.AccessibleProperty.LABEL],
                                     ["Actions Ring. Arrow keys select, Enter opens or runs, keys 1 through 8 choose, Escape goes back or closes."])
@@ -108,15 +114,22 @@ class ActionsRing(Gtk.Window):
         self.callout_key.add_css_class("ring-shortcut")
         self.callout.append(self.callout_key)
         self.labels.put(self.callout, 0, 0)
-        self.instructions = Gtk.Label(width_request=480)
+        self.instructions = Gtk.Label(width_request=480, ellipsize=Pango.EllipsizeMode.END, max_width_chars=1)
         self.instructions.add_css_class("ring-hint")
         self.instructions.set_can_target(False)
         self.labels.put(self.instructions, 30, HEIGHT - 28)
+        for widget in (self.callout, self.callout_label, self.callout_key, self.instructions):
+            widget.get_style_context().add_provider(self.scale_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
         self.set_child(self.surface)
         motion = Gtk.EventControllerMotion()
         motion.connect("motion", self.pointer_motion)
         motion.connect("leave", self.pointer_leave)
         self.surface.add_controller(motion)
+        scroll = Gtk.EventControllerScroll(flags=(Gtk.EventControllerScrollFlags.VERTICAL
+                    | Gtk.EventControllerScrollFlags.HORIZONTAL | Gtk.EventControllerScrollFlags.DISCRETE))
+        scroll.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        scroll.connect("scroll", self.scroll)
+        self.surface.add_controller(scroll)
         click = Gtk.GestureClick(button=1)
         # Native buttons have square allocations. Claim pointer clicks here so
         # only the actual circular faces can select an action.
@@ -144,14 +157,42 @@ class ActionsRing(Gtk.Window):
         return self.config.get("ring_groups", {}) if self.config else {}
 
     def show_ring(self, config, held=False, preview=False):
+        geometry = RingGeometry(config.get("ring_scale", 100))
+        state = RingState(config.get("ring_motion_gain", .45), config.get("ring_deadzone", 24))
+        self.geometry, self.state = geometry, state
         self.config, self.preview = config, preview
+        self._adjusted_in_hold = False
+        self._keyboard_yielded = False
+        if self.overlay_supported:
+            Layer.set_keyboard_mode(self, Layer.KeyboardMode.EXCLUSIVE)
+        self.set_default_size(geometry.size(WIDTH), geometry.size(HEIGHT))
+        self.canvas.set_content_width(geometry.size(WIDTH))
+        self.canvas.set_content_height(geometry.size(HEIGHT))
+        for button, icon in zip(self.buttons + self.child_buttons, self.icons + self.child_icons):
+            radius = CHILD_RADIUS if button in self.child_buttons else BUTTON_RADIUS
+            button.set_size_request(geometry.size(radius * 2), geometry.size(radius * 2))
+            icon.set_pixel_size(geometry.size(23))
+        self.close_button.set_size_request(geometry.size(32), geometry.size(32))
+        self.close_button.get_child().set_pixel_size(geometry.size(16))
+        scale = geometry.scale
+        self.scale_css.load_from_string(f"""
+            .ring-callout {{ padding: {7 * scale}px {10 * scale}px; border-radius: {12 * scale}px; }}
+            .ring-callout label {{ font-size: {13 * scale}px; }}
+            .ring-shortcut {{ font-size: {11 * scale}px; }}
+            .ring-hint {{ font-size: {12 * scale}px; padding: {6 * scale}px {12 * scale}px;
+                         border-radius: {12 * scale}px; }}
+        """)
+        self.callout.set_spacing(geometry.size(8))
+        self._move(self.close_button, CENTER_X - CENTER_RADIUS, CENTER_Y - CENTER_RADIUS)
+        self.instructions.set_size_request(geometry.size(480), -1)
+        self._move(self.instructions, 30, HEIGHT - 28)
         self.close_group()
         self.state.open(held)
         for index, action_id in enumerate(config["ring"]):
             action = config["actions"][action_id]
             grouped = str(index) in self.groups()
             self.icons[index].set_from_icon_name(action_icon(action, grouped=grouped))
-            text = f"{index + 1}. {action['label']}" + (". Open action group" if grouped else "")
+            text = f"{index + 1}. {action['label']}" + (". Open action group" if grouped else self.adjustment_hint(action))
             self.buttons[index].set_tooltip_text(text)
             self.buttons[index].update_property([Gtk.AccessibleProperty.LABEL], [text])
             if grouped:
@@ -167,6 +208,7 @@ class ActionsRing(Gtk.Window):
         self.animate()
 
     def hide_ring(self):
+        self._adjusted_in_hold = False
         self.state.cancel()
         self.close_group()
         self.stop_animation()
@@ -193,6 +235,12 @@ class ActionsRing(Gtk.Window):
             self.on_selected(self.config["ring"][chosen], self.preview)
 
     def release_button(self):
+        if self.state.visible and self.state.held and self._adjusted_in_hold:
+            self.state.held = False
+            self._adjusted_in_hold = False
+            self.update_labels()
+            self.canvas.queue_draw()
+            return
         index = self.state.selected
         if self.state.visible and self.state.held and index is not None and str(index) in self.groups():
             self.commit(index)
@@ -241,7 +289,7 @@ class ActionsRing(Gtk.Window):
                 if i < len(children):
                     action = self.config["actions"][children[i]]
                     self.child_icons[i].set_from_icon_name(action_icon(action))
-                    label = f"{i + 1}. {action['label']}"
+                    label = f"{i + 1}. {action['label']}" + self.adjustment_hint(action)
                     button.set_tooltip_text(label)
                     button.update_property([Gtk.AccessibleProperty.LABEL], [label])
             self.group_reveal.move(0, animate=False)
@@ -318,14 +366,20 @@ class ActionsRing(Gtk.Window):
             self.callout_label.set_text(text)
             self.callout_label.set_lines(1 if self.group_slot is not None and child is None else 2)
             self.callout_key.set_text(key)
-            self.callout.set_size_request(width, -1)
-            self.labels.move(self.callout, *position)
+            self.callout.set_size_request(self.geometry.size(width), -1)
+            self._move(self.callout, *position)
             self.callout.set_opacity(self.label_reveal.value())
         if self.group_slot is not None:
             hint = f"{'Preview · ' if self.preview else ''}Choose a group action · 1–{len(self.children)} · Esc to go back"
         else:
             hint = ("Preview · " if self.preview else "") + ("Hold · move · release" if self.state.held else "Choose an action · 1–8 · Esc to close")
+        if action_id and self.config["actions"][action_id].get("adjustment") and not (
+                self.group_slot is not None and child is None):
+            hint += " · Scroll to adjust"
         self.instructions.set_text(hint)
+        self.instructions.set_tooltip_text(hint)
+        footer_height = self.instructions.measure(Gtk.Orientation.VERTICAL, self.geometry.size(480)).natural
+        self.labels.move(self.instructions, self.geometry.size(30), self.geometry.size(HEIGHT) - footer_height - 1)
 
     @staticmethod
     def expanded_state(button, expanded):
@@ -352,7 +406,7 @@ class ActionsRing(Gtk.Window):
         self.surface.set_opacity(reveal)
         for index, button in enumerate(self.buttons):
             dx, dy = button_center(index)
-            self.labels.move(button, CENTER_X + dx * self.spread - BUTTON_RADIUS,
+            self._move(button, CENTER_X + dx * self.spread - BUTTON_RADIUS,
                              CENTER_Y + dy * self.spread - BUTTON_RADIUS)
         self.callout.set_opacity(self.label_reveal.value(now))
         if self.group_slot is not None:
@@ -365,11 +419,11 @@ class ActionsRing(Gtk.Window):
                 x, y = CENTER_X + 214 - abs(offset) * 7, CENTER_Y + offset * 62
                 px, py = origin_x + (x - origin_x) * progress, origin_y + (y - origin_y) * progress
                 self.child_positions.append((px, py))
-                self.labels.move(self.child_buttons[index], px - CHILD_RADIUS, py - CHILD_RADIUS)
+                self._move(self.child_buttons[index], px - CHILD_RADIUS, py - CHILD_RADIUS)
                 self.child_buttons[index].set_opacity(progress)
             if self.child_selected is not None:
                 x, y = self.child_positions[self.child_selected]
-                self.labels.move(self.callout, x + CHILD_RADIUS + 10, y - 18)
+                self._move(self.callout, x + CHILD_RADIUS + 10, y - 18)
 
     def tick(self, _widget, _clock):
         now = monotonic()
@@ -412,6 +466,7 @@ class ActionsRing(Gtk.Window):
         return None
 
     def pointer_motion(self, _controller, x, y):
+        x, y = self.geometry.logical(x, y)
         if not self.state.visible or self.state.held:
             return
         if self.group_slot is not None:
@@ -439,6 +494,7 @@ class ActionsRing(Gtk.Window):
             self.changed(before)
 
     def pointer_click(self, _gesture, _count, x, y):
+        x, y = self.geometry.logical(x, y)
         if self.state.held or not self.state.visible:
             return
         if math.hypot(x - CENTER_X, y - CENTER_Y) <= CENTER_RADIUS:
@@ -494,6 +550,76 @@ class ActionsRing(Gtk.Window):
 
     def draw(self, _area, cr, width, height):
         if self.state.visible and self.state.held:
+            cr.scale(self.geometry.scale, self.geometry.scale)
             cr.arc(CENTER_X + self.state.x, CENTER_Y + self.state.y, 3, 0, math.tau)
             cr.set_source_rgb(0.2, 0.52, 0.92)
             cr.fill()
+
+    def _move(self, widget, x, y):
+        self.labels.move(widget, *self.geometry.point(x, y))
+
+    @staticmethod
+    def adjustment_hint(action):
+        return ". Scroll to adjust" if action.get("adjustment") else ""
+
+    def scroll(self, controller, dx, dy):
+        event = controller.get_current_event()
+        if event is None:
+            return False
+        ok, x, y = event.get_position()
+        if not ok:
+            return False
+        native = self.surface.get_native()
+        translated = native.translate_coordinates(self.surface, x, y)
+        return self.adjust_at(*translated, dx, dy) if translated else False
+
+    def adjust_at(self, x, y, dx, dy):
+        """Wheel up increases; horizontal-only right also increases. One step/event."""
+        if (not self.state.visible or self.preview or not self.on_adjusted
+                or any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y, dx, dy))
+                or (dx == 0 and dy == 0)):
+            return False
+        x, y = self.geometry.logical(x, y)
+        child = self.child_at(x, y) if self.group_slot is not None else None
+        if child is not None:
+            action_id = self.children[child]
+        else:
+            if self.group_slot is not None and any(math.hypot(x - cx, y - cy) <= CHILD_RADIUS
+                                                   for cx, cy in self.child_positions):
+                return False
+            index = button_at(x - CENTER_X, y - CENTER_Y, spread=self.spread)
+            if index is None or str(index) in self.groups():
+                return False
+            action_id = self.config["ring"][index]
+        if not self.config["actions"][action_id].get("adjustment"):
+            return False
+        direction = "increase" if (dy < 0 if dy else dx > 0) else "decrease"
+        accepted = bool(self.on_adjusted(action_id, direction, self.preview))
+        if accepted and self.state.held:
+            self._adjusted_in_hold = True
+        return accepted
+
+    def yield_keyboard(self):
+        """Keep pointer input mapped while returning the seat keyboard to the source."""
+        if self._keyboard_yielded or not self.state.visible:
+            return
+        self._saved_focus = self.get_focus()
+        self._keyboard_yielded = True
+        if self.overlay_supported:
+            Layer.set_keyboard_mode(self, Layer.KeyboardMode.NONE)
+        Gdk.Display.get_default().flush()
+
+    def resume_keyboard(self):
+        if not self._keyboard_yielded or not self.state.visible:
+            return
+        self._keyboard_yielded = False
+        if self.overlay_supported:
+            Layer.set_keyboard_mode(self, Layer.KeyboardMode.EXCLUSIVE)
+        else:
+            self.present()
+        Gdk.Display.get_default().flush()
+        focus = self._saved_focus
+        if focus and focus.get_visible():
+            focus.grab_focus()
+        else:
+            self.canvas.grab_focus()
