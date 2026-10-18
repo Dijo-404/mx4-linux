@@ -1,0 +1,165 @@
+{
+  "scope": "Complete remote path inventory; selected metadata projection. Full original metadata remains under ignored artifacts. No application execution.",
+  "installations": [
+    {
+      "root": "C:\\Program Files\\Logi",
+      "file_count": 1462,
+      "total_bytes": 293440893,
+      "subdirectories": [
+        "LogiPluginService"
+      ],
+      "executable_files": [
+        {
+          "path": "LogiPluginService\\ChromeNativeMessaging.exe",
+          "Length": 173208
+        },
+        {
+          "path": "LogiPluginService\\createdump.exe",
+          "Length": 72032
+        },
+        {
+          "path": "LogiPluginService\\LogiPluginService.exe",
+          "Length": 323224
+        },
+        {
+          "path": "LogiPluginService\\LogiPluginServiceExt.exe",
+          "Length": 3740312
+        },
+        {
+          "path": "LogiPluginService\\LogiPluginServiceTool.exe",
+          "Length": 323224
+        },
+        {
+          "path": "LogiPluginService\\LogiPluginTool.exe",
+          "Length": 173720
+        },
+        {
+          "path": "LogiPluginService\\LoupedeckStubInstallerRunner.exe",
+          "Length": 173208
+        },
+        {
+          "path": "LogiPluginService\\LoupeDiag.exe",
+          "Length": 203416
+        },
+        {
+          "path": "LogiPluginService\\LoupeTool.exe",
+          "Length": 323224
+        },
+        {
+          "path": "LogiPluginService\\PluginAdminInstaller.exe",
+          "Length": 173208
+        },
+        {
+          "path": "LogiPluginService\\uninstall.exe",
+          "Length": 173208
+        }
+      ],
+      "selected_metadata": [
+        {
+          "path": "LogiPluginService\\PluginApi.xml",
+          "Length": 40497
+        },
+        {
+          "path": "LogiPluginService\\Plugins\\@Generic\\metadata\\LoupedeckPackage.yaml",
+          "Length": 166
+        },
+        {
+          "path": "LogiPluginService\\Plugins\\DefaultWin\\metadata\\LoupedeckPackage.yaml",
+          "Length": 149
+        }
+      ]
+    },
+    {
+      "root": "C:\\Program Files\\LogiDownloadAssistant",
+      "file_count": 30,
+      "total_bytes": 29639175,
+      "subdirectories": [
+        "Uninstall.exe",
+        "bin",
+        "include",
+        "lib",
+        "share"
+      ],
+      "executable_files": [
+        {
+          "path": "Uninstall.exe",
+          "Length": 121668
+        },
+        {
+          "path": "bin\\create_shortcut.exe",
+          "Length": 1323520
+        },
+        {
+          "path": "bin\\logi_download_assistant.exe",
+          "Length": 19199488
+        },
+        {
+          "path": "bin\\logi_download_assistant_crashpad_handler.exe",
+          "Length": 2172416
+        }
+      ],
+      "selected_metadata": [
+        {
+          "path": "include\\logi\\demalu\\AuthenticateData.h",
+          "Length": 614
+        },
+        {
+          "path": "include\\logi\\demalu\\Demalu.h",
+          "Length": 2801
+        },
+        {
+          "path": "include\\logi\\demalu\\DemaluEvents_Interface.h",
+          "Length": 4428
+        },
+        {
+          "path": "include\\logi\\demalu\\DemaluRequest.h",
+          "Length": 6451
+        },
+        {
+          "path": "include\\logi\\demalu\\DemaluStrings.h",
+          "Length": 477
+        },
+        {
+          "path": "include\\logi\\demalu\\DiskPayload.h",
+          "Length": 4587
+        },
+        {
+          "path": "include\\logi\\demalu\\Downloader.h",
+          "Length": 2012
+        },
+        {
+          "path": "include\\logi\\demalu\\Downloader_Interface.h",
+          "Length": 540
+        },
+        {
+          "path": "include\\logi\\demalu\\EmptyPayload.h",
+          "Length": 2300
+        },
+        {
+          "path": "include\\logi\\demalu\\HttpStatusCode.h",
+          "Length": 865
+        },
+        {
+          "path": "include\\logi\\demalu\\Logging.h",
+          "Length": 730
+        },
+        {
+          "path": "include\\logi\\demalu\\MemoryPayload.h",
+          "Length": 3950
+        },
+        {
+          "path": "include\\logi\\demalu\\PayloadKit.h",
+          "Length": 2942
+        },
+        {
+          "path": "include\\logi\\demalu\\ResultCodeSet.h",
+          "Length": 1022
+        },
+        {
+          "path": "include\\logi\\demalu\\Types.h",
+          "Length": 4723
+        }
+      ]
+    }
+  ]
+}
