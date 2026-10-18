@@ -77,6 +77,12 @@ For graph projection, create an input JSON object `{"inventory_evidence": [<R1 n
 
 ## Remaining reconstruction work
 
-The most useful next vendor artifact is a **full offline installer or installed Options+ app tree containing its backend/agent and device database**. Its digest must be recorded as a new target. Until that evidence or a documented protocol/capture is available, the application should discover features from the connected device and use independently established HID++ definitions. Haptics, Actions Ring, application profiles and Flow remain separate implementation questions; the route strings above do not establish how to reproduce them.
+A later pass acquired the installed Windows Options+ application and native
+agent. See [the installed-app investigation](windows-optionsplus-analysis.md)
+for recovered interface protocols and haptic/force/radial-menu schemas. That
+evidence is a separate target; its encoded MX4-specific resources and native
+device packet handlers remain unresolved.
+
+The installer-only pass identified an installed backend/agent and device database as the next useful artifacts. Those are now covered by the separate investigation above. The application should continue discovering features from the connected device and using independently established HID++ definitions until native handlers or documented captures establish the remaining packet mappings. The installer route strings alone do not establish how to reproduce haptics, Actions Ring, application profiles or Flow.
 
 No macOS binary execution, live hardware validation, native handler decompilation, code-signature verification, or network behavior was covered by this pass.
