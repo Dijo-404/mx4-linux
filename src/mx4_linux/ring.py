@@ -2,9 +2,17 @@
 
 import math
 from time import monotonic
+from uuid import uuid4
 
 from .gtk_support import Gdk, Gtk, Layer
+import gi
 from gi.repository import GObject, Pango
+
+try:
+    gi.require_version("GdkWayland", "4.0")
+    from gi.repository import GdkWayland
+except (ImportError, ValueError):
+    GdkWayland = None
 from .motion import Transition
 from .ring_icons import action_icon
 from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, RingGeometry, RingState, button_at, button_center
@@ -19,6 +27,7 @@ class ActionsRing(Gtk.Window):
     def __init__(self, application, selected, dismissed, hovered=None, adjusted=None):
         super().__init__(application=application, title="MX4 Actions Ring", decorated=False,
                          resizable=False, default_width=WIDTH, default_height=HEIGHT)
+        self.context_app_id = "io.github.mx4linux.Ring.r" + uuid4().hex
         self.state = RingState()
         self.geometry = RingGeometry()
         self.on_adjusted = adjusted
@@ -45,6 +54,7 @@ class ActionsRing(Gtk.Window):
             Layer.set_layer(self, Layer.Layer.OVERLAY)
             Layer.set_keyboard_mode(self, Layer.KeyboardMode.EXCLUSIVE)
             Layer.set_exclusive_zone(self, 0)
+        self.connect_after("map", self.identify_popup)
         self.add_css_class("mx4-ring")
         css = Gtk.CssProvider()
         css.load_from_string("""
@@ -554,6 +564,13 @@ class ActionsRing(Gtk.Window):
             cr.arc(CENTER_X + self.state.x, CENTER_Y + self.state.y, 3, 0, math.tau)
             cr.set_source_rgb(0.2, 0.52, 0.92)
             cr.fill()
+
+    def identify_popup(self, *_args):
+        if self.overlay_supported:
+            return  # Layer surfaces have no Niri window ID.
+        surface = self.get_surface()
+        if GdkWayland and isinstance(surface, GdkWayland.WaylandToplevel):
+            surface.set_application_id(self.context_app_id)
 
     def _move(self, widget, x, y):
         self.labels.move(widget, *self.geometry.point(x, y))
