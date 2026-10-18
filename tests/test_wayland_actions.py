@@ -1,6 +1,5 @@
 """Native keyboard selection and injection, using process/device doubles."""
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import evdev

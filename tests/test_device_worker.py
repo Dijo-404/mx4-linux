@@ -136,6 +136,22 @@ def fake_api(settings=None, devices=None, receiver=False):
 
 
 class WorkerTests(unittest.TestCase):
+    def test_isolation_bounds_paired_node_wait_and_restores_on_failure(self):
+        api, _, _ = fake_api()
+        original = api.base.find_paired_node = Mock(return_value="/dev/paired")
+        with self.assertRaisesRegex(RuntimeError, "injected failure"):
+            with worker._isolated_solaar(api):
+                self.assertEqual(api.base.find_paired_node("/dev/receiver", 2, 1), "/dev/paired")
+                original.assert_called_once_with("/dev/receiver", 2, .01)
+                scoped = api.base.find_paired_node
+                with worker._isolated_solaar(api):
+                    self.assertEqual(api.base.find_paired_node("/dev/receiver", 2, 1), "/dev/paired")
+                self.assertIs(api.base.find_paired_node, scoped)
+                api.base.find_paired_node("/dev/receiver", 2, 0)
+                self.assertEqual(original.call_args.args[-1], 0)
+                raise RuntimeError("injected failure")
+        self.assertIs(api.base.find_paired_node, original)
+
     def test_isolation_uses_distinct_software_id_and_restores_after_error(self):
         api, _, _ = fake_api()
         api.base.SOLAAR_SOFTWARE_ID = 0x0B
@@ -264,6 +280,102 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(setting.writes, [(75, False)])
         self.assertEqual(setting.reads, [False, False])
         dev.close.assert_called_once()
+
+    def test_single_setting_write_does_not_build_unrelated_capabilities(self):
+        settings = [FakeSetting(name) for name in worker.ALLOWED_SETTINGS]
+        api, _, _ = fake_api(settings)
+        self.assertTrue(self.request_write(api, "haptic-level", 75)["ok"])
+        checked = [call.args[1].name for call in api.settings_templates.check_feature.call_args_list]
+        self.assertEqual(checked, ["haptic-level"])
+        self.assertTrue(all(not setting.reads for setting in settings if setting.name != "haptic-level"))
+
+    def test_wheel_write_returns_related_live_values_without_a_full_scan(self):
+        shift, ratchet, unrelated = FakeSetting(), FakeSetting("scroll-ratchet", value=2), FakeSetting("haptic-level")
+        api, _, _ = fake_api([shift, ratchet, unrelated])
+        self.assertEqual(self.request_write(api, "smart-shift", 25), {
+            "ok": True, "value": 25, "values": {"scroll-ratchet": 2}})
+        self.assertEqual(ratchet.reads, [False])
+        self.assertFalse(unrelated.reads)
+        self.assertFalse(ratchet.writes)
+
+    def test_failed_related_wheel_read_requires_refresh_without_failing_confirmed_write(self):
+        for result in (None, RuntimeError("Related wheel read timed out")):
+            with self.subTest(result=result):
+                shift, ratchet = FakeSetting(), FakeSetting("scroll-ratchet", value=2)
+                if isinstance(result, Exception):
+                    ratchet.read = Mock(side_effect=result)
+                else:
+                    ratchet.read = Mock(return_value=result)
+                api, _, _ = fake_api([shift, ratchet])
+                self.assertEqual(self.request_write(api, "smart-shift", 25), {
+                    "ok": True, "value": 25, "refresh_required": True})
+                self.assertEqual(shift.writes, [(25, False)])
+                self.assertEqual(shift.reads, [False, False])
+
+    def test_failed_wheel_dependency_discovery_requires_refresh_after_confirmed_write(self):
+        shift, ratchet = FakeSetting(), FakeSetting("scroll-ratchet", value=2)
+        api, _, _ = fake_api([shift, ratchet])
+
+        def check(_dev, template):
+            if template.name == "scroll-ratchet":
+                raise RuntimeError("Wheel capability query timed out")
+            return template.instance
+
+        api.settings_templates.check_feature.side_effect = check
+        self.assertEqual(self.request_write(api, "smart-shift", 25), {
+            "ok": True, "value": 25, "refresh_required": True})
+        self.assertEqual(shift.writes, [(25, False)])
+
+    def test_torque_write_keeps_the_solaar_wheel_mode_dependency(self):
+        torque, ratchet = FakeSetting("scroll-ratchet-torque"), FakeSetting("scroll-ratchet", value=2)
+        api, dev, _ = fake_api([torque, ratchet])
+        original_write = torque.write
+
+        def write(value, save=True):
+            self.assertEqual([setting.name for setting in dev._settings], ["scroll-ratchet-torque", "scroll-ratchet"])
+            return original_write(value, save=save)
+
+        torque.write = write
+        self.assertEqual(self.request_write(api, torque.name, 75), {
+            "ok": True, "value": 75, "values": {"scroll-ratchet": 2}})
+        self.assertFalse(ratchet.writes)
+
+    def test_targeted_receiver_lookup_skips_unrelated_paths_and_slots(self):
+        setting = FakeSetting()
+        devices = [FakeDevice(number=1), FakeDevice(number=2)]
+        api, _, info = fake_api([setting], devices, receiver=True)
+        api.base.receivers_and_devices.return_value = [SimpleNamespace(path="/dev/other", isDevice=False), info]
+        original = api.receiver.create_receiver.side_effect
+        slots = []
+
+        def create(base, selected):
+            self.assertIs(selected, info)
+            owner = original(base, selected)
+
+            class Receiver:
+                close = owner.close
+
+                def __getitem__(self, slot):
+                    slots.append(slot)
+                    return owner[slot]
+
+            return Receiver()
+
+        api.receiver.create_receiver.side_effect = create
+        response = worker.handle_request({"op": "write", "device_id": worker._device_id(info.path, 2),
+                                          "setting": setting.name, "value": 75}, api)
+        self.assertTrue(response["ok"])
+        self.assertEqual(slots, [2])
+        devices[0].ping.assert_not_called()
+        devices[1].ping.assert_called_once()
+
+    def test_target_ids_cannot_open_paths_outside_device_enumeration(self):
+        for target in ('["/dev/arbitrary",255]', '"ab"', 'null', '{}', '["/dev/hidraw-test",true]'):
+            api, _, _ = fake_api([FakeSetting()])
+            response = worker.handle_request({"op": "write", "device_id": target,
+                                              "setting": "smart-shift", "value": 25}, api)
+            self.assertFalse(response["ok"])
+            api.device.create_device.assert_not_called()
 
     def test_invalid_range_values_never_write(self):
         for value in (True, False, -1, 101, 40.0, "40", None):

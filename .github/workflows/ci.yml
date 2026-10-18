@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.14']
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y gcc pkg-config libdbus-1-dev libcairo2-dev libgirepository-2.0-dev gir1.2-gtk-4.0 gir1.2-adw-1
+      - name: Install application and development tools
+        run: python -m pip install -e '.[test,dev]'
+      - name: Check Python correctness
+        run: |
+          python -m ruff check src tests scripts/gtk-smoke.py
+          python -m compileall -q src tests
+          python -m pytest -q
+      - name: Validate shell scripts and udev rules
+        run: |
+          for script in scripts/*.sh; do bash -n "$script"; done
+          udevadm verify data/70-mx4-linux.rules data/71-mx4-input.rules
+      - name: Build Python distributions
+        run: python -m build
+
+  npm:
+    name: npm / Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Test launcher and install packed application
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run check
+          npm run test:package
+
+  gtk:
+    name: Native runtime and GTK smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+      - name: Install desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y python3-venv python3-gi python3-gi-cairo python3-cairo python3-dbus gir1.2-gtk-4.0 gir1.2-adw-1 xvfb xauth dbus-x11
+      - name: Install the npm archive, set up its native runtime, and preview GUI
+        env:
+          PYTHON: /usr/bin/python3
+          GDK_BACKEND: x11
+        run: |
+          npm ci --ignore-scripts
+          dbus-run-session -- xvfb-run -a npm run test:native
