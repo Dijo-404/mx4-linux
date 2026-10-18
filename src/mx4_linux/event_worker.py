@@ -21,7 +21,9 @@ import threading
 import time
 
 from .device_worker import _device_id, _devices, _isolated_solaar, _load_solaar
+from .hardware_errors import format_hardware_error
 from .reporting_state import Ownership, OwnershipConflict, configuration_lock, require_identity
+from .thumb_wheel import read_info as thumb_info, read_status as thumb_status, write_owned as thumb_write
 
 
 ALLOWED_CONTROLS = frozenset((82, 83, 86, 195, 196, 416))
@@ -33,6 +35,10 @@ _LOG = logging.getLogger(__name__)
 
 class _StopRequested(Exception):
     pass
+
+
+class _HapticUnavailable(RuntimeError):
+    """Optional feedback failed without changing button reporting ownership."""
 
 
 class _FDLines:
@@ -109,6 +115,8 @@ def _validate(request):
         raise ValueError("Select at least one supported mouse control")
     if raw_xy and ring not in controls:
         raise ValueError("The ring control must be selected for raw motion reporting")
+    if type(request.get("thumb_wheel", False)) is not bool:
+        raise ValueError("thumb_wheel must be a JSON boolean")
     return target, controls, ring, raw_xy
 
 
@@ -154,6 +162,22 @@ class _Decoder:
         self.pressed.clear()
 
 
+class _ThumbDecoder:
+    def __init__(self, number, index, emit):
+        self.number, self.index, self.emit = number, index, emit
+        self.active = False
+
+    def __call__(self, notification):
+        if (not self.active or notification.devnumber != self.number or notification.sub_id != self.index
+                or notification.address != 0):
+            return
+        data = notification.data
+        if (not isinstance(data, bytes) or len(data) not in (6, 16) or any(data[6:]) or data[4] > 3):
+            return
+        rotation, timestamp, status, flags = struct.unpack("!hHBB", data[:6])
+        self.emit({"type": "thumb", "rotation": rotation, "timestamp": timestamp, "status": status, "flags": flags})
+
+
 def _reporting(dev, api, key):
     """Require an addressed, live reply; Solaar's fallback defaults are unsafe."""
     cid = int(key._cid)
@@ -187,20 +211,38 @@ def _play_haptic(dev, api, waveform, cached, expected_stable_id=None):
     if type(waveform) is not int or not 0 <= waveform <= 255:
         raise ValueError("waveform must be an integer between 0 and 255")
     if not cached:
-        for template in api.settings_templates.SETTINGS:
-            if template.name == "haptic-play":
-                setting = api.settings_templates.check_feature(dev, template)
-                if setting is not None:
-                    cached.append(setting)
-                    break
+        try:
+            for template in api.settings_templates.SETTINGS:
+                if template.name == "haptic-play":
+                    setting = api.settings_templates.check_feature(dev, template)
+                    if setting is not None:
+                        status = dev.feature_request(api.hidpp20_constants.SupportedFeature.HAPTIC, 0x10)
+                        if not isinstance(status, bytes) or len(status) < 2:
+                            raise _HapticUnavailable("The mouse did not report its haptic feedback state.")
+                        if not status[0] & 1:
+                            raise _HapticUnavailable("Haptic feedback is turned off on the mouse.")
+                        cached.append(setting)
+                        break
+        except (_HapticUnavailable, OwnershipConflict):
+            raise
+        except Exception as error:
+            raise _HapticUnavailable(format_hardware_error(error)) from error
     if not cached:
-        raise ValueError("Haptic playback is not supported by this device")
+        raise _HapticUnavailable("Haptic playback is not supported by this device.")
     setting = cached[0]
     if waveform not in [int(choice) for choice in setting.choices]:
         raise ValueError("This waveform is not supported by the device")
+    # Identity failures must stop the listener, never become optional feedback
+    # warnings. Keep this precondition outside the playback exception boundary.
     require_identity(dev, expected_stable_id)
-    if setting.write(waveform, save=False) is None:
-        raise RuntimeError("Device did not acknowledge haptic playback")
+    try:
+        acknowledged = setting.write(waveform, save=False)
+    except OwnershipConflict:
+        raise
+    except Exception as error:
+        raise _HapticUnavailable(format_hardware_error(error)) from error
+    if acknowledged is None:
+        raise _HapticUnavailable("Device did not acknowledge haptic playback.")
 
 
 def recover_reporting(dev, api, ownership):
@@ -219,6 +261,11 @@ def recover_reporting(dev, api, ownership):
             raise OwnershipConflict("Previous reporting mapping conflicts with the current mouse; recovery remains pending.")
         if item["touched"] & 16 and api.hidpp20.KeyFlag.RAW_XY not in key.flags:
             raise OwnershipConflict("Previous raw reporting capability is unavailable; recovery remains pending.")
+    # Validate both feature families before restoring either.
+    if "thumb" in record:
+        thumb_info(dev)
+        thumb_status(dev)
+        require_identity(dev, ownership.stable_id)
     failures = []
     for item in reversed(record["controls"]):
         key = selected[item["cid"]][0]
@@ -247,6 +294,11 @@ def recover_reporting(dev, api, ownership):
         if actual & item["touched"] != item["flags"] & item["touched"] or mapping != item["mapping"]:
             detail = ": " + "; ".join(write_errors) if write_errors else ""
             failures.append(f"control {item['cid']}: Reporting restoration was not confirmed{detail}")
+    if "thumb" in record:
+        try:
+            thumb_write(dev, bool(record["thumb"]["original"][0] & 1), ownership.stable_id)
+        except Exception as exc:
+            failures.append("thumb wheel: " + str(exc))
     if failures:
         raise RuntimeError("Could not restore mouse reporting; wake/reconnect this mouse and retry recovery. " + "; ".join(failures))
     # Even an already-native/no-setter path must never clear another unit's
@@ -255,7 +307,7 @@ def recover_reporting(dev, api, ownership):
     ownership.clear()
 
 
-def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, ownership, outcome):
+def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, ownership, outcome, thumb=False):
     feature = api.hidpp20_constants.SupportedFeature.REPROG_CONTROLS_V4
     index = dev.features[feature] if dev.features is not None else None
     if type(index) is not int or not 0 < index < 256:
@@ -264,8 +316,12 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
     owner = dev if dev.handle else dev.receiver
     if owner is None or not owner.handle:
         raise RuntimeError("Device has no available HID handle")
+    thumb_decoder = _ThumbDecoder(dev.number, None, emit)
     original = owner.handle
-    handle = _NotificationHandle(original, decoder)
+    def decode(notification):
+        decoder(notification)
+        thumb_decoder(notification)
+    handle = _NotificationHandle(original, decode)
     owner.handle = handle
     snapshots = {}
     expected_owned = {}
@@ -273,7 +329,11 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
     diversion = api.hidpp20.MappingFlag.DIVERTED.value
     raw = api.hidpp20.MappingFlag.RAW_XY_DIVERTED.value
     haptic = []
-    def transition(selected, selected_ring, selected_raw):
+    haptic_unavailable = False
+    thumb_snapshot, thumb_expected, thumb_details = None, None, None
+    def transition(selected, selected_ring, selected_raw, selected_thumb=False):
+        nonlocal thumb_snapshot, thumb_expected, thumb_details
+        thumb_decoder.active = False
         # Read and validate additions AND removals before the first write.
         live = {int(key._cid): (key, flags, mapping) for key, flags, mapping in
                 _selected_keys(dev, api, selected, selected_ring, selected_raw)}
@@ -287,6 +347,18 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
             if cid in expected_owned and flags & (diversion | raw) != expected_owned[cid]:
                 raise OwnershipConflict(f"Control {cid} reporting changed outside this integration; use Recover or enable integration explicitly to continue")
             snapshots.setdefault(cid, [key, flags, mapping, 0])
+        # Snapshot/validate thumb additions and removals before either family mutates.
+        if selected_thumb or thumb_snapshot is not None:
+            details = thumb_info(dev)
+            status = thumb_status(dev)
+            require_identity(dev, ownership.stable_id)
+            if thumb_expected is not None and status[0] & 1 != thumb_expected:
+                raise OwnershipConflict("Thumb reporting changed outside this integration; use Recover or enable integration explicitly to continue")
+            if thumb_snapshot is None:
+                if status[0] & 1:
+                    raise OwnershipConflict("Thumb wheel is already diverted by another owner; restore it before enabling this assignment")
+                thumb_snapshot = status
+            thumb_details = details
         relevant = active | set(selected)
         if decoder.active and decoder.pressed & relevant:
             return False
@@ -319,15 +391,28 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
             expected_owned[cid] = actual_flags & owned
         active.clear()
         active.update(selected)
+        if thumb_snapshot is not None:
+            desired_thumb = True if selected_thumb else bool(thumb_snapshot[0] & 1)
+            # Persist before every potential write; original/live status are distinct.
+            ownership.touch_thumb(thumb_snapshot)
+            actual_thumb = thumb_write(dev, desired_thumb, ownership.stable_id)
+            thumb_expected = actual_thumb[0] & 1
+            thumb_decoder.index = thumb_details["feature_index"]
+        thumb_decoder.active = selected_thumb
         decoder.controls, decoder.ring, decoder.raw_xy = set(selected), selected_ring, selected_raw
         decoder.active = True
         return True
 
     try:
-        transition(controls, ring, raw_xy)
+        transition(controls, ring, raw_xy, thumb)
         if stop_event.is_set():
             raise _StopRequested()
-        emit({"type": "ready", "controls": controls, "ring_button": ring, "raw_xy": raw_xy})
+        def thumb_ack(enabled):
+            return {**(thumb_details or {}), "diverted": enabled}
+        ready = {"type": "ready", "controls": controls, "ring_button": ring, "raw_xy": raw_xy}
+        if thumb or thumb_snapshot is not None:
+            ready["thumb_wheel"] = thumb_ack(thumb)
+        emit(ready)
         decoder.active = True
         pending = None
         last_config_id = 0
@@ -347,39 +432,56 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
                     stop_event.set()
                     break
                 elif command.get("op") == "haptic":
+                    if haptic_unavailable:
+                        continue
                     try:
                         _play_haptic(dev, api, command.get("waveform"), haptic, ownership.stable_id)
+                    except _HapticUnavailable as error:
+                        haptic_unavailable = True
+                        _LOG.debug("Optional haptic feedback unavailable", exc_info=True)
+                        emit({"type": "warning", "source": "haptic", "message":
+                              "Haptic feedback is unavailable for this session. Mouse integration remains enabled. "
+                              + str(error)})
                     except ValueError as error:
                         emit({"type": "warning", "source": "haptic", "message": str(error)})
                 elif command.get("op") == "configure":
-                    if (set(command) != {"op", "config_id", "controls", "ring_button", "raw_xy"}
+                    if (set(command) - {"thumb_wheel"} != {"op", "config_id", "controls", "ring_button", "raw_xy"}
                             or type(command.get("config_id")) is not int
                             or command["config_id"] <= last_config_id):
                         raise ValueError("Invalid configure command")
                     _, selected, selected_ring, selected_raw = _validate({"device_id": "configure", **command})
                     last_config_id = command["config_id"]
-                    pending = selected, selected_ring, selected_raw, last_config_id
+                    pending = selected, selected_ring, selected_raw, last_config_id, command.get("thumb_wheel", False)
                 else:
                     emit({"type": "error", "message": command.get("message", "Unknown command; use haptic or stop")})
             if stop_event.is_set():
                 break
             if pending and not decoder.pressed & (active | set(pending[0])):
-                selected, selected_ring, selected_raw, config_id = pending
-                if transition(selected, selected_ring, selected_raw):
-                    emit({"type": "configured", "config_id": config_id, "controls": selected,
-                          "ring_button": selected_ring, "raw_xy": selected_raw})
+                selected, selected_ring, selected_raw, config_id, selected_thumb = pending
+                if transition(selected, selected_ring, selected_raw, selected_thumb):
+                    ack = {"type": "configured", "config_id": config_id, "controls": selected,
+                           "ring_button": selected_ring, "raw_xy": selected_raw}
+                    if selected_thumb or thumb_snapshot is not None:
+                        ack["thumb_wheel"] = thumb_ack(selected_thumb)
+                    emit(ack)
                     pending = None
             reply = api.base.read(handle, _POLL_SECONDS)
             if reply:
                 if len(reply) == 3 and isinstance(reply[2], bytes) and len(reply[2]) >= 2:
                     notification = api.base.make_notification(*reply)
                     if notification is not None:
-                        decoder(notification)
+                        decode(notification)
             if time.monotonic() >= heartbeat:
                 if not dev.ping():
                     raise RuntimeError("Mouse disconnected or is no longer responding")
+                if thumb_expected is not None:
+                    status = thumb_status(dev)
+                    require_identity(dev, ownership.stable_id)
+                    if status[0] & 1 != thumb_expected:
+                        raise OwnershipConflict("Thumb reporting changed outside this integration; explicit recovery is required")
                 heartbeat = time.monotonic() + _HEARTBEAT_SECONDS
     finally:
+        thumb_decoder.active = False
         decoder.release()
         try:
             recover_reporting(dev, api, ownership)
@@ -420,7 +522,7 @@ def run(request, api=None, commands=None, emit=None, stop_event=None):
                         with configuration_lock(stable_id), Ownership(stable_id) as ownership:
                             outcome[0] = False
                             recover_reporting(dev, api, ownership)
-                            _listen(dev, api, controls, ring, raw_xy, commands, send, stop_event, ownership, outcome)
+                            _listen(dev, api, controls, ring, raw_xy, commands, send, stop_event, ownership, outcome, request.get("thumb_wheel", False))
                         return True
                 detail = "; ".join(item["message"] for item in diagnostics)
                 raise RuntimeError("Selected mouse is unavailable; scan again" + (": " + detail if detail else ""))
@@ -428,7 +530,7 @@ def run(request, api=None, commands=None, emit=None, stop_event=None):
         return True
     except Exception as error:
         _LOG.debug("Event listener stopped", exc_info=True)
-        event = {"type": "error", "message": str(error) or type(error).__name__}
+        event = {"type": "error", "message": format_hardware_error(error)}
         if isinstance(error, OwnershipConflict):
             event["reason"] = "ownership-conflict"
         send(event)

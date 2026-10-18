@@ -25,6 +25,7 @@ def private_reporting_state(tmp_path, monkeypatch):
 
 
 FEATURE = 0x1B04
+HAPTIC = 0x19B0
 INDEX = 9
 TARGET = _device_id("/dev/hidraw-test", 255)
 
@@ -53,6 +54,8 @@ class FakeDevice:
     def _feature_request(self, feature, function, *data):
         if feature == 3 and function == 0:
             return b'\0' + bytes.fromhex(self.id) + b'\0' * 8
+        if feature == HAPTIC and function == 0x10:
+            return b'\x01\x32\x00'
         assert feature == FEATURE
         payload = bytes(data)
         cid = int.from_bytes(payload[:2])
@@ -75,7 +78,7 @@ def setup_session():
     dev, commands, events = FakeDevice(), queue.Queue(), []
     api = SimpleNamespace(
         hidpp20=hidpp20,
-        hidpp20_constants=SimpleNamespace(SupportedFeature=SimpleNamespace(REPROG_CONTROLS_V4=FEATURE)),
+        hidpp20_constants=SimpleNamespace(SupportedFeature=SimpleNamespace(REPROG_CONTROLS_V4=FEATURE, HAPTIC=HAPTIC)),
         configuration=SimpleNamespace(persister=Mock()),
         hidpp10=SimpleNamespace(set_configuration_pending_flags=Mock()),
         settings_templates=SimpleNamespace(SETTINGS=[], check_feature=Mock()),
@@ -144,6 +147,30 @@ def test_listener_uses_separate_software_id_for_discovery_events_and_restore():
     assert run(dev, api, commands, events)
     assert api.base.SOLAAR_SOFTWARE_ID == 0x0B
     assert dev.reporting[416] == (0x104, 416)
+
+
+def test_hidpp_enable_failure_is_readable_and_still_stops_without_ready():
+    from logitech_receiver.exceptions import FeatureCallError
+
+    dev, api, commands, events = setup_session()
+    # A live reporting read fails before the worker writes any flags.
+    original = dev._feature_request
+
+    def request(feature, function, *args):
+        if feature == FEATURE and function == 0x20:
+            raise FeatureCallError(number=2, request=2893, error=5, params=b"\x00")
+        return original(feature, function, *args)
+
+    dev.feature_request.side_effect = request
+    assert not run(dev, api, commands, events)
+    assert not dev.writes
+    assert not any(event["type"] == "ready" for event in events)
+    assert events[0] == {
+        "type": "error",
+        "message": "The mouse rejected this request with a device-specific error. "
+                   "(HID++ error 0x05, request 0x0B4D)",
+    }
+    assert events[-1] == {"type": "stopped", "restored": True}
 
 
 def test_preexisting_diversion_and_raw_motion_remain_enabled_without_writes():
@@ -294,6 +321,133 @@ def test_haptic_request_notifications_use_same_decoder_and_are_not_swallowed():
         {"type": "motion", "dx": 8, "dy": -5},
         {"type": "button", "control": 416, "pressed": False, "cancelled": True},
     ]
+
+
+@pytest.mark.parametrize("failure", ["discovery", "playback", "no-acknowledgement", "unsupported"])
+def test_optional_haptic_failure_warns_once_and_keeps_button_and_motion_events(failure):
+    from logitech_receiver.exceptions import FeatureCallError
+
+    dev, api, commands, events = setup_session()
+    before = dict(dev.reporting)
+    rejection = FeatureCallError(number=2, request=2893, error=5, params=b"\x00")
+    setting = SimpleNamespace(choices=[0], write=Mock(return_value=0))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    api.settings_templates.check_feature.return_value = setting
+    if failure == "discovery":
+        api.settings_templates.check_feature.side_effect = rejection
+    elif failure == "playback":
+        setting.write.side_effect = rejection
+    elif failure == "no-acknowledgement":
+        setting.write.return_value = None
+    else:
+        api.settings_templates.check_feature.return_value = None
+
+    def read(*_args):
+        assert dev.reporting[416][0] & 0x11 == 0x11
+        dev.handle.notifications_hook(notification(data=struct.pack("!4H", 416, 0, 0, 0)))
+        dev.handle.notifications_hook(notification(address=16, data=struct.pack("!hh", 8, -5)))
+        commands.put({"op": "stop"})
+
+    api.base.read.side_effect = read
+    for _ in range(3):
+        commands.put({"op": "haptic", "waveform": 0})
+    assert run(dev, api, commands, events)
+    assert [event["type"] for event in events] == ["ready", "warning", "button", "motion", "button", "stopped"]
+    warning = events[1]
+    assert warning["source"] == "haptic"
+    assert "Mouse integration remains enabled" in warning["message"]
+    if failure in ("discovery", "playback"):
+        assert "HID++ error 0x05, request 0x0B4D" in warning["message"]
+        assert "'params'" not in warning["message"]
+    assert events[2:4] == [
+        {"type": "button", "control": 416, "pressed": True},
+        {"type": "motion", "dx": 8, "dy": -5},
+    ]
+    assert events[-1] == {"type": "stopped", "restored": True}
+    assert dev.reporting == before
+    api.settings_templates.check_feature.assert_called_once()
+    assert setting.write.call_count == int(failure in ("playback", "no-acknowledgement"))
+
+
+@pytest.mark.parametrize("invalid", [True, -1, 256, 2])
+def test_invalid_haptic_waveform_does_not_block_later_valid_feedback(invalid):
+    dev, api, commands, events = setup_session()
+    setting = SimpleNamespace(choices=[1], write=Mock(return_value=1))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    api.settings_templates.check_feature.return_value = setting
+    commands.put({"op": "haptic", "waveform": invalid})
+    commands.put({"op": "haptic", "waveform": 1})
+    assert run(dev, api, commands, events)
+    assert [event["type"] for event in events] == ["ready", "warning", "stopped"]
+    setting.write.assert_called_once_with(1, save=False)
+
+
+@pytest.mark.parametrize("status", [b"\x00\x32\x00", None, b"\x01"])
+def test_haptic_disabled_or_unreadable_status_never_plays_or_changes_hardware_settings(status):
+    dev, api, commands, events = setup_session()
+    setting = SimpleNamespace(choices=[0], write=Mock(return_value=0))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    api.settings_templates.check_feature.return_value = setting
+    original = dev._feature_request
+
+    def request(feature, function, *data):
+        if feature == HAPTIC:
+            assert function == 0x10 and not data  # Only the documented state GET is allowed.
+            return status
+        return original(feature, function, *data)
+
+    dev.feature_request.side_effect = request
+    for _ in range(2):
+        commands.put({"op": "haptic", "waveform": 0})
+    assert run(dev, api, commands, events)
+    assert [event["type"] for event in events] == ["ready", "warning", "stopped"]
+    assert "Mouse integration remains enabled" in events[1]["message"]
+    assert ("turned off on the mouse" if status and len(status) >= 2 else "did not report") in events[1]["message"]
+    setting.write.assert_not_called()
+    assert len([call for call in dev.feature_request.call_args_list if call.args[0] == HAPTIC]) == 1
+
+
+def test_haptic_identity_precondition_failure_remains_fatal():
+    dev, api, commands, events = setup_session()
+    setting = SimpleNamespace(choices=[0], write=Mock(return_value=0))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    feedback_pending = [False]
+
+    def discover(*_args):
+        feedback_pending[0] = True
+        return setting
+
+    original_identity = worker.require_identity
+
+    def identity(*args):
+        if feedback_pending[0]:
+            feedback_pending[0] = False
+            raise RuntimeError("Mouse identity is unavailable or changed.")
+        return original_identity(*args)
+
+    api.settings_templates.check_feature.side_effect = discover
+    commands.put({"op": "haptic", "waveform": 0})
+    with patch.object(worker, "require_identity", side_effect=identity):
+        assert not run(dev, api, commands, events)
+    assert events[1] == {"type": "error", "message": "Mouse identity is unavailable or changed."}
+    assert not any(event["type"] == "warning" for event in events)
+    assert events[-1] == {"type": "stopped", "restored": True}
+    setting.write.assert_not_called()
+
+
+@pytest.mark.parametrize("stage", ["discovery", "playback"])
+def test_haptic_path_never_downgrades_reporting_ownership_conflicts(stage):
+    dev, api, commands, events = setup_session()
+    setting = SimpleNamespace(choices=[0], write=Mock(return_value=0))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    api.settings_templates.check_feature.return_value = setting
+    operation = api.settings_templates.check_feature if stage == "discovery" else setting.write
+    operation.side_effect = worker.OwnershipConflict("Reporting ownership changed.")
+    commands.put({"op": "haptic", "waveform": 0})
+    assert not run(dev, api, commands, events)
+    assert events[1] == {"type": "error", "reason": "ownership-conflict", "message": "Reporting ownership changed."}
+    assert not any(event["type"] == "warning" for event in events)
+    assert events[-1] == {"type": "stopped", "restored": True}
 
 
 def test_eof_command_reader_and_malformed_command_are_handled():

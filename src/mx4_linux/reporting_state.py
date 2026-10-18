@@ -151,8 +151,10 @@ class Ownership:
             record = read_json(self.path, MAX_BYTES)
             if record is MISSING:
                 return None
-            if (not isinstance(record, dict) or set(record) != {'version', 'stable_id', 'controls'}
-                    or type(record['version']) is not int or record['version'] != 1
+            if (not isinstance(record, dict) or type(record.get('version')) is not int
+                    or record['version'] not in (1, 2)
+                    or set(record) != ({'version', 'stable_id', 'controls'} if record['version'] == 1
+                                       else {'version', 'stable_id', 'controls', 'thumb'})
                     or record['stable_id'] != self.stable_id
                     or not isinstance(record['controls'], list) or len(record['controls']) > 6):
                 raise ValueError('invalid record')
@@ -166,6 +168,13 @@ class Ownership:
                         or not 1 <= mapping <= 65535 or touched <= 0 or touched & ~OWNED_BITS):
                     raise ValueError('invalid control values')
                 seen.add(cid)
+            if record['version'] == 2:
+                thumb = record['thumb']
+                if (not isinstance(thumb, dict) or set(thumb) != {'original', 'touched'}
+                        or not isinstance(thumb['original'], list) or len(thumb['original']) != 2
+                        or any(type(value) is not int or not 0 <= value <= 255 for value in thumb['original'])
+                        or thumb['touched'] != [1, 0] or any(type(value) is not int for value in thumb['touched'])):
+                    raise ValueError('invalid thumb ownership')
             return record
         except (OSError, ValueError, TypeError, KeyError) as exc:
             raise RuntimeError('Previous reporting record is unreadable or invalid; keep it intact and retry recovery for this mouse.') from exc
@@ -184,6 +193,15 @@ class Ownership:
                 or type(mapping) is not int or not 1 <= mapping <= 65535
                 or type(bit) is not int or bit <= 0 or bit & ~OWNED_BITS):
             raise RuntimeError('Invalid reporting ownership snapshot')
+        atomic_json(self.path, record)
+
+    def touch_thumb(self, original):
+        if not isinstance(original, bytes) or len(original) != 2:
+            raise RuntimeError('Invalid thumb reporting snapshot')
+        record = self.read() or {'version': 1, 'stable_id': self.stable_id, 'controls': []}
+        if 'thumb' in record and record['thumb']['original'] != list(original):
+            raise RuntimeError('Original thumb reporting snapshot changed')
+        record.update(version=2, thumb={'original': list(original), 'touched': [1, 0]})
         atomic_json(self.path, record)
 
     def clear(self):
