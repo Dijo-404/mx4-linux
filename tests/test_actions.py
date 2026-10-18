@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 from types import SimpleNamespace
 
@@ -682,3 +683,71 @@ def test_extended_document_size_limit_is_enforced_before_store_write(tmp_path):
     with pytest.raises(RuntimeError, match="exceeds 1 MiB"):
         DesktopConfigStore(tmp_path / "config.json").save(config)
     assert not (tmp_path / "config.json").exists()
+
+
+@pytest.mark.parametrize('value', [None, 82, 83, 86, 195, 196, 416])
+def test_trigger_accepts_manual_and_supported_controls(value):
+    config = default_config()
+    config['ring_button'] = value
+    config['button_bindings'] = {str(cid): 'copy' for cid in actions.BUTTON_IDS if cid != value}
+    assert validate_config(config) is config
+
+
+@pytest.mark.parametrize('field,value', [('adapt_to_app', 1), ('adapt_to_app', None), ('adapt_to_app', 'false'),
+                                         ('ring_button', True), ('ring_button', 83.0), ('ring_button', '83')])
+def test_trigger_and_adaptation_have_exact_types(field, value):
+    config = default_config()
+    config[field] = value
+    with pytest.raises(RuntimeError):
+        validate_config(config)
+
+
+def test_profile_trigger_inheritance_and_detached_resolution_remain_valid():
+    config = default_config()
+    config['assignment_profiles'] = {
+        'a': profile(config, 'A', 'app.a', ring_button=83, button_bindings={'416': 'copy'}),
+        'b': profile(config, 'B', 'app.b'),
+        'general': profile(config, ring_button=None, button_bindings={'416': 'undo'}),
+    }
+    config['active_profiles'] = {'app.a': 'a', 'app.b': 'b', '*': 'general'}
+    before = deepcopy(config)
+    exact = actions.resolve_config(config, 'app.a')
+    assert exact['ring_button'] == 83 and exact['button_bindings'] == {'416': 'copy'}
+    assert validate_config(exact)
+    assert exact['assignment_profiles']['b']['ring_button'] == 416
+    assert config == before and 'ring_button' not in config['assignment_profiles']['b']
+    config['adapt_to_app'] = False
+    general = actions.resolve_config(config, 'app.a')
+    assert general['ring_button'] is None and general['button_bindings'] == {'416': 'undo'}
+    assert actions.resolve_config(config, 'app.a', for_editing=True)['ring_button'] == 83
+    del config['active_profiles']['*']
+    assert actions.resolve_config(config, 'app.a')['ring_button'] == 416
+
+
+def test_inactive_profile_trigger_conflict_is_rejected():
+    config = default_config()
+    config['assignment_profiles'] = {'inactive': profile(config, ring_button=83)}
+    with pytest.raises(RuntimeError, match='distinct'):
+        validate_config(config)
+
+
+def test_button_assignment_changes_one_explicit_scope_and_rolls_back_conflicts():
+    config = default_config()
+    config['assignment_profiles'] = {'app': profile(config, 'A', 'app.a')}
+    config['active_profiles'] = {'app.a': 'app'}
+    config['adapt_to_app'] = False
+    actions.set_button_assignment(config, 416, 'undo', 'app.a')
+    assert config['ring_button'] == 416
+    assert config['assignment_profiles']['app']['ring_button'] is None
+    assert config['assignment_profiles']['app']['button_bindings']['416'] == 'undo'
+    actions.set_button_assignment(config, 83, actions.SHOW_RING, 'app.a')
+    assert config['assignment_profiles']['app']['ring_button'] == 83
+    assert '83' not in config['assignment_profiles']['app']['button_bindings']
+    assert config['assignment_profiles']['app']['button_bindings']['416'] == 'undo'
+    # An inherited profile reserving83 as an ordinary binding rejects root83.
+    del config['assignment_profiles']['app']['ring_button']
+    config['assignment_profiles']['app']['button_bindings'] = {'83': 'copy'}
+    before = deepcopy(config)
+    with pytest.raises(RuntimeError):
+        actions.set_button_assignment(config, 83, actions.SHOW_RING)
+    assert config == before

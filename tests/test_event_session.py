@@ -366,3 +366,19 @@ def test_restoration_outcome_is_current_session_only_after_child_exit(processes,
     wait_for(lambda: any(event['type'] == 'stopped' for event in events))
     assert session.restored is expected
     assert events[-1]['restored'] is expected
+
+
+@pytest.mark.parametrize('bindings,expected', [({}, []), ({'416': 'copy', '82': 'paste'}, [82, 416])])
+def test_manual_only_session_requests_only_real_bindings_and_no_raw(processes, bindings, expected):
+    session = EventSession(lambda _: None)
+    config = default_config() | {'ring_button': None, 'button_bindings': bindings}
+    session.start('fake', config)
+    process = processes[0]
+    assert json.loads(process.stdin.lines[0]) == {'device_id': 'fake', 'controls': expected,
+                                                 'ring_button': None, 'raw_xy': False}
+    process.stdout.put({'type': 'ready'})
+    wait_for(lambda: session.ready)
+    assert session.configure(config) == 1
+    assert json.loads(process.stdin.lines[-1]) == {'op': 'configure', 'config_id': 1,
+        'controls': expected, 'ring_button': None, 'raw_xy': False}
+    session.stop()

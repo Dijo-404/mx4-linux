@@ -4,7 +4,7 @@ import math
 from time import monotonic
 from uuid import uuid4
 
-from .gtk_support import Gdk, Gtk, Layer
+from .gtk_support import Gdk, GLib, Gtk, Layer
 import gi
 from gi.repository import GObject, Pango
 
@@ -15,7 +15,7 @@ except (ImportError, ValueError):
     GdkWayland = None
 from .motion import Transition
 from .ring_icons import action_icon
-from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, RingGeometry, RingState, button_at, button_center
+from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, HorizontalDrag, RingGeometry, RingState, button_at, button_center
 
 
 WIDTH, HEIGHT = 720, 460
@@ -31,6 +31,9 @@ class ActionsRing(Gtk.Window):
         self.state = RingState()
         self.geometry = RingGeometry()
         self.on_adjusted = adjusted
+        self._primary_start = self._drag = self._press_target = None
+        self._suppress_native = False
+        self._pointer_token = 0
         self._adjusted_in_hold = False
         self._keyboard_yielded = False
         self._saved_focus = None
@@ -81,7 +84,7 @@ class ActionsRing(Gtk.Window):
         self.scale_css = Gtk.CssProvider()
         self.canvas = Gtk.DrawingArea(content_width=WIDTH, content_height=HEIGHT, focusable=True)
         self.canvas.update_property([Gtk.AccessibleProperty.LABEL],
-                                    ["Actions Ring. Arrow keys select, Enter opens or runs, keys 1 through 8 choose, Escape goes back or closes."])
+                                    ["Actions Ring. Arrow keys select, Enter opens or runs, keys 1 through 8 choose, Escape goes back or closes. Scroll or drag horizontally on adjustable actions."])
         self.canvas.set_draw_func(self.draw)
         self.surface = Gtk.Overlay(child=self.canvas)
         self.labels = Gtk.Fixed()
@@ -89,7 +92,7 @@ class ActionsRing(Gtk.Window):
         self.buttons, self.icons = [], []
         for index in range(8):
             button, icon = self.make_button(BUTTON_RADIUS)
-            button.connect("clicked", lambda _button, i=index: self.commit(i) if not self.state.held else None)
+            button.connect("clicked", lambda _button, i=index: self.native_commit(i))
             focus = Gtk.EventControllerFocus()
             focus.connect("enter", lambda _controller, i=index: self.focus_action(i))
             button.add_controller(focus)
@@ -101,7 +104,7 @@ class ActionsRing(Gtk.Window):
             button, icon = self.make_button(CHILD_RADIUS)
             button.add_css_class("child-action")
             button.set_visible(False)
-            button.connect("clicked", lambda _button, i=index: self.commit_child(i))
+            button.connect("clicked", lambda _button, i=index: self.native_commit(i, child=True))
             focus = Gtk.EventControllerFocus()
             focus.connect("enter", lambda _controller, i=index: self.focus_child(i))
             button.add_controller(focus)
@@ -132,6 +135,7 @@ class ActionsRing(Gtk.Window):
             widget.get_style_context().add_provider(self.scale_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
         self.set_child(self.surface)
         motion = Gtk.EventControllerMotion()
+        motion.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         motion.connect("motion", self.pointer_motion)
         motion.connect("leave", self.pointer_leave)
         self.surface.add_controller(motion)
@@ -144,15 +148,24 @@ class ActionsRing(Gtk.Window):
         # Native buttons have square allocations. Claim pointer clicks here so
         # only the actual circular faces can select an action.
         click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        click.connect("pressed", lambda gesture, *_: gesture.set_state(Gtk.EventSequenceState.CLAIMED))
+        click.connect("pressed", self.pointer_press)
         click.connect("released", self.pointer_click)
+        click.connect("cancel", lambda *_: self.cancel_pointer())
         self.surface.add_controller(click)
+        drag = Gtk.GestureDrag(button=1)
+        drag.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        drag.connect("drag-begin", lambda gesture, x, y: self.pointer_press(gesture, 1, x, y))
+        drag.connect("drag-update", self.pointer_drag)
+        drag.connect("drag-end", self.pointer_drag_end)
+        drag.connect("cancel", lambda *_: self.cancel_pointer())
+        self.surface.add_controller(drag)
+        drag.group(click)
         keys = Gtk.EventControllerKey()
         keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", self.key_pressed)
         self.add_controller(keys)
         self.connect("close-request", lambda *_: self.dismiss() or True)
-        self.connect("unmap", lambda *_: self.stop_animation())
+        self.connect("unmap", lambda *_: (self.cancel_pointer(), self.stop_animation()))
         self.settings.connect("notify::gtk-enable-animations", self.motion_preference_changed)
 
     @staticmethod
@@ -169,6 +182,8 @@ class ActionsRing(Gtk.Window):
     def show_ring(self, config, held=False, preview=False):
         geometry = RingGeometry(config.get("ring_scale", 100))
         state = RingState(config.get("ring_motion_gain", .45), config.get("ring_deadzone", 24))
+        self.cancel_pointer()
+        self._suppress_native = False
         self.geometry, self.state = geometry, state
         self.config, self.preview = config, preview
         self._adjusted_in_hold = False
@@ -218,6 +233,7 @@ class ActionsRing(Gtk.Window):
         self.animate()
 
     def hide_ring(self):
+        self.cancel_pointer()
         self._adjusted_in_hold = False
         self.state.cancel()
         self.close_group()
@@ -278,6 +294,8 @@ class ActionsRing(Gtk.Window):
             self.canvas.queue_draw()
 
     def focus_action(self, index):
+        if self._primary_start is not None:
+            return
         if self.state.visible and not self.state.held:
             if self.group_slot is not None and index != self.group_slot:
                 self.close_group()
@@ -290,6 +308,7 @@ class ActionsRing(Gtk.Window):
         if not children or not self.state.visible:
             return
         if self.group_slot != index:
+            self.cancel_pointer()
             if self.group_slot is not None:
                 self.expanded_state(self.buttons[self.group_slot], False)
             self.group_slot, self.children, self.child_selected = index, list(children), None
@@ -312,6 +331,7 @@ class ActionsRing(Gtk.Window):
         self.update_labels()
 
     def close_group(self):
+        self.cancel_pointer()
         if self.group_slot is not None:
             self.expanded_state(self.buttons[self.group_slot], False)
         self.group_slot = self.child_selected = None
@@ -322,6 +342,8 @@ class ActionsRing(Gtk.Window):
             button.set_visible(False)
 
     def focus_child(self, index):
+        if self._primary_start is not None:
+            return
         if self.state.visible and self.group_slot is not None and index < len(self.children):
             before = self.child_selected
             self.child_selected = index
@@ -385,7 +407,7 @@ class ActionsRing(Gtk.Window):
             hint = ("Preview · " if self.preview else "") + ("Hold · move · release" if self.state.held else "Choose an action · 1–8 · Esc to close")
         if action_id and self.config["actions"][action_id].get("adjustment") and not (
                 self.group_slot is not None and child is None):
-            hint += " · Scroll to adjust"
+            hint += " · Scroll or drag horizontally to adjust"
         self.instructions.set_text(hint)
         self.instructions.set_tooltip_text(hint)
         footer_height = self.instructions.measure(Gtk.Orientation.VERTICAL, self.geometry.size(480)).natural
@@ -477,7 +499,7 @@ class ActionsRing(Gtk.Window):
 
     def pointer_motion(self, _controller, x, y):
         x, y = self.geometry.logical(x, y)
-        if not self.state.visible or self.state.held:
+        if not self.state.visible or self.state.held or self._primary_start is not None:
             return
         if self.group_slot is not None:
             child = self.child_at(x, y)
@@ -498,12 +520,75 @@ class ActionsRing(Gtk.Window):
         self.update_labels()
 
     def pointer_leave(self, *_):
+        if self._primary_start is not None:
+            return
         if not self.state.held and self.group_slot is None:
             before = self.state.selected
             self.state.selected = None
             self.changed(before)
 
-    def pointer_click(self, _gesture, _count, x, y):
+    def pointer_press(self, gesture, _count, x, y):
+        if gesture is not None:
+            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        if self._primary_start is not None or not self.state.visible:
+            return
+        if any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y)):
+            return
+        self._pointer_token += 1
+        self._suppress_native = True
+        self._primary_start = (x, y)
+        self._press_target = self.pointer_target(x, y)
+        action = self.adjustment_at(x, y)
+        self._drag = (HorizontalDrag(*self.geometry.logical(x, y)), action) if action else None
+
+    def pointer_drag(self, _gesture, dx, dy):
+        if (self._primary_start is None or self._drag is None or not self.state.visible
+                or any(type(v) not in (int, float) or not math.isfinite(v) for v in (dx, dy))):
+            return
+        model, action = self._drag
+        x, y = self._primary_start
+        delta = model.move(*self.geometry.logical(x + dx, y + dy))
+        if model.recognized and self.state.held:
+            self._adjusted_in_hold = True
+        for _ in range(abs(delta)):
+            self.on_adjusted(action, "increase" if delta > 0 else "decrease", self.preview)
+            if self._primary_start is None or not self.state.visible:
+                break
+
+    def pointer_drag_end(self, gesture, dx, dy):
+        if self._primary_start is not None:
+            x, y = self._primary_start
+            self.pointer_click(gesture, 1, x + dx, y + dy)
+
+    def cancel_pointer(self):
+        self._primary_start = self._drag = self._press_target = None
+        token = self._pointer_token = self._pointer_token + 1
+        def unblock():
+            if token == self._pointer_token:
+                self._suppress_native = False
+            return GLib.SOURCE_REMOVE
+        GLib.idle_add(unblock)
+
+    def native_commit(self, index, child=False):
+        if not self._suppress_native and self._primary_start is None:
+            if child:
+                self.commit_child(index)
+            elif not self.state.held:
+                self.commit(index)
+
+    def pointer_click(self, gesture, _count, x, y):
+        if self._primary_start is not None:
+            sx, sy = self._primary_start
+            self.pointer_drag(gesture, x - sx, y - sy)
+            dragged = self._drag is not None and self._drag[0].recognized
+            same_face = self._press_target is not None and self.pointer_target(x, y) == self._press_target
+            self.cancel_pointer()
+            if dragged or not same_face:
+                return
+        elif gesture is not None:
+            return  # Grouped drag/click release has already been handled or cancelled.
+        if any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y)):
+            return
         x, y = self.geometry.logical(x, y)
         if self.state.held or not self.state.visible:
             return
@@ -577,7 +662,7 @@ class ActionsRing(Gtk.Window):
 
     @staticmethod
     def adjustment_hint(action):
-        return ". Scroll to adjust" if action.get("adjustment") else ""
+        return ". Scroll to adjust, or drag horizontally" if action.get("adjustment") else ""
 
     def scroll(self, controller, dx, dy):
         event = controller.get_current_event()
@@ -596,25 +681,43 @@ class ActionsRing(Gtk.Window):
                 or any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y, dx, dy))
                 or (dx == 0 and dy == 0)):
             return False
-        x, y = self.geometry.logical(x, y)
-        child = self.child_at(x, y) if self.group_slot is not None else None
-        if child is not None:
-            action_id = self.children[child]
-        else:
-            if self.group_slot is not None and any(math.hypot(x - cx, y - cy) <= CHILD_RADIUS
-                                                   for cx, cy in self.child_positions):
-                return False
-            index = button_at(x - CENTER_X, y - CENTER_Y, spread=self.spread)
-            if index is None or str(index) in self.groups():
-                return False
-            action_id = self.config["ring"][index]
-        if not self.config["actions"][action_id].get("adjustment"):
+        action_id = self.adjustment_at(x, y)
+        if action_id is None:
             return False
         direction = "increase" if (dy < 0 if dy else dx > 0) else "decrease"
         accepted = bool(self.on_adjusted(action_id, direction, self.preview))
         if accepted and self.state.held:
             self._adjusted_in_hold = True
         return accepted
+
+    def pointer_target(self, x, y):
+        if (not self.state.visible
+                or any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y))):
+            return None
+        x, y = self.geometry.logical(x, y)
+        if math.hypot(x - CENTER_X, y - CENTER_Y) <= CENTER_RADIUS:
+            return ("center", None)
+        child = self.child_at(x, y) if self.group_slot is not None else None
+        if child is not None:
+            return ("child", child)
+        if self.group_slot is not None and any(math.hypot(x - cx, y - cy) <= CHILD_RADIUS
+                                               for cx, cy in self.child_positions):
+            return None
+        index = button_at(x - CENTER_X, y - CENTER_Y, spread=self.spread)
+        return ("root", index) if index is not None else None
+
+    def adjustment_at(self, x, y):
+        """Exact actionable circle shared by primary drag and wheel input."""
+        if self.preview or not self.on_adjusted:
+            return None
+        target = self.pointer_target(x, y)
+        if target is None or target[0] == "center":
+            return None
+        kind, index = target
+        if kind == "root" and str(index) in self.groups():
+            return None
+        action_id = self.children[index] if kind == "child" else self.config["ring"][index]
+        return action_id if self.config["actions"][action_id].get("adjustment") else None
 
     def yield_keyboard(self):
         """Keep pointer input mapped while returning the seat keyboard to the source."""

@@ -459,9 +459,9 @@ def test_rebuilt_context_can_open_inspector_before_first_allocation(window, capf
     window.desktop.reload_config()
     window.shell.update_context()
     context = GLib.MainContext.default()
-    def pump():
-        deadline = monotonic() + .35
-        while monotonic() < deadline:
+    def pump(allocated=None):
+        deadline = monotonic() + (3 if allocated else .35)
+        while monotonic() < deadline and (allocated is None or not allocated()):
             while context.pending():
                 context.iteration(False)
             sleep(.002)
@@ -472,7 +472,7 @@ def test_rebuilt_context_can_open_inspector_before_first_allocation(window, capf
     assert window.shell.inspector.get_width() == 0
     window.navigate('buttons')
     window.select_target('button:83')
-    pump()
+    pump(lambda: window.shell.inspector.get_width() > 0)
     assert window.selected_target == 'button:83'
     assert window.shell.inspector.get_show_sidebar()
     assert window.shell.inspector.get_width() > 0
@@ -596,3 +596,110 @@ def test_local_completion_after_close_skips_ui_reconciliation(window, monkeypatc
         window.local_config_finished.assert_not_called()
     finally:
         release.set()
+
+
+def test_all_button_menus_can_replace_trigger_and_edit_explicit_app_with_adapt_off(window):
+    from mx4_linux.actions import SHOW_RING
+    config = deepcopy(window.desktop.config)
+    config['assignment_profiles'] = {'app': {'label': 'Editor', 'app_id': 'org.example.Editor',
+        'ring': config['ring'][:], 'button_bindings': {}}}
+    config['active_profiles'] = {'org.example.Editor': 'app'}
+    config['adapt_to_app'] = False
+    window.desktop.store.save(config)
+    window.desktop.reload_config()
+    window.shell.context_app = 'org.example.Editor'
+    window.shell.update_context()
+    window.navigate('buttons')
+    assert set(window.shell.binding_widgets) == {82, 83, 86, 195, 196, 416}
+    dropdown, choices = window.shell.binding_widgets[416]
+    assert choices[:2] == [None, SHOW_RING]
+    assert dropdown.get_selected() == 1
+    dropdown.set_selected(choices.index('copy'))
+    settle(window)
+    saved = window.desktop.store.read()
+    assert saved['ring_button'] == 416
+    assert saved['assignment_profiles']['app']['ring_button'] is None
+    assert window.shell.effective_config()['button_bindings'] == {'416': 'copy'}
+    dropdown, choices = window.shell.binding_widgets[83]
+    dropdown.set_selected(choices.index(SHOW_RING))
+    settle(window)
+    assert window.desktop.store.read()['assignment_profiles']['app']['ring_button'] == 83
+    assert 'Show Actions Ring' in window.shell.art.callouts['button:83'].get_label()
+    assert window.shell.binding_widgets[416][0].get_selected() == window.shell.binding_widgets[416][1].index('copy')
+
+
+def test_native_mapping_clears_selected_local_trigger_before_hid_write(window):
+    window.navigate('buttons')
+    window.select_target('button:416')
+    original = window.backend.write
+    observations = []
+    def write(*args, **kwargs):
+        observations.append(window.desktop.store.read()['ring_button'])
+        return original(*args, **kwargs)
+    window.backend.write = Mock(side_effect=write)
+    setting = next(s for s in window.current['settings'] if s['name'] == 'reprogrammable-keys')
+    window.change(setting, 83, 416)
+    settle(window)
+    assert observations == [None]
+    assert window.desktop.config['ring_button'] is None
+    assert 'Show Actions Ring' not in window.shell.art.callouts['button:416'].get_label()
+
+
+def test_native_mapping_never_writes_after_local_clear_save_failure(window):
+    window.navigate('buttons')
+    original = window.desktop.store.read()
+    window.desktop.store.update = Mock(side_effect=RuntimeError('disk unavailable'))
+    window.backend.write = Mock()
+    window.backend.scan = Mock(return_value={'ok': True, 'devices': deepcopy(window.devices), 'diagnostics': []})
+    setting = next(s for s in window.current['settings'] if s['name'] == 'reprogrammable-keys')
+    window.change(setting, 83, 416)
+    settle(window)
+    window.backend.write.assert_not_called()
+    assert window.desktop.store.read() == original
+    assert 'not changed' in window.status.get_text()
+
+
+def test_root_trigger_conflict_rolls_back_selected_menu_and_document(window):
+    from mx4_linux.actions import SHOW_RING
+    document = deepcopy(window.desktop.config)
+    document['assignment_profiles'] = {'inactive': {'label': 'Inactive', 'app_id': 'app.inactive',
+        'ring': document['ring'][:], 'button_bindings': {'83': 'copy'}}}
+    window.desktop.store.save(document)
+    window.desktop.reload_config()
+    window.navigate('buttons')
+    window.select_target('button:83')
+    dropdown, choices = window.shell.binding_widgets[83]
+    dropdown.set_selected(choices.index(SHOW_RING))
+    settle(window)
+    assert window.desktop.store.read() == document
+    assert window.shell.binding_widgets[83][0].get_selected() == 0
+    assert window.selected_target == 'button:83'
+    assert 'distinct' in window.status.get_text()
+
+
+def test_native_mapping_failure_keeps_local_clear_and_reports_two_operations(window):
+    window.navigate('buttons')
+    window.backend.write = Mock(side_effect=RuntimeError('readback missing'))
+    window.backend.scan = Mock(return_value={'ok': True, 'devices': deepcopy(window.devices), 'diagnostics': []})
+    setting = next(s for s in window.current['settings'] if s['name'] == 'reprogrammable-keys')
+    window.change(setting, 83, 416)
+    settle(window)
+    assert window.desktop.store.read()['ring_button'] is None
+    assert window.desktop.config['ring_button'] is None
+    assert 'Local assignment cleared' in window.status.get_text()
+    assert 'not confirmed' in window.status.get_text()
+
+
+def test_adapt_preference_does_not_stop_or_dismiss_pinned_ring(window):
+    window.desktop.stop = Mock()
+    window.desktop.ring = Mock()
+    window.desktop.ring.state.visible = True
+    snapshot = window.desktop._ring_config = deepcopy(window.desktop.config)
+    target = window.desktop.target = {'window_id': 12, 'app_id': 'app.original'}
+    window.save_local_preference('adapt_to_app', False)
+    settle(window)
+    assert window.desktop.config['adapt_to_app'] is False
+    window.desktop.stop.assert_not_called()
+    window.desktop.ring.dismiss.assert_not_called()
+    assert window.desktop._ring_config is snapshot and window.desktop.target is target
+    window.desktop.ring = None

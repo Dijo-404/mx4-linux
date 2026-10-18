@@ -183,3 +183,19 @@ def test_finite_huge_raw_motion_cannot_overflow_state():
     assert math.isfinite(state.x) and math.isfinite(state.y)
     assert math.hypot(state.x, state.y) == pytest.approx(155)
     assert state.motion(0, -10) is not None
+
+
+def test_horizontal_drag_threshold_remainder_reversal_and_bounded_huge_delta():
+    from mx4_linux.ring_model import HorizontalDrag
+    drag = HorizontalDrag(100, 100)
+    assert drag.move(109, 101) == 0 and not drag.recognized
+    assert drag.move(110, 101) == 1 and drag.recognized
+    assert drag.move(121, 102) == 0
+    assert drag.move(122, 102) == 1
+    assert drag.move(110, 102) == -1
+    assert drag.move(100, 102) == -1 and drag.recognized
+    assert drag.move(-1e308, 100) == -4
+    assert drag.move(1e308, 100) == 4
+    assert drag.move(float('nan'), 100) == 0
+    vertical = HorizontalDrag(0, 0)
+    assert vertical.move(11, 100) == 0 and not vertical.recognized

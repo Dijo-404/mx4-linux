@@ -415,3 +415,136 @@ def test_fallback_resume_does_not_request_another_gtk_activation(preview, monkey
     window.resume_keyboard()
     present.assert_not_called()  # Controller already restored the exact popup through Niri.
     assert not window._keyboard_yielded
+
+
+@pytest.mark.parametrize('scale', [75, 100, 150])
+def test_primary_horizontal_drag_pins_root_suppresses_release_and_scales(preview, scale):
+    window = preview.window
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    window.show_ring(adjustment_config() | {'ring_scale': scale}, preview=False)
+    settle(window)
+    x, y = window.geometry.point(*main_position(window, 0))
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, 22 * scale / 100, 2 * scale / 100)
+    window.pointer_motion(None, *window.geometry.point(*main_position(window, 2)))
+    window.pointer_drag(None, 10 * scale / 100, 0)
+    window.pointer_click(None, 1, x + 10 * scale / 100, y)
+    assert adjusted == [('copy', 'increase', False), ('copy', 'increase', False), ('copy', 'decrease', False)]
+    assert window.state.visible and not preview.selected
+
+
+def test_below_threshold_primary_motion_retains_one_click(preview):
+    window = preview.window
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    window.on_adjusted = lambda *_: pytest.fail('Below threshold is an ordinary click')
+    x, y = main_position(window, 0)
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, 9, 2)
+    window.pointer_click(None, 1, x + 9, y + 2)
+    window.buttons[0].emit('clicked')
+    assert preview.selected == [('copy', False)]
+
+
+def test_failed_drag_and_reversal_never_run_main_and_reopen_resets(preview):
+    window = preview.window
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    window.on_adjusted = lambda *_: False
+    x, y = main_position(window, 0)
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, 30, 0)
+    window.pointer_drag(None, 0, 0)
+    window.pointer_click(None, 1, x, y)
+    assert not preview.selected and window.state.visible
+    window.hide_ring()
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    window.pointer_click(None, 1, *main_position(window, 0))
+    assert preview.selected == [('copy', False)]
+
+
+def test_child_drag_keeps_group_and_initial_action_across_hover_and_leave(preview):
+    window = preview.window
+    config = adjustment_config() | {'ring_groups': {'2': ['copy', 'paste']}}
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(2)
+    settle(window)
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    x, y = window.child_positions[0]
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, -22, 0)
+    window.pointer_motion(None, *main_position(window, 6))
+    window.pointer_leave(None)
+    assert window.group_slot == 2
+    window.pointer_click(None, 1, x - 22, y)
+    assert adjusted == [('copy', 'decrease', False), ('copy', 'decrease', False)]
+    assert not preview.selected and window.state.visible
+
+
+def test_drag_preview_gap_group_head_emerging_and_nonfinite_are_inert(preview):
+    window = preview.window
+    config = adjustment_config() | {'ring_groups': {'2': ['copy', 'paste']}}
+    window.on_adjusted = lambda *_: pytest.fail('Rejected drag cannot execute')
+    for is_preview, where in [(True, 0), (False, 2), (False, None)]:
+        window.show_ring(config, preview=is_preview)
+        settle(window)
+        x, y = main_position(window, where) if where is not None else (0, 0)
+        window.pointer_press(None, 1, x, y)
+        window.pointer_drag(None, 50, 0)
+        window.cancel_pointer()
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(2)
+    window.group_reveal.move(0, animate=False)
+    window.apply_frame(monotonic())
+    window.pointer_press(None, 1, *window.child_positions[0])
+    window.pointer_drag(None, 50, 0)
+    window.cancel_pointer()
+    window.pointer_press(None, 1, float('nan'), 0)
+    window.pointer_drag(None, float('inf'), 0)
+    assert not preview.selected
+
+
+@pytest.mark.parametrize('start,end', [(None, 0), (1, 0), (0, None)])
+def test_captured_click_needs_the_same_initial_painted_face(preview, start, end):
+    window = preview.window
+    settle(window)
+    a = main_position(window, start) if start is not None else (0, 0)
+    b = main_position(window, end) if end is not None else (0, 0)
+    window.pointer_press(None, 1, *a)
+    window.pointer_click(None, 1, *b)
+    assert not preview.selected and window.state.visible
+
+
+def test_cancelled_drag_and_late_native_release_are_inert(preview):
+    window = preview.window
+    window.on_adjusted = lambda *_: True
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    x, y = main_position(window, 0)
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, 22, 0)
+    window.cancel_pointer()
+    window.pointer_click(object(), 1, x, y)
+    window.buttons[0].emit('clicked')
+    assert not preview.selected and window.state.visible
+
+
+def test_switching_group_cancels_captured_child_before_more_adjustment(preview):
+    window = preview.window
+    config = adjustment_config() | {'ring_groups': {'2': ['copy'], '3': ['copy']}}
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(2)
+    settle(window)
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    window.pointer_press(None, 1, *window.child_positions[0])
+    window.pointer_drag(None, 10, 0)
+    window.open_group(3)
+    window.pointer_drag(None, 22, 0)
+    assert adjusted == [('copy', 'increase', False)]

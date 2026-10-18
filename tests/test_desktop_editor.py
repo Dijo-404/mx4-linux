@@ -294,3 +294,33 @@ def test_clearing_group_entry_compacts_the_visible_order_to_match_shortcuts(edit
     assert editor.config["ring_groups"]["2"] == ["paste"]
     assert choices[0].get_selected() == editor.choice_ids.index("paste") + 1
     assert all(choice.get_selected() == 0 for choice in choices[1:])
+
+
+def test_manual_trigger_and_all_six_button_rows_preserve_overrides_and_adjustments(editor):
+    from mx4_linux.actions import SHOW_RING
+    assert {cid for cid, _choice in editor.binding_choices} == {82, 83, 86, 195, 196, 416}
+    choice = dict(editor.binding_choices)[416]
+    assert choice.get_model().get_string(1) == 'Show Actions Ring'
+    choice.set_selected(editor.choice_ids.index('copy') + 2)
+    assert editor.config['ring_button'] is None
+    assert editor.config['button_bindings']['416'] == 'copy'
+    assert 'Manual' in editor.trigger_row.get_subtitle() and 'None' not in editor.trigger_row.get_subtitle()
+    dict(editor.binding_choices)[83].set_selected(1)
+    assert editor.config['ring_button'] == 83
+    assert '83' not in editor.config['button_bindings']
+    assert editor.config['button_bindings']['416'] == 'copy'
+    assert SHOW_RING not in editor.config.values()
+
+
+def test_existing_action_icon_adjustment_and_profile_override_survive_trigger_edit(editor):
+    editor.config['actions']['copy']['icon'] = 'edit-copy-symbolic'
+    editor.config['actions']['copy']['adjustment'] = {
+        'increase': [{'type': 'command', 'argv': ['/usr/bin/true']}],
+        'decrease': [{'type': 'command', 'argv': ['/usr/bin/true']}],
+    }
+    editor.config['assignment_profiles'] = {'p': {'label': 'P', 'app_id': 'app.p',
+        'ring': editor.config['ring'][:], 'button_bindings': {}, 'ring_button': None}}
+    candidate = editor._candidate()
+    assert candidate['actions']['copy']['icon'] == 'edit-copy-symbolic'
+    assert candidate['actions']['copy']['adjustment'] == editor.config['actions']['copy']['adjustment']
+    assert candidate['assignment_profiles']['p']['ring_button'] is None

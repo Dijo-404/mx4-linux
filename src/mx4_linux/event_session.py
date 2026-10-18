@@ -15,6 +15,14 @@ _LOG = logging.getLogger(__name__)
 _MAX_LINE = 65536
 
 
+def _reporting_request(config):
+    ring = config["ring_button"]
+    controls = set(map(int, config["button_bindings"]))
+    if ring is not None:
+        controls.add(ring)
+    return {"controls": sorted(controls), "ring_button": ring, "raw_xy": ring is not None}
+
+
 class EventSession:
     def __init__(self, callback):
         self.callback = callback
@@ -54,8 +62,7 @@ class EventSession:
                 return False
 
     def start(self, device_id, config, expected_stable_id=None):
-        controls = sorted({config["ring_button"], *map(int, config["button_bindings"])})
-        request = {"device_id": device_id, "controls": controls, "ring_button": config["ring_button"], "raw_xy": True}
+        request = {"device_id": device_id, **_reporting_request(config)}
         if expected_stable_id is not None:
             request["expected_stable_id"] = expected_stable_id
         _validate(request)
@@ -183,8 +190,7 @@ class EventSession:
 
     def configure(self, config):
         """Request an exact control set; the worker acknowledges its safe boundary."""
-        controls = sorted({config["ring_button"], *map(int, config["button_bindings"])})
-        request = {"controls": controls, "ring_button": config["ring_button"], "raw_xy": True}
+        request = _reporting_request(config)
         _validate({"device_id": "configure", **request})
         with self._lock:
             if not self.ready or self.stopping or not self.running:
