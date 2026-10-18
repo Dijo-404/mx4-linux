@@ -721,3 +721,34 @@ def test_host_switch_same_channel_is_noop_and_changed_identity_is_rejected(hosts
     request.update(index=1, expected_stable_id='unit:d1e2f3a4')
     assert not worker.handle_request(request, api)['ok']
     assert not any(feature == 0x1814 and fn == 0x10 for feature, fn, _, _ in calls)
+
+
+def test_legacy_write_without_expected_identity_still_binds_and_rechecks_unit():
+    setting = FakeSetting('dpi', 2, 1000, [Named(1000, '1000'), Named(1600, '1600')])
+    api, dev, _ = fake_api([setting])
+    original = dev._feature_request
+    identity_reads = []
+    def request(feature, function, *args):
+        if feature == 3:
+            identity_reads.append(True)
+        return original(feature, function, *args)
+    dev.feature_request.side_effect = request
+    result = worker.handle_request({'op': 'write', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                    'setting': 'dpi', 'value': 1600}, api)
+    assert result['ok']
+    assert len(identity_reads) >= 2
+    setting.writes.clear()
+    dev.feature_request.side_effect = lambda *_args, **_kwargs: None
+    result = worker.handle_request({'op': 'write', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                    'setting': 'dpi', 'value': 1000}, api)
+    assert not result['ok']
+    assert setting.writes == []
+
+
+def test_explicit_unknown_expected_identity_cannot_mutate_a_fresh_device():
+    setting = FakeSetting('dpi', 2, 1000, [Named(1000, '1000'), Named(1600, '1600')])
+    api, _dev, _ = fake_api([setting])
+    result = worker.handle_request({'op': 'write', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                    'setting': 'dpi', 'value': 1600, 'expected_stable_id': None}, api)
+    assert not result['ok']
+    assert setting.writes == []

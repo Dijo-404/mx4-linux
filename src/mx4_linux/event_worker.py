@@ -257,6 +257,7 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
     handle = _NotificationHandle(original, decoder)
     owner.handle = handle
     snapshots = {}
+    expected_owned = {}
     active = set()
     diversion = api.hidpp20.MappingFlag.DIVERTED.value
     raw = api.hidpp20.MappingFlag.RAW_XY_DIVERTED.value
@@ -272,6 +273,8 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
         for cid, (key, flags, mapping) in live.items():
             if cid in snapshots and mapping != snapshots[cid][2]:
                 raise RuntimeError(f"Control {cid} mapping changed during mouse integration")
+            if cid in expected_owned and flags & (diversion | raw) != expected_owned[cid]:
+                raise RuntimeError(f"Control {cid} reporting changed outside this integration; stopping without reasserting it")
             snapshots.setdefault(cid, [key, flags, mapping, 0])
         relevant = active | set(selected)
         if decoder.active and decoder.pressed & relevant:
@@ -302,6 +305,7 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
             owned = diversion | raw
             if actual_flags & owned != desired & owned or actual_mapping != mapped_to:
                 raise RuntimeError(f"Device did not confirm reporting configuration for control {key._cid}")
+            expected_owned[cid] = actual_flags & owned
         active.clear()
         active.update(selected)
         decoder.controls, decoder.ring, decoder.raw_xy = set(selected), selected_ring, selected_raw

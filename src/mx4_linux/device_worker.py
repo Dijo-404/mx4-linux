@@ -498,8 +498,11 @@ def _write(request, api):
                 continue
             if not dev.online:
                 raise RuntimeError("Device is offline; wake it and scan again")
-            if request.get("expected_stable_id") is not None:
-                require_identity(dev, request["expected_stable_id"])
+            if "expected_stable_id" in request and not valid_identity(request["expected_stable_id"]):
+                raise ValueError("A verified expected mouse identity is required")
+            # Legacy explicit writes may bind the selected, freshly verified unit.
+            # Every setter below must recheck this bound identity independently.
+            identity = require_identity(dev, request.get("expected_stable_id"))
             names = [name]
             if name in ("smart-shift", "scroll-ratchet"):
                 names.append("scroll-ratchet" if name == "smart-shift" else "smart-shift")
@@ -515,12 +518,11 @@ def _write(request, api):
                 raise ValueError("Setting is not editable on the connected device")
             value, key = request["value"], request.get("key")
             _validate_value(descriptor, value, key)
-            lock = Ownership(require_identity(dev)) if name == "reprogrammable-keys" else contextlib.nullcontext()
+            lock = Ownership(identity) if name == "reprogrammable-keys" else contextlib.nullcontext()
             with lock as ownership:
                 if ownership and ownership.read() is not None:
                     raise RuntimeError("Recover previous button reporting before changing button mappings")
-                if request.get("expected_stable_id") is not None:
-                    require_identity(dev, request["expected_stable_id"])
+                require_identity(dev, identity)
                 if descriptor["kind"] == "map_choice":
                     written = setting.write_key_value(key, value, save=False)
                 else:

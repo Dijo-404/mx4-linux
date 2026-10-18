@@ -27,6 +27,7 @@ class ControlWindow(Adw.ApplicationWindow):
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mx4-device")
         self.busy = False
         self.pending_hardware = None
+        self._hardware_resume = None
         self.devices = []
         self.selected_id = None
         self.current = None
@@ -111,6 +112,7 @@ class ControlWindow(Adw.ApplicationWindow):
 
     def on_close(self, *_):
         self.closed = True
+        self._hardware_resume = None
         self.operation_epoch += 1
         self.hardware_cancelled.set()
         if self.battery_source:
@@ -201,10 +203,18 @@ class ControlWindow(Adw.ApplicationWindow):
             self._observed_online = online
             if new_connection and not self.demo and not self.desktop.session.running and not self.desktop._reconnect_busy:
                 epoch = self.operation_epoch
-                GLib.idle_add(lambda: self.recover_current(replay=self.current and self.current.get("stable_id") != self.replay_suppressed_identity) if not self.closed and epoch == self.operation_epoch else GLib.SOURCE_REMOVE)
+                GLib.idle_add(lambda: self.recover_current(replay=self.current and self.current.get("stable_id") != self.replay_suppressed_identity, automatic=True) if not self.closed and epoch == self.operation_epoch else GLib.SOURCE_REMOVE)
             if notice:
                 self.status.set_text(notice)
-        self.job(self.backend.scan, loaded, "Reading connected devices… Wake the mouse if it is asleep.")
+            resume, self._hardware_resume = self._hardware_resume, None
+            if resume:
+                resume(not result.get("diagnostics"))
+        def failed(error):
+            resume, self._hardware_resume = self._hardware_resume, None
+            if resume:
+                resume(False)
+            self.status.set_text(error)
+        self.job(self.backend.scan, loaded, "Reading connected devices… Wake the mouse if it is asleep.", failed=failed)
 
     def clear_controls(self):
         self.setting_widgets.clear()
@@ -402,6 +412,9 @@ class ControlWindow(Adw.ApplicationWindow):
     def change(self, setting, value, key=None):
         if self.busy:
             return
+        if not self.demo and (not self.current or not valid_identity(self.current.get("stable_id"))):
+            self.status.set_text("Wake and refresh this mouse to verify its identity before changing settings.")
+            return
         previous = setting.get("value")
         if key is not None:
             previous = (previous or {}).get(str(key), (previous or {}).get(key))
@@ -459,6 +472,7 @@ class ControlWindow(Adw.ApplicationWindow):
         self.update_desktop_status()
 
     def cancel_hardware(self):
+        self._hardware_resume = None
         self.set_hardware_wait(None)
         self.hardware_cancelled.set()
         self.operation_epoch += 1
@@ -475,6 +489,7 @@ class ControlWindow(Adw.ApplicationWindow):
         generation = self.desktop._intent_generation
         epoch = self.operation_epoch
         wanted = self.desktop.requested_enabled and resume
+        identity = self.current.get("stable_id") if self.current else None
         self.desktop.hardware_paused = True
         def stopped(restored):
             if self.pending_hardware is wait_token:
@@ -485,13 +500,24 @@ class ControlWindow(Adw.ApplicationWindow):
                 self.desktop.hardware_paused = False
                 self.status.set_text("Button restoration was not confirmed. Recover this mouse before changing its mappings or computer.")
                 return
-            def completed(result):
+            def resume_after_readback(confirmed):
+                if epoch != self.operation_epoch or generation != self.desktop._intent_generation:
+                    return
                 self.desktop.hardware_paused = False
-                done(result)
-                if (wanted and not self.busy and not self.closed and epoch == self.operation_epoch
-                        and generation == self.desktop._intent_generation and self.desktop.requested_enabled):
+                if (wanted and confirmed and not self.busy and not self.closed
+                        and self.desktop.requested_enabled and self.current and self.current.get("online")
+                        and self.current.get("stable_id") == identity):
                     self.desktop.start(automatic=True)
+            def completed(result):
+                # The completion may request a fresh scan after a whole profile.
+                # Keep the pause until that matching readback resolves.
+                self._hardware_resume = resume_after_readback
+                done(result)
+                if not self.busy and self._hardware_resume is resume_after_readback:
+                    self._hardware_resume = None
+                    resume_after_readback(True)
             def failure(error):
+                self._hardware_resume = None
                 self.desktop.hardware_paused = False
                 self.desktop.stop()
                 (failed or self.status.set_text)(error)
@@ -513,7 +539,11 @@ class ControlWindow(Adw.ApplicationWindow):
         self.job(lambda: self.backend.battery(device_id, identity), loaded, "Reading battery…", failed=failed)
         return GLib.SOURCE_CONTINUE
 
-    def recover_current(self, replay=False):
+    def recover_current(self, replay=False, automatic=False):
+        if (automatic and self.desktop.session.process is not None
+                and self.desktop.restoration_confirmed is not True):
+            self.status.set_text("Previous reporting restoration was not confirmed. Use Recover for this mouse before resuming integration.")
+            return GLib.SOURCE_REMOVE
         if self.closed or self.busy or self.desktop.starting or self.desktop.session.running or self.desktop.session.stopping or not self.current:
             return GLib.SOURCE_REMOVE
         device = deepcopy(self.current)
