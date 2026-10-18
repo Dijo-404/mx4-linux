@@ -10,6 +10,7 @@ applications and return after starting them, so an editor can stay open.
 from copy import deepcopy
 import fcntl
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -26,11 +27,14 @@ MAX_CONFIG_BYTES = 1024 * 1024
 MAX_ACTIONS = 128
 MAX_STEPS = 64
 MAX_GROUP_ACTIONS = 6
+MAX_ASSIGNMENT_PROFILES = 64
 MAX_DELAY_MS = 30_000
 MAX_TOTAL_DELAY_MS = 60_000
 MAX_RUN_SECONDS = 120
 BUTTON_IDS = frozenset({82, 83, 86, 195, 196, 416})
 ACTION_ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
+THEME_ICON = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
+HAPTIC_SOURCES = frozenset({"open", "hover", "select", "complete"})
 NIRI_ACTION = re.compile(r"[a-z][a-z0-9-]{0,79}\Z")
 
 
@@ -177,63 +181,49 @@ def _wtype_shortcut_args(codes):
     return argv
 
 
-def validate_config(config):
-    """Validate the entire document before it is saved or any action is run."""
-    _fields(config, ("version", "ring", "actions", "button_bindings", "ring_button", "haptic_feedback"),
-            ("ring_groups",), location="document")
-    if type(config["version"]) is not int or config["version"] != 1:
-        _fail("only version 1 is supported.")
-    actions = config["actions"]
-    if not isinstance(actions, dict) or not 1 <= len(actions) <= MAX_ACTIONS:
-        _fail(f"actions must contain 1–{MAX_ACTIONS} entries.")
-    for action_id, action in actions.items():
-        if not isinstance(action_id, str) or not ACTION_ID.fullmatch(action_id):
-            _fail("action IDs must be 1–64 lowercase letters, numbers, hyphens or underscores.")
-        _fields(action, ("label", "steps"), ("app_id",), f"action {action_id}")
-        if not _plain_string(action["label"], maximum=80):
-            _fail(f"action {action_id} needs a label of 1–80 printable characters.")
-        if "app_id" in action and not _plain_string(action["app_id"]):
-            _fail(f"action {action_id} needs a nonempty exact app_id condition.")
-        steps = action["steps"]
-        if not isinstance(steps, list) or not 1 <= len(steps) <= MAX_STEPS:
-            _fail(f"action {action_id} needs 1–{MAX_STEPS} steps.")
-        delay = 0
-        for index, step in enumerate(steps, 1):
-            if not isinstance(step, dict) or not isinstance(step.get("type"), str):
-                _fail(f"step {index} of {action_id} needs a type.")
-            kind = step["type"]
-            location = f"{kind} step {index} of {action_id}"
-            if kind == "niri":
-                _fields(step, ("type", "action"), ("args",), location)
-                if (not isinstance(step["action"], str) or not NIRI_ACTION.fullmatch(step["action"])
-                        or step["action"] in {"spawn", "spawn-sh"}):
-                    _fail(f"{location} needs a niri action name; use a command step to launch applications.")
-                if not _argv(step.get("args", []), allow_empty=True):
-                    _fail(f"{location} args must be an array of strings.")
-            elif kind == "command":
-                _fields(step, ("type", "argv"), location=location)
-                if not _argv(step["argv"]):
-                    _fail(f"{location} argv must be a nonempty array of at most 64 arguments.")
-            elif kind == "shortcut":
-                _fields(step, ("type", "keys"), location=location)
-                try:
-                    _key_codes(step["keys"])
-                except RuntimeError as exc:
-                    _fail(f"{location}: {exc}")
-            elif kind == "text":
-                _fields(step, ("type", "text"), location=location)
-                if not isinstance(step["text"], str) or not 1 <= len(step["text"]) <= 65_536 or "\0" in step["text"]:
-                    _fail(f"{location} needs 1–65536 characters without NUL bytes.")
-            elif kind == "delay":
-                _fields(step, ("type", "milliseconds"), location=location)
-                value = step["milliseconds"]
-                if type(value) is not int or not 0 <= value <= MAX_DELAY_MS:
-                    _fail(f"{location} must be 0–{MAX_DELAY_MS} milliseconds.")
-                delay += value
-            else:
-                _fail(f"unsupported step type {kind!r}.")
-        if delay > MAX_TOTAL_DELAY_MS:
-            _fail(f"action {action_id} has more than {MAX_TOTAL_DELAY_MS} milliseconds of delays.")
+def _validate_steps(steps, action_id):
+    if not isinstance(steps, list) or not 1 <= len(steps) <= MAX_STEPS:
+        _fail(f"action {action_id} needs 1–{MAX_STEPS} steps.")
+    delay = 0
+    for index, step in enumerate(steps, 1):
+        if not isinstance(step, dict) or not isinstance(step.get("type"), str):
+            _fail(f"step {index} of {action_id} needs a type.")
+        kind = step["type"]
+        location = f"{kind} step {index} of {action_id}"
+        if kind == "niri":
+            _fields(step, ("type", "action"), ("args",), location)
+            if (not isinstance(step["action"], str) or not NIRI_ACTION.fullmatch(step["action"])
+                    or step["action"] in {"spawn", "spawn-sh"}):
+                _fail(f"{location} needs a niri action name; use a command step to launch applications.")
+            if not _argv(step.get("args", []), allow_empty=True):
+                _fail(f"{location} args must be an array of strings.")
+        elif kind == "command":
+            _fields(step, ("type", "argv"), location=location)
+            if not _argv(step["argv"]):
+                _fail(f"{location} argv must be a nonempty array of at most 64 arguments.")
+        elif kind == "shortcut":
+            _fields(step, ("type", "keys"), location=location)
+            try:
+                _key_codes(step["keys"])
+            except RuntimeError as exc:
+                _fail(f"{location}: {exc}")
+        elif kind == "text":
+            _fields(step, ("type", "text"), location=location)
+            if not isinstance(step["text"], str) or not 1 <= len(step["text"]) <= 65_536 or "\0" in step["text"]:
+                _fail(f"{location} needs 1–65536 characters without NUL bytes.")
+        elif kind == "delay":
+            _fields(step, ("type", "milliseconds"), location=location)
+            value = step["milliseconds"]
+            if type(value) is not int or not 0 <= value <= MAX_DELAY_MS:
+                _fail(f"{location} must be 0–{MAX_DELAY_MS} milliseconds.")
+            delay += value
+        else:
+            _fail(f"unsupported step type {kind!r}.")
+    if delay > MAX_TOTAL_DELAY_MS:
+        _fail(f"action {action_id} has more than {MAX_TOTAL_DELAY_MS} milliseconds of delays.")
+
+
+def _validate_assignments(config, actions, ring_button):
     ring = config["ring"]
     if not isinstance(ring, list) or len(ring) != 8 or any(not isinstance(value, str) or value not in actions for value in ring):
         _fail("ring must contain exactly eight existing action IDs.")
@@ -248,11 +238,6 @@ def validate_config(config):
             _fail(f"ring group {position} needs 1–{MAX_GROUP_ACTIONS} existing action IDs.")
         if len(set(children)) != len(children):
             _fail(f"ring group {position} cannot repeat an action ID.")
-    ring_button = config["ring_button"]
-    if type(ring_button) is not int or ring_button not in BUTTON_IDS:
-        _fail("ring_button must be one of 82, 83, 86, 195, 196 or 416.")
-    if type(config["haptic_feedback"]) is not bool:
-        _fail("haptic_feedback must be true or false.")
     bindings = config["button_bindings"]
     if not isinstance(bindings, dict):
         _fail("button_bindings must map decimal button IDs to action IDs.")
@@ -260,13 +245,106 @@ def validate_config(config):
     for button, action_id in bindings.items():
         if button not in allowed or not isinstance(action_id, str) or action_id not in actions:
             _fail("button_bindings must use an existing action and a supported button distinct from ring_button.")
+
+
+def validate_config(config):
+    """Validate the entire document before it is saved or any action is run."""
+    _fields(config, ("version", "ring", "actions", "button_bindings", "ring_button", "haptic_feedback"),
+            ("ring_groups", "assignment_profiles", "active_profiles", "ring_scale", "ring_motion_gain",
+             "ring_deadzone", "haptic_events", "haptic_waveforms", "haptic_power_save", "appearance",
+             "autostart", "background", "resume_integration"), location="document")
+    if type(config["version"]) is not int or config["version"] != 1:
+        _fail("only version 1 is supported.")
+    actions = config["actions"]
+    if not isinstance(actions, dict) or not 1 <= len(actions) <= MAX_ACTIONS:
+        _fail(f"actions must contain 1–{MAX_ACTIONS} entries.")
+    for action_id, action in actions.items():
+        if not isinstance(action_id, str) or not ACTION_ID.fullmatch(action_id):
+            _fail("action IDs must be 1–64 lowercase letters, numbers, hyphens or underscores.")
+        _fields(action, ("label", "steps"), ("app_id", "icon", "adjustment"), f"action {action_id}")
+        if not _plain_string(action["label"], maximum=80):
+            _fail(f"action {action_id} needs a label of 1–80 printable characters.")
+        if "app_id" in action and not _plain_string(action["app_id"]):
+            _fail(f"action {action_id} needs a nonempty exact app_id condition.")
+        if "icon" in action and (not isinstance(action["icon"], str) or not THEME_ICON.fullmatch(action["icon"])):
+            _fail(f"action {action_id} needs a theme icon name of 1–128 letters, digits, dots, hyphens or underscores.")
+        _validate_steps(action["steps"], action_id)
+        if "adjustment" in action:
+            _fields(action["adjustment"], ("increase", "decrease"), location=f"adjustment of {action_id}")
+            for branch, steps in action["adjustment"].items():
+                _validate_steps(steps, f"{action_id} adjustment {branch}")
+    ring_button = config["ring_button"]
+    if type(ring_button) is not int or ring_button not in BUTTON_IDS:
+        _fail("ring_button must be one of 82, 83, 86, 195, 196 or 416.")
+    _validate_assignments(config, actions, ring_button)
+    for flag in ("haptic_feedback", "haptic_power_save", "autostart", "background", "resume_integration"):
+        if flag in config and type(config[flag]) is not bool:
+            _fail(f"{flag} must be true or false.")
+    if "ring_scale" in config and (type(config["ring_scale"]) is not int or not 75 <= config["ring_scale"] <= 150):
+        _fail("ring_scale must be an integer from 75 to 150.")
+    for field, minimum, maximum in (("ring_motion_gain", 0.1, 2.0), ("ring_deadzone", 8, 80)):
+        if field in config:
+            value = config[field]
+            if type(value) not in (int, float) or not minimum <= value <= maximum or not math.isfinite(value):
+                _fail(f"{field} must be a finite number from {minimum} to {maximum}.")
+    if "appearance" in config and config["appearance"] not in ("system", "light", "dark"):
+        _fail("appearance must be system, light or dark.")
+    for field in ("haptic_events", "haptic_waveforms"):
+        if field not in config:
+            continue
+        values = config[field]
+        if not isinstance(values, dict) or values.keys() - HAPTIC_SOURCES:
+            _fail(f"{field} must map open, hover, select or complete to values.")
+        for value in values.values():
+            if field == "haptic_events" and type(value) is not bool:
+                _fail("haptic_events values must be true or false.")
+            if field == "haptic_waveforms" and (type(value) is not int or not 0 <= value <= 255):
+                _fail("haptic_waveforms values must be integers from 0 to 255.")
+    if "assignment_profiles" in config:
+        profiles = config["assignment_profiles"]
+        if not isinstance(profiles, dict) or len(profiles) > MAX_ASSIGNMENT_PROFILES:
+            _fail(f"assignment_profiles must contain at most {MAX_ASSIGNMENT_PROFILES} profiles.")
+        for profile_id, profile in profiles.items():
+            if not isinstance(profile_id, str) or not ACTION_ID.fullmatch(profile_id):
+                _fail("assignment profile IDs must use the action ID syntax.")
+            _fields(profile, ("label", "app_id", "ring", "button_bindings"), ("ring_groups",), f"profile {profile_id}")
+            if not _plain_string(profile["label"], maximum=80) or not _plain_string(profile["app_id"]):
+                _fail(f"profile {profile_id} needs a printable label of 1–80 and app_id of 1–256 characters.")
+            _validate_assignments(profile, actions, ring_button)
+    if "active_profiles" in config:
+        if "assignment_profiles" not in config:
+            _fail("active_profiles requires assignment_profiles.")
+        active = config["active_profiles"]
+        if not isinstance(active, dict) or len(active) > MAX_ASSIGNMENT_PROFILES:
+            _fail(f"active_profiles must map at most {MAX_ASSIGNMENT_PROFILES} exact app IDs to profile IDs.")
+        for app_id, profile_id in active.items():
+            if (not _plain_string(app_id) or not isinstance(profile_id, str) or profile_id not in profiles
+                    or profiles[profile_id]["app_id"] != app_id):
+                _fail("active_profiles must reference an existing profile with the same exact app_id.")
     try:
         size = len(json.dumps(config, ensure_ascii=False).encode("utf-8"))
-    except (ValueError, UnicodeError) as exc:
+    except (TypeError, ValueError, UnicodeError) as exc:
         _fail(f"document cannot be encoded: {exc}")
     if size > MAX_CONFIG_BYTES:
         _fail("document exceeds 1 MiB.")
     return config
+
+
+def resolve_config(config, app_id=None):
+    """Return a detached document with the active exact or General assignments."""
+    validate_config(config)
+    resolved = deepcopy(config)
+    active = config.get("active_profiles", {})
+    profile_id = active.get(app_id) if isinstance(app_id, str) else None
+    profile_id = profile_id or active.get("*")
+    if profile_id is not None:
+        profile = resolved["assignment_profiles"][profile_id]
+        for field in ("ring", "button_bindings"):
+            resolved[field] = deepcopy(profile[field])
+        resolved.pop("ring_groups", None)
+        if "ring_groups" in profile:
+            resolved["ring_groups"] = deepcopy(profile["ring_groups"])
+    return resolved
 
 
 class DesktopConfigStore:
@@ -360,16 +438,26 @@ class DesktopActions:
                 self._keyboard.close()
                 self._keyboard = None
 
-    def execute(self, action_id, cancelled=None):
+    def execute(self, action_id, cancelled=None, adjustment=None):
         with self._lock:
             validate_config(self.config)
             if not isinstance(action_id, str) or action_id not in self.config["actions"]:
                 raise RuntimeError(f"Unknown Smart Action {action_id!r}.")
             action = deepcopy(self.config["actions"][action_id])
+            if adjustment is not None:
+                if not isinstance(adjustment, str) or adjustment not in ("increase", "decrease"):
+                    raise RuntimeError("An adjustment must be increase or decrease.")
+                if "adjustment" not in action:
+                    raise RuntimeError(f"Smart Action {action_id!r} does not support adjustment.")
+                steps = action["adjustment"][adjustment]
+            else:
+                steps = action["steps"]
             result = {"ok": True, "action_id": action_id, "label": action["label"], "completed": 0,
                       "dry_run": self.dry_run, "steps": []}
+            if adjustment is not None:
+                result["adjustment"] = adjustment
             if self.dry_run:
-                result["steps"] = deepcopy(action["steps"])
+                result["steps"] = deepcopy(steps)
                 if "app_id" in action:
                     result["condition"] = {"app_id": action["app_id"], "evaluated": False}
                 return result
@@ -381,14 +469,14 @@ class DesktopActions:
                     if context is None or context["app_id"] != action["app_id"]:
                         result.update(ok=False, skipped=True, reason=f"Requires focused app_id {action['app_id']!r}.")
                         return result
-                for step in action["steps"]:
+                for step in steps:
                     self._check(cancelled, deadline)
                     performed = self._step(step, cancelled, deadline)
                     result["steps"].append(performed)
                     result["completed"] += 1
                 return result
             except (RuntimeError, OSError) as exc:
-                raise RuntimeError(f"Smart Action {action['label']!r} stopped after {result['completed']}/{len(action['steps'])} steps: {exc}") from exc
+                raise RuntimeError(f"Smart Action {action['label']!r} stopped after {result['completed']}/{len(steps)} steps: {exc}") from exc
 
     @staticmethod
     def _check(cancelled, deadline):
