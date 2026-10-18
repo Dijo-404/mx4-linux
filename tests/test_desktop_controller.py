@@ -23,6 +23,7 @@ def controller():
     value._reconnect_busy = False
     value._stop_waiters = []
     value.restoration_confirmed = None
+    value.reacquire_blocked = False
     value.starting = False
     value.closed = False
     value._event_lock = threading.Lock()
@@ -981,3 +982,57 @@ def test_unconfirmed_stop_blocks_new_and_already_queued_automatic_reconnect(runt
     runtime._reconnect(runtime._intent_generation)
     runtime.window.job.assert_not_called()
     runtime.window.backend.scan.assert_not_called()
+
+
+def test_worker_conflict_followed_by_confirmed_cleanup_inhibits_auto_acquisition(runtime, monkeypatch, tmp_path):
+    from test_event_worker import setup_session, TARGET
+    from mx4_linux import event_worker
+    monkeypatch.setenv('XDG_STATE_HOME', str(tmp_path))
+    dev, api, commands, events = setup_session()
+    def emit(event):
+        events.append(event)
+        if event['type'] == 'ready':
+            flags, mapping = dev.reporting[416]
+            dev.reporting[416] = (flags & ~16, mapping)
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [416], 'ring_button': 416, 'raw_xy': True})
+    assert not event_worker.run({'device_id': TARGET}, api, commands, emit)
+    assert events[-1]['restored'] is True
+    runtime.requested_enabled = True
+    runtime.config['resume_integration'] = True
+    runtime.session.running = False
+    runtime.window.busy = False
+    runtime.window.job = Mock()
+    runtime.start = Mock()
+    timers = []
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda ms, fn: timers.append(fn) or len(timers))
+    for event in events:
+        if event['type'] in ('error', 'stopped'):
+            runtime.event(event)
+    assert not timers
+    runtime._reconnect(runtime._intent_generation)  # A stale already-queued callback is inert too.
+    runtime.window.job.assert_not_called()
+    runtime.start.assert_not_called()
+    assert runtime.reacquire_blocked is True
+
+
+def test_explicit_valid_enable_clears_ownership_conflict_latch(runtime, monkeypatch):
+    from concurrent.futures import Future
+    runtime.reacquire_blocked = True
+    runtime.session.running = runtime.session.ready = False
+    runtime.window.busy = False
+    runtime.reload_config = Mock()
+    runtime.executor = SimpleNamespace(submit=Mock(return_value=Future()))
+    runtime.start()
+    assert runtime.reacquire_blocked is False
+
+
+def test_ordinary_transport_error_with_confirmed_cleanup_retains_opt_in_reconnect(runtime, monkeypatch):
+    runtime.requested_enabled = True
+    runtime.config['resume_integration'] = True
+    runtime.session.running = False
+    timers = []
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda ms, fn: timers.append((ms, fn)) or len(timers))
+    runtime.event({'type': 'error', 'message': 'Mouse disconnected'})
+    runtime.event({'type': 'stopped', 'restored': True})
+    assert runtime.reacquire_blocked is False
+    assert [ms for ms, _fn in timers] == [1000]

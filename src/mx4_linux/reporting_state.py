@@ -16,6 +16,10 @@ MAX_BYTES = 16384
 MISSING = object()
 
 
+class OwnershipConflict(RuntimeError):
+    """An observable external reporting change requires explicit user intervention."""
+
+
 def valid_identity(value):
     if not isinstance(value, str) or not re.fullmatch(r'(unit|serial|demo):[a-z0-9][a-z0-9._-]{1,127}', value):
         return False

@@ -273,3 +273,16 @@ def test_automatic_recovery_cannot_bypass_unconfirmed_listener_stop(window, rest
         assert not window.busy
     finally:
         window.desktop.session.process = None
+
+
+def test_ownership_conflict_blocks_automatic_gui_recovery_until_explicit_recover(window):
+    window.desktop.reacquire_blocked = True
+    window.desktop.restoration_confirmed = True
+    window.backend.recover = Mock(return_value={'ok': True, 'restored': True})
+    window.recover_current(automatic=True)
+    window.backend.recover.assert_not_called()
+    assert not window.busy
+    window.recover_current()
+    settle(window)
+    window.backend.recover.assert_called_once()
+    assert window.desktop.reacquire_blocked is False
