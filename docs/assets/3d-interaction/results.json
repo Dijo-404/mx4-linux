@@ -1,0 +1,1130 @@
+[
+  {
+    "name": "home-1100-dark",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      220.0,
+      195.0,
+      320.0,
+      320.0
+    ],
+    "model_samples": 4,
+    "parked": true
+  },
+  {
+    "name": "home-1100-dark-hover",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      220.0,
+      195.0,
+      320.0,
+      320.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      287.0,
+      677.0,
+      186.0,
+      34.0
+    ]
+  },
+  {
+    "name": "haptics-1100-dark",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      170.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "haptics": [
+        407.74737548828125,
+        464.7786560058594,
+        167.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "haptics-1100-dark-hover",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      170.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      407.74737548828125,
+      464.7786560058594,
+      167.0,
+      40.0
+    ],
+    "callout_bounds": {
+      "haptics": [
+        407.74737548828125,
+        464.7786560058594,
+        167.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-1100-dark",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-1100-dark-hover",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      611.1458740234375,
+      493.109375,
+      131.0,
+      40.0
+    ],
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-1100-dark-hosts",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      140.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        343.6458435058594,
+        493.109375,
+        145.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "flip-0.10",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": false,
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    },
+    "elapsed": 0.15779695399396587,
+    "orientation": [
+      0.7819521797656067,
+      0.5472287566339483,
+      0.14780171397723738,
+      -0.2593185874905042
+    ]
+  },
+  {
+    "name": "flip-0.25",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": false,
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    },
+    "elapsed": 0.30656705499859527,
+    "orientation": [
+      0.4374171253369691,
+      0.7724400601270305,
+      0.25039299771418944,
+      -0.38640129227086434
+    ]
+  },
+  {
+    "name": "flip-0.40",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": false,
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    },
+    "elapsed": 0.4561145899933763,
+    "orientation": [
+      0.001878683411750383,
+      0.45599438552800137,
+      0.3575755834070903,
+      -0.8149879097671683
+    ]
+  },
+  {
+    "name": "flip-0.55",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": false,
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    },
+    "elapsed": 0.6015428200043971,
+    "orientation": [
+      -0.1452360308066348,
+      0.21426940453123858,
+      0.5511792172289189,
+      -0.7932191299586004
+    ]
+  },
+  {
+    "name": "flip-0.80",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    },
+    "elapsed": 0.855436144003761,
+    "orientation": [
+      0.15617423847046277,
+      -0.20368612170676081,
+      -0.5880841583715886,
+      0.766993216224635
+    ]
+  },
+  {
+    "name": "home-1100-light",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      220.0,
+      195.0,
+      320.0,
+      320.0
+    ],
+    "model_samples": 4,
+    "parked": true
+  },
+  {
+    "name": "home-1100-light-hover",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      220.0,
+      195.0,
+      320.0,
+      320.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      287.0,
+      677.0,
+      186.0,
+      34.0
+    ]
+  },
+  {
+    "name": "haptics-1100-light",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      170.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "haptics": [
+        407.74737548828125,
+        464.7786560058594,
+        167.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "haptics-1100-light-hover",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      170.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      407.74737548828125,
+      464.7786560058594,
+      167.0,
+      40.0
+    ],
+    "callout_bounds": {
+      "haptics": [
+        407.74737548828125,
+        464.7786560058594,
+        167.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-1100-light",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-1100-light-hover",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      407.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      611.1458740234375,
+      493.109375,
+      131.0,
+      40.0
+    ],
+    "callout_bounds": {
+      "hosts": [
+        611.1458740234375,
+        493.109375,
+        131.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-1100-light-hosts",
+    "width": 1100,
+    "height": 800,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      140.0,
+      171.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        343.6458435058594,
+        493.109375,
+        145.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "home-620-dark",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      179.0,
+      192.0,
+      260.0,
+      260.0
+    ],
+    "model_samples": 4,
+    "parked": true
+  },
+  {
+    "name": "home-620-dark-hover",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      179.0,
+      192.0,
+      260.0,
+      260.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      216.0,
+      614.0,
+      186.0,
+      34.0
+    ]
+  },
+  {
+    "name": "haptics-620-dark",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      63.0,
+      211.0,
+      445.0,
+      445.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "haptics": [
+        47.57161331176758,
+        481.4622497558594,
+        167.0,
+        40.000030517578125
+      ]
+    }
+  },
+  {
+    "name": "haptics-620-dark-hover",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      63.0,
+      211.0,
+      445.0,
+      445.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      47.57161331176758,
+      481.4622497558594,
+      167.0,
+      40.000030517578125
+    ],
+    "callout_bounds": {
+      "haptics": [
+        47.57161331176758,
+        481.4622497558594,
+        167.0,
+        40.000030517578125
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-620-dark",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      40.0,
+      162.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        243.6458282470703,
+        484.109375,
+        130.99998474121094,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-620-dark-hover",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      40.0,
+      162.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      243.6458282470703,
+      484.109375,
+      130.99998474121094,
+      40.0
+    ],
+    "callout_bounds": {
+      "hosts": [
+        243.6458282470703,
+        484.109375,
+        130.99998474121094,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-620-dark-hosts",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      85.0,
+      162.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        288.6458435058594,
+        484.109375,
+        145.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "home-620-light",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      179.0,
+      192.0,
+      260.0,
+      260.0
+    ],
+    "model_samples": 4,
+    "parked": true
+  },
+  {
+    "name": "home-620-light-hover",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      179.0,
+      192.0,
+      260.0,
+      260.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      216.0,
+      614.0,
+      186.0,
+      34.0
+    ]
+  },
+  {
+    "name": "haptics-620-light",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      63.0,
+      211.0,
+      445.0,
+      445.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "haptics": [
+        47.57161331176758,
+        481.4622497558594,
+        167.0,
+        40.000030517578125
+      ]
+    }
+  },
+  {
+    "name": "haptics-620-light-hover",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      63.0,
+      211.0,
+      445.0,
+      445.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      47.57161331176758,
+      481.4622497558594,
+      167.0,
+      40.000030517578125
+    ],
+    "callout_bounds": {
+      "haptics": [
+        47.57161331176758,
+        481.4622497558594,
+        167.0,
+        40.000030517578125
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-620-light",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      40.0,
+      162.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        243.6458282470703,
+        484.109375,
+        130.99998474121094,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-620-light-hover",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      40.0,
+      162.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      243.6458282470703,
+      484.109375,
+      130.99998474121094,
+      40.0
+    ],
+    "callout_bounds": {
+      "hosts": [
+        243.6458282470703,
+        484.109375,
+        130.99998474121094,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-620-light-hosts",
+    "width": 620,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      85.0,
+      162.0,
+      490.0,
+      490.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        288.6458435058594,
+        484.109375,
+        145.0,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "home-400-dark",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      70.0,
+      192.0,
+      260.0,
+      260.0
+    ],
+    "model_samples": 4,
+    "parked": true
+  },
+  {
+    "name": "home-400-dark-hover",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      70.0,
+      192.0,
+      260.0,
+      260.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      107.0,
+      630.0,
+      186.0,
+      34.0
+    ]
+  },
+  {
+    "name": "haptics-400-dark",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      -9.0,
+      249.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "haptics": [
+        6.0,
+        478.3541564941406,
+        167.0,
+        39.999969482421875
+      ]
+    }
+  },
+  {
+    "name": "haptics-400-dark-hover",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      -9.0,
+      249.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      6.0,
+      478.3541564941406,
+      167.0,
+      39.999969482421875
+    ],
+    "callout_bounds": {
+      "haptics": [
+        6.0,
+        478.3541564941406,
+        167.0,
+        39.999969482421875
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-400-dark",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      -9.0,
+      223.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        150.1666717529297,
+        473.625,
+        131.00001525878906,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-400-dark-hover",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      -9.0,
+      223.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      150.1666717529297,
+      473.625,
+      131.00001525878906,
+      40.0
+    ],
+    "callout_bounds": {
+      "hosts": [
+        150.1666717529297,
+        473.625,
+        131.00001525878906,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-400-dark-hosts",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      36.0,
+      223.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        195.1666717529297,
+        473.625,
+        145.00001525878906,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "home-400-light",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      70.0,
+      192.0,
+      260.0,
+      260.0
+    ],
+    "model_samples": 4,
+    "parked": true
+  },
+  {
+    "name": "home-400-light-hover",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      70.0,
+      192.0,
+      260.0,
+      260.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      107.0,
+      630.0,
+      186.0,
+      34.0
+    ]
+  },
+  {
+    "name": "haptics-400-light",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      -9.0,
+      249.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "haptics": [
+        6.0,
+        478.3541564941406,
+        167.0,
+        39.999969482421875
+      ]
+    }
+  },
+  {
+    "name": "haptics-400-light-hover",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      -9.0,
+      249.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      6.0,
+      478.3541564941406,
+      167.0,
+      39.999969482421875
+    ],
+    "callout_bounds": {
+      "haptics": [
+        6.0,
+        478.3541564941406,
+        167.0,
+        39.999969482421875
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-400-light",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      -9.0,
+      223.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        150.1666717529297,
+        473.625,
+        131.00001525878906,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-400-light-hover",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      -9.0,
+      223.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "hover_bounds": [
+      150.1666717529297,
+      473.625,
+      131.00001525878906,
+      40.0
+    ],
+    "callout_bounds": {
+      "hosts": [
+        150.1666717529297,
+        473.625,
+        131.00001525878906,
+        40.0
+      ]
+    }
+  },
+  {
+    "name": "easy-switch-400-light-hosts",
+    "width": 400,
+    "height": 740,
+    "model_ready": true,
+    "model_error": null,
+    "model_bounds": [
+      36.0,
+      223.0,
+      368.0,
+      368.0
+    ],
+    "model_samples": 4,
+    "parked": true,
+    "callout_bounds": {
+      "hosts": [
+        195.1666717529297,
+        473.625,
+        145.00001525878906,
+        40.0
+      ]
+    }
+  }
+]
