@@ -189,8 +189,8 @@ class DesktopController:
             context = None
             self.notify(event.get("message", "Application profiles unavailable; General assignments remain active."))
         elif (self.opening or (self.ring and self.ring.state.visible)) and (
-                not context or context.get("app_id", "").startswith("io.github.mx4linux")):
-            return  # The owned overlay must not replace its original application.
+                not context or self._is_ring_context(context)):
+            return  # Only this popup may preserve its original application.
         else:
             self.context_available = True
         if context == self.context and event["type"] != "context-unavailable":
@@ -319,8 +319,7 @@ class DesktopController:
             self.opening = False
             try:
                 self.target = future.result()
-                if (self.target and self.target.get("app_id", "").startswith("io.github.mx4linux")
-                        and self.context):
+                if self._is_ring_context(self.target) and self.context:
                     self.target = deepcopy(self.context)
                 self._ring_config = resolve_config(document, self.target.get("app_id") if self.target else None)
                 if self.ring is None:
@@ -367,16 +366,35 @@ class DesktopController:
         if observer:
             observer.stop()
 
+    def _is_ring_context(self, context, identity=None):
+        if identity is None:
+            identity = getattr(self, "_ring_identity", None)
+            if identity is None:
+                ring = self.ring
+                app_id = (getattr(ring, "context_app_id", None) if ring
+                          and not getattr(ring, "overlay_supported", True) else None)
+                self._ring_identity = identity = {"app_id": app_id, "window_id": None}
+        if (not context or not identity["app_id"] or context.get("app_id") != identity["app_id"]
+                or type(context.get("window_id")) is not int):
+            return False
+        if identity["window_id"] is None:
+            identity["window_id"] = context["window_id"]
+        return context["window_id"] == identity["window_id"]
+
     def _watch_ring_context(self):
         self._stop_ring_context()
         self._ring_focus_lost = threading.Event()
+        ring = self.ring
+        app_id = (getattr(ring, "context_app_id", None) if ring
+                  and not getattr(ring, "overlay_supported", True) else None)
+        self._ring_identity = identity = {"app_id": app_id, "window_id": None}
         if self.observer is not None:
             return  # Integration already owns an observer; action boundaries also verify focus.
         token, target, lost = self._ring_context_token, deepcopy(self.target), self._ring_focus_lost
         def receive(event):
             context = event.get("context")
             if (event.get("type") == "context" and context and context != target
-                    and not context.get("app_id", "").startswith("io.github.mx4linux")):
+                    and not self._is_ring_context(context, identity)):
                 lost.set()  # Cancel worker delays even before GTK drains the event queue.
             self.queue_event({"type": "ring-context", "ring_context_token": token})
         self._ring_observer = NiriFocusObserver(receive)
@@ -418,6 +436,7 @@ class DesktopController:
         self._adjustment_pending = None
         self._selection_pending = None
         self._adjustment_active = False
+        self._adjustment_resuming = False
         self._adjustment_yield = None
         if getattr(self, "_adjustment_running", False):
             self.cancelled.set()
@@ -457,14 +476,14 @@ class DesktopController:
                 or (pending and pending["key"][2:] != (self._open_token, self._dispatch_token, self.session.session_id))):
             self._cancel_adjustments()
             return GLib.SOURCE_REMOVE
-        if self._adjustment_running:
+        if self._adjustment_running or getattr(self, "_adjustment_resuming", False):
             return GLib.SOURCE_REMOVE
         if pending is None:
             self._adjustment_active = False
             yielded = self._adjustment_yield
             self._adjustment_yield = None
             if yielded and yielded == (self.ring, self._open_token, token):
-                self.ring.resume_keyboard()
+                self._resume_adjustment_keyboard(token)
             return GLib.SOURCE_REMOVE
         direction = "increase" if pending["count"] > 0 else "decrease"
         pending["count"] += -1 if pending["count"] > 0 else 1
@@ -474,6 +493,46 @@ class DesktopController:
         self.execute(pending["action"], target=pending["target"], config=pending["config"],
                      adjustment=direction, completed=lambda success: self._adjustment_finished(token, success))
         return GLib.SOURCE_REMOVE
+
+    def _resume_adjustment_keyboard(self, token):
+        if getattr(self.ring, "overlay_supported", True):
+            self.ring.resume_keyboard()
+            return
+        identity = getattr(self, "_ring_identity", None)
+        if not identity or identity["window_id"] is None:
+            self.ring.dismiss()
+            return
+        ring, target, lost = self.ring, deepcopy(self.target), self._ring_focus_lost
+        self._adjustment_active = self._adjustment_resuming = True
+        def focus_popup():
+            if self.closed or token != self._adjustment_token or lost.is_set():
+                return False
+            if focused_context() != target:
+                lost.set()
+                return False
+            if token != self._adjustment_token or lost.is_set():
+                return False
+            return self._is_ring_context(restore_focus(identity["window_id"]), identity)
+        future = self.executor.submit(focus_popup)
+        def focused():
+            if self.closed or token != self._adjustment_token:
+                return GLib.SOURCE_REMOVE
+            self._adjustment_active = self._adjustment_resuming = False
+            try:
+                restored = future.result()
+            except (RuntimeError, OSError):
+                restored = False
+            if self.ring is ring and ring.state.visible:
+                if not restored or lost.is_set():
+                    ring.dismiss()
+                elif self._adjustment_pending:
+                    self._adjustment_active = True
+                    self._adjustment_yield = (ring, self._open_token, token)
+                    self._drain_adjustment(token)
+                else:
+                    ring.resume_keyboard()
+            return GLib.SOURCE_REMOVE
+        future.add_done_callback(lambda _: GLib.idle_add(focused))
 
     def _adjustment_finished(self, token, success):
         self._adjustment_running = False
@@ -501,6 +560,7 @@ class DesktopController:
         session_id, dispatch_token = self.session.session_id, self._dispatch_token
         self.cancelled.clear()
         focus_lost = getattr(self, "_ring_focus_lost", threading.Event())
+        popup_identity = getattr(self, "_ring_identity", {"app_id": None, "window_id": None})
         self.notify("Previewing action…" if preview else "Running Smart Action…")
         def run():
             if self.closed or dispatch_token != self._dispatch_token or self.cancelled.is_set():
@@ -513,8 +573,7 @@ class DesktopController:
                 if not preview:
                     if adjustment and target:
                         before = focused_context()
-                        if focus_lost.is_set() or (before != target and (
-                                not before or not before.get("app_id", "").startswith("io.github.mx4linux"))):
+                        if focus_lost.is_set() or (before != target and not self._is_ring_context(before, popup_identity)):
                             focus_lost.set()
                             raise RuntimeError("The original window lost focus; the adjustment was cancelled.")
                     context = restore_focus(target["window_id"]) if target else focused_context()
@@ -528,7 +587,7 @@ class DesktopController:
                     if self.cancelled.is_set() or (adjustment and focus_lost.is_set()):
                         return True
                     # This runs on the action worker at every step/delay/input boundary.
-                    if adjustment and sends_input and focused_context() != target:
+                    if adjustment and target and focused_context() != target:
                         focus_lost.set()
                         return True
                     return False

@@ -210,7 +210,9 @@ def test_observer_failure_returns_general_and_ignores_stale_context(runtime):
 def test_own_overlay_focus_preserves_external_application(runtime):
     runtime.context = {'app_id': 'editor', 'window_id': 7}
     runtime.ring.state.visible = True
-    runtime.event({'type': 'context', 'context': {'app_id': 'io.github.mx4linux.ring', 'window_id': 9}, 'context_token': 0})
+    runtime.ring.overlay_supported = False
+    runtime.ring.context_app_id = 'io.github.mx4linux.Ring.unique'
+    runtime.event({'type': 'context', 'context': {'app_id': runtime.ring.context_app_id, 'window_id': 9}, 'context_token': 0})
     assert runtime.context == {'app_id': 'editor', 'window_id': 7}
     runtime.session.configure.assert_not_called()
 
@@ -642,7 +644,7 @@ def test_external_focus_cancels_wheel_but_pinned_source_and_overlay_do_not(wheel
     runtime.adjusted('copy', 'increase')
     runtime.event({'type': 'context', 'context': runtime.target, 'context_token': 0})
     assert runtime._adjustment_active
-    runtime.event({'type': 'context', 'context': {'app_id': 'io.github.mx4linux.ring'}, 'context_token': 0})
+    runtime.event({'type': 'context', 'context': None, 'context_token': 0})
     assert runtime._adjustment_active
     runtime.event({'type': 'context', 'context': {'app_id': 'other', 'window_id': 8}, 'context_token': 0})
     assert not runtime._adjustment_active
@@ -729,3 +731,121 @@ def test_delayed_adjustment_cancellation_predicate_rechecks_exact_pinned_window(
     proof.finish()
     runtime.ring.resume_keyboard.assert_not_called()
     assert not runtime.ring.state.visible
+
+@pytest.mark.parametrize('phase', ['before-dispatch', 'during-command'])
+def test_actual_settings_focus_cancels_adjustment_even_with_own_app_prefix(wheel_runtime, monkeypatch, phase):
+    proof = wheel_runtime
+    runtime = proof.controller
+    current = {'app_id': 'editor', 'window_id': 7}
+    settings = {'app_id': 'io.github.mx4linux.Control', 'window_id': 99}
+    monkeypatch.setattr('mx4_linux.desktop.focused_context', lambda: current.copy())
+    runtime._ring_config['actions']['copy']['adjustment']['increase'] = [
+        {'type': 'delay', 'milliseconds': 300}, {'type': 'command', 'argv': ['true']}]
+    restore = Mock(return_value=runtime.target)
+    monkeypatch.setattr('mx4_linux.desktop.restore_focus', restore)
+    def create_runner(_config, **_kwargs):
+        def execute(_action, cancelled, **_kw):
+            assert not cancelled()
+            current.update(settings)
+            if cancelled():
+                raise RuntimeError('cancelled before command')
+            pytest.fail('Command would execute after settings gained focus')
+        return SimpleNamespace(execute=execute, close=Mock())
+    monkeypatch.setattr('mx4_linux.desktop.DesktopActions', create_runner)
+    runtime.adjusted('copy', 'increase')
+    if phase == 'before-dispatch':
+        current.update(settings)
+    proof.timers.pop()()
+    proof.finish()
+    if phase == 'before-dispatch':
+        restore.assert_not_called()
+    runtime.ring.resume_keyboard.assert_not_called()
+    assert not runtime.ring.state.visible
+
+
+def test_settings_focus_is_not_preserved_as_owned_overlay_by_integration_observer(runtime):
+    runtime.context = runtime.target = {'app_id': 'editor', 'window_id': 7}
+    runtime.ring.state.visible = True
+    runtime.ring.overlay_supported = True
+    runtime.event({'type': 'context', 'context': {'app_id': 'io.github.mx4linux.Control', 'window_id': 99},
+                   'context_token': 0})
+    runtime.ring.dismiss.assert_called_once()
+    assert runtime.context['window_id'] == 99
+
+
+def test_popup_context_binds_exact_window_and_stale_identity_cannot_replace_new_open(runtime):
+    runtime.ring.overlay_supported = False
+    runtime.ring.context_app_id = 'io.github.mx4linux.Ring.unique'
+    own = {'app_id': runtime.ring.context_app_id, 'window_id': 91}
+    assert runtime._is_ring_context(own)
+    assert not runtime._is_ring_context(own | {'window_id': 92})
+    old_identity = runtime._ring_identity
+    runtime._ring_identity = new_identity = {'app_id': runtime.ring.context_app_id, 'window_id': None}
+    assert runtime._is_ring_context(own, old_identity)
+    assert new_identity['window_id'] is None
+    assert runtime._is_ring_context(own | {'window_id': 92})
+
+
+def test_layer_surface_never_exempts_another_window_even_with_ring_app_id(runtime):
+    runtime.ring.overlay_supported = True
+    runtime.ring.context_app_id = 'io.github.mx4linux.Ring.unique'
+    assert not runtime._is_ring_context({'app_id': runtime.ring.context_app_id, 'window_id': 91})
+
+
+def test_non_layer_reacquisition_uses_exact_popup_and_never_restores_after_close(wheel_runtime, monkeypatch):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.ring.overlay_supported = False
+    runtime._ring_identity = {'app_id': 'io.github.mx4linux.Ring.unique', 'window_id': 91}
+    restore = Mock(side_effect=lambda wid: runtime.target if wid == 7 else runtime._ring_identity)
+    monkeypatch.setattr('mx4_linux.desktop.restore_focus', restore)
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    proof.finish()  # An async exact-popup focus check remains, with no action queued.
+    runtime.ring.resume_keyboard.assert_not_called()
+    assert len(proof.queued) == 1
+    runtime.ring.dismiss()
+    proof.finish()
+    assert [call.args[0] for call in restore.call_args_list] == [7]
+    runtime.ring.resume_keyboard.assert_not_called()
+
+
+def test_non_layer_reacquisition_verifies_source_before_focusing_popup(wheel_runtime, monkeypatch):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.ring.overlay_supported = False
+    runtime._ring_identity = {'app_id': 'io.github.mx4linux.Ring.unique', 'window_id': 91}
+    restore = Mock(side_effect=lambda wid: runtime.target if wid == 7 else runtime._ring_identity)
+    monkeypatch.setattr('mx4_linux.desktop.restore_focus', restore)
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    proof.finish()
+    monkeypatch.setattr('mx4_linux.desktop.focused_context',
+                        lambda: {'app_id': 'io.github.mx4linux.Control', 'window_id': 99})
+    proof.finish()
+    assert [call.args[0] for call in restore.call_args_list] == [7]
+    assert not runtime.ring.state.visible
+    runtime.ring.resume_keyboard.assert_not_called()
+
+
+def test_unknown_popup_identity_never_requests_focus(wheel_runtime):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.ring.overlay_supported = False
+    runtime._ring_identity = {'app_id': None, 'window_id': None}
+    runtime._resume_adjustment_keyboard(runtime._adjustment_token)
+    assert not proof.queued
+    runtime.ring.resume_keyboard.assert_not_called()
+    assert not runtime.ring.state.visible
+
+
+def test_no_target_general_command_adjustment_remains_available(wheel_runtime, monkeypatch):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.target = None
+    runtime._ring_config['actions']['copy']['adjustment']['increase'] = [{'type': 'command', 'argv': ['true']}]
+    monkeypatch.setattr('mx4_linux.desktop.focused_context', lambda: None)
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    proof.finish()
+    assert [call[1] for call in proof.calls] == ['copy']
