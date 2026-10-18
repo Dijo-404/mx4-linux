@@ -1,0 +1,17 @@
+{
+  "files": {
+    "client.c": "866d658d68fc8e14422e914b5a0656863bd0cae1c2b76bd0decbbb3f3678a547",
+    "command.c": "0d170d7f80490e48cb139f5d7cf79f557ca49c29340f6923ae39253c3c607ffd",
+    "command.h": "94abf996189a30a45a3f4072f50ba65ff3ca07ada2ad2dbd8c98be15336f55f4",
+    "parser-test.c": "6bb664bd79f3bb500b7f4583abf1a186d435eab256951a735bc994c9c804cc79",
+    "build.py": "713e1b26fb7bfa372768f5de21ecefc733dfd3b442ff9ffe6f7a08d66e397886",
+    "plan.py": "e0add8959a80604d896b67a525ab3abf906fa9b0e7eb53efd380b177d6681549",
+    "owned_gtk_hook.py": "3fe6f37cd652bb0d6cbab5c503d1365cd4c918a23413b06f84af78be1d4896b9",
+    "pure-tests.py": "2086af2dc82c3ee7a31d0c859099da4b9ac49dc7e6d716e1e5447504d9ad5c01",
+    "emission-hook-pure-test.py": "35588a467b2da321f20f647576d992ebd4ed4a5b6d014771448e47edf2258b7f",
+    "wlr-virtual-pointer-unstable-v1.xml": "3ff6d540be0bc5228195bf072bde42117ea17945a5c2061add5d3cf97d6bb524"
+  },
+  "executed_client_sha256": "3240d15da361fd44b9daa608203f3a8a9b501684148a896879d72aaf61e76cf1",
+  "native_result": "../native-drag-proof.json",
+  "root_review_gate_closed_after_execution": true
+}
