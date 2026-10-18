@@ -632,8 +632,8 @@ class ActionsRing(Gtk.Window):
         self._keyboard_yielded = False
         if self.overlay_supported:
             Layer.set_keyboard_mode(self, Layer.KeyboardMode.EXCLUSIVE)
-        else:
-            self.present()
+        # Normal toplevel focus was verified by the controller; another GTK
+        # activation request could arrive during the next yielded adjustment.
         Gdk.Display.get_default().flush()
         focus = self._saved_focus
         if focus and focus.get_visible():
