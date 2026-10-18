@@ -324,3 +324,24 @@ def test_existing_action_icon_adjustment_and_profile_override_survive_trigger_ed
     assert candidate['actions']['copy']['icon'] == 'edit-copy-symbolic'
     assert candidate['actions']['copy']['adjustment'] == editor.config['actions']['copy']['adjustment']
     assert candidate['assignment_profiles']['p']['ring_button'] is None
+
+
+def test_utility_steps_and_toggle_metadata_remain_lossless_without_execution(editor):
+    editor.config['assignment_profiles'] = {'work': {'label': 'Work', 'app_id': '*',
+        'ring': editor.config['ring'][:], 'button_bindings': {}}}
+    action = editor.config['actions']['copy']
+    action['icon'] = 'edit-copy-symbolic'
+    action['steps'] = [{'type': 'local', 'operation': 'switch-profile', 'profile_id': 'work'}]
+    action['toggle_steps'] = [[{'type': 'date', 'format': 'moon-phase'}]]
+    action['adjustment'] = {'increase': [{'type': 'clipboard', 'operation': 'upper'}],
+                            'decrease': [{'type': 'clipboard', 'operation': 'lower'}]}
+    editor.drafts['copy']['steps_text'] = json.dumps(action['steps'])
+    editor.drafts['copy'].pop('form_values', None)
+    select(editor, 'copy')
+    assert editor.json_toggle.get_active()
+    assert editor._validate_selected()
+    assert editor._candidate()['actions']['copy'] == action
+    editor.name_entry.set_text('New label')
+    candidate = editor._candidate()
+    assert candidate['actions']['copy'] == {**action, 'label': 'New label'}
+    validate_config(candidate)

@@ -113,3 +113,43 @@ def test_templates_validate_and_detach_inputs(preset, value, step):
 def test_invalid_catalog_requests_rejected(preset, value):
     with pytest.raises(RuntimeError):
         catalog_action(preset, value)
+
+
+def test_new_catalog_entries_are_detached_and_availability_is_not_action_schema(monkeypatch):
+    from mx4_linux.action_catalog import catalog_availability
+    entries = {item['id']: item for item in catalog_entries()}
+    assert {'iso-date', 'moon-phase', 'clipboard-sentence-case', 'switch-profile', 'adapt-on', 'adapt-off',
+            'stopwatch', 'tap-tempo', 'bell', 'multi-toggle', 'do-nothing', 'sound', 'keyboard-layout-next',
+            'new-tab', 'media-stop'} <= entries.keys()
+    assert 'approximate' in entries['moon-phase']['description'].lower()
+    assert 'session' in entries['multi-toggle']['description'].lower()
+    monkeypatch.setattr('mx4_linux.action_catalog.shutil.which', lambda _: None)
+    availability = catalog_availability('clipboard-upper')
+    assert availability['available'] is False
+    action = catalog_action('clipboard-upper')
+    assert 'available' not in action and 'availability' not in action
+    assert catalog_action('bell')['steps'] == [{'type': 'local', 'operation': 'bell'}]
+
+
+def test_local_profile_catalog_template_requires_real_config_and_reference():
+    cfg = actions.default_config()
+    cfg['assignment_profiles'] = {'work': {'label': 'Work', 'app_id': '*', 'ring': cfg['ring'][:], 'button_bindings': {}}}
+    action = catalog_action('switch-profile', 'work', config=cfg)
+    assert action['steps'] == [{'type': 'local', 'operation': 'switch-profile', 'profile_id': 'work'}]
+    with pytest.raises(RuntimeError, match='profile|configuration'):
+        catalog_action('switch-profile', 'missing', config=cfg)
+    with pytest.raises(RuntimeError, match='configuration'):
+        catalog_action('switch-profile', 'work')
+
+
+def test_toggle_and_literal_local_sound_templates_validate_without_discovery(monkeypatch):
+    monkeypatch.setattr('mx4_linux.action_catalog.shutil.which', lambda _: pytest.fail('construction discovers helper'))
+    branches = [[{'type': 'delay', 'milliseconds': 0}], [{'type': 'delay', 'milliseconds': 1}]]
+    action = catalog_action('multi-toggle', branches)
+    assert action['steps'] == branches[0] and action['toggle_steps'] == branches[1:]
+    branches[1].clear()
+    assert action['toggle_steps'][0]
+    assert catalog_action('sound', '/tmp/literal $(test).wav')['steps'] == [
+        {'type': 'command', 'argv': ['pw-play', '--', '/tmp/literal $(test).wav']}]
+    with pytest.raises(RuntimeError):
+        catalog_action('sound', 'https://example.com/sound.wav')
