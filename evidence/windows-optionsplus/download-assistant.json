@@ -1,0 +1,1392 @@
+{
+  "scope": "Copied C:/Program Files/LogiDownloadAssistant; static inventory, native string triage and shipped C++ header declarations",
+  "inventory": [
+    {
+      "path": "Uninstall.exe",
+      "bytes": 121668,
+      "sha256": "66fa16f709b1873fa9deeb1f0badd08eda54850dcb44fa2efa57a3e6436f738a"
+    },
+    {
+      "path": "bin/create_shortcut.exe",
+      "bytes": 1323520,
+      "sha256": "1e6ab7e55cdc3207ecdebef0a852dac6cff312b2dfd2b34e618e89c6a7f06f1c"
+    },
+    {
+      "path": "bin/logi_download_assistant.exe",
+      "bytes": 19199488,
+      "sha256": "885e25d7c1c6d6fde6476260ffd1b0d30fc14cf5894d7912a6330646dd5a1078"
+    },
+    {
+      "path": "bin/logi_download_assistant_crashpad_handler.exe",
+      "bytes": 2172416,
+      "sha256": "60f20c5f937d01e3108e96a2e4f23837472fff6380e67c55bb13604d4eff1bba"
+    },
+    {
+      "path": "include/logi/demalu/AuthenticateData.h",
+      "bytes": 614,
+      "sha256": "fd8ae9898292563f8ab3ba19457ee5cbfcf53b89200d8cb6d4e1d47e200e8e4e"
+    },
+    {
+      "path": "include/logi/demalu/Demalu.h",
+      "bytes": 2801,
+      "sha256": "6608d59d7120297ab778442b697911ee40655be1143cea39553fba0a7d3fd980"
+    },
+    {
+      "path": "include/logi/demalu/DemaluEvents_Interface.h",
+      "bytes": 4428,
+      "sha256": "151a1a470d4aff93eebb65f1a7caa82b71dc44b48d34e55189040df37a8132ff"
+    },
+    {
+      "path": "include/logi/demalu/DemaluRequest.h",
+      "bytes": 6451,
+      "sha256": "52fbdf19178153ff96a274a99fedc808c9299f24d552533e241c22d4bcd77fd0"
+    },
+    {
+      "path": "include/logi/demalu/DemaluStrings.h",
+      "bytes": 477,
+      "sha256": "77bd263a503eb76f66c3f6a198b249ee32de9f5c05f3b038eb01039a12ff0a54"
+    },
+    {
+      "path": "include/logi/demalu/DiskPayload.h",
+      "bytes": 4587,
+      "sha256": "060f4ed414152a9d28852861717961dfd503e73c3a9c7c8f8a787e439e22c63d"
+    },
+    {
+      "path": "include/logi/demalu/Downloader.h",
+      "bytes": 2012,
+      "sha256": "b660f8205b5239d3126af3dab4bc202fdad4b048828f108ef03742bc6ffa11fe"
+    },
+    {
+      "path": "include/logi/demalu/Downloader_Interface.h",
+      "bytes": 540,
+      "sha256": "f801e64f3ed699bd0ff13e52c3c8d32d3af888789bbaed3b08cd850702049505"
+    },
+    {
+      "path": "include/logi/demalu/EmptyPayload.h",
+      "bytes": 2300,
+      "sha256": "bc5292c4e79e98a9dbeb949e38afb7d3b1cc332a32eccf30a80a7d815480e117"
+    },
+    {
+      "path": "include/logi/demalu/HttpStatusCode.h",
+      "bytes": 865,
+      "sha256": "614080af6eae8c51b6c3e3519723af9b3374348da31ce6e0628cb224ca49a338"
+    },
+    {
+      "path": "include/logi/demalu/Logging.h",
+      "bytes": 730,
+      "sha256": "9b47efb388d9f80a2db0d4bfe5c20cb40b269ddef96f32b590c79eedd2435c35"
+    },
+    {
+      "path": "include/logi/demalu/MemoryPayload.h",
+      "bytes": 3950,
+      "sha256": "3b67eef76ef5b86653199a6cd72d6f1916c7564837b18a1e37c6851ab906d2b5"
+    },
+    {
+      "path": "include/logi/demalu/PayloadKit.h",
+      "bytes": 2942,
+      "sha256": "1cd62ed1eda9418e6251f4b5713bb3ac94826e1c7766dc9890d0ceee0d93790e"
+    },
+    {
+      "path": "include/logi/demalu/ResultCodeSet.h",
+      "bytes": 1022,
+      "sha256": "c0344950f3be89bbbf3a793a25de6647a9dc32b9541e57741fb9355ad969cbad"
+    },
+    {
+      "path": "include/logi/demalu/Types.h",
+      "bytes": 4723,
+      "sha256": "17e5b1a12609fa4cc9e3ed3678fe9acf2a6ce73c90bfaa84c6a319803fc1075b"
+    },
+    {
+      "path": "lib/cmake/logi_demalu/logi_demaluTargets-relwithdebinfo.cmake",
+      "bytes": 955,
+      "sha256": "bb492a84249407424038699c4dc59b92b9dd1f17f56da6598acc44a29205161d"
+    },
+    {
+      "path": "lib/cmake/logi_demalu/logi_demaluTargets.cmake",
+      "bytes": 4471,
+      "sha256": "fef4832cfdd7f77d638f72e5fc41077801a954811c44f25fdaf9555c600bfd8b"
+    },
+    {
+      "path": "lib/logi_demalu.lib",
+      "bytes": 6761188,
+      "sha256": "329fba2256cdc4f0c37724455368a111743e0611bf18349af2c57b10f6961059"
+    },
+    {
+      "path": "share/assets/Close.png",
+      "bytes": 535,
+      "sha256": "237a6394eea5dba602a878ffe42b8b7730f15a265ae7b42ce38fcdc839ccea4c"
+    },
+    {
+      "path": "share/assets/Download.png",
+      "bytes": 442,
+      "sha256": "44aac98c2efafbf39e2d849dbb2971a32d6fa7f00494dd73243b2f2c3a791bc2"
+    },
+    {
+      "path": "share/assets/downloader/download.pem",
+      "bytes": 814,
+      "sha256": "a3006e15add3440f4a3df05b7ff03ae96b1a4c8afbde26c087c0fce14be213e0"
+    },
+    {
+      "path": "share/assets/error.png",
+      "bytes": 1902,
+      "sha256": "eeaa376bc996e6d4f74caad08064d028dca4b419b8e92be522b848d5e1439fd1"
+    },
+    {
+      "path": "share/assets/lghub.png",
+      "bytes": 3185,
+      "sha256": "800515962bfd9b56841f804429192e10eaaaa791114ddb4ed24d41c3ca622d61"
+    },
+    {
+      "path": "share/assets/lghub_small.png",
+      "bytes": 3185,
+      "sha256": "800515962bfd9b56841f804429192e10eaaaa791114ddb4ed24d41c3ca622d61"
+    },
+    {
+      "path": "share/assets/logioptionsplus.png",
+      "bytes": 3482,
+      "sha256": "2a94ea817f591d5afedb1a3f0b5609a63c27aa6c4a395e4067b3ea6576f37cc6"
+    },
+    {
+      "path": "share/assets/logioptionsplus_small.png",
+      "bytes": 3482,
+      "sha256": "2a94ea817f591d5afedb1a3f0b5609a63c27aa6c4a395e4067b3ea6576f37cc6"
+    }
+  ],
+  "inventory_file_count": 30,
+  "inventory_total_bytes": 29639175,
+  "main_executable": {
+    "path": "bin/logi_download_assistant.exe",
+    "bytes": 19199488,
+    "sha256": "885e25d7c1c6d6fde6476260ffd1b0d30fc14cf5894d7912a6330646dd5a1078",
+    "format": "PE32+",
+    "machine": "0x8664",
+    "coff_timestamp": 1779174631,
+    "image_base": "0x140000000",
+    "entry_rva": "0x1fa28",
+    "sections": [
+      {
+        "name": ".text",
+        "rva": "0x1000",
+        "virtual_size": 13181296,
+        "file_offset": "0x600",
+        "file_size": 13181440
+      },
+      {
+        "name": ".rdata",
+        "rva": "0xc94000",
+        "virtual_size": 4404489,
+        "file_offset": "0xc92800",
+        "file_size": 4404736
+      },
+      {
+        "name": ".data",
+        "rva": "0x10c8000",
+        "virtual_size": 1107152,
+        "file_offset": "0x10c5e00",
+        "file_size": 775168
+      },
+      {
+        "name": ".pdata",
+        "rva": "0x11d7000",
+        "virtual_size": 630312,
+        "file_offset": "0x1183200",
+        "file_size": 630784
+      },
+      {
+        "name": ".idata",
+        "rva": "0x1271000",
+        "virtual_size": 21635,
+        "file_offset": "0x121d200",
+        "file_size": 22016
+      },
+      {
+        "name": ".tls",
+        "rva": "0x1277000",
+        "virtual_size": 1266,
+        "file_offset": "0x1222800",
+        "file_size": 1536
+      },
+      {
+        "name": "minATL",
+        "rva": "0x1278000",
+        "virtual_size": 809,
+        "file_offset": "0x1222e00",
+        "file_size": 1024
+      },
+      {
+        "name": "CPADinfo",
+        "rva": "0x1279000",
+        "virtual_size": 323,
+        "file_offset": "0x1223200",
+        "file_size": 512
+      },
+      {
+        "name": ".00cfg",
+        "rva": "0x127a000",
+        "virtual_size": 373,
+        "file_offset": "0x1223400",
+        "file_size": 512
+      },
+      {
+        "name": "_RDATA",
+        "rva": "0x127b000",
+        "virtual_size": 863,
+        "file_offset": "0x1223600",
+        "file_size": 1024
+      },
+      {
+        "name": ".rsrc",
+        "rva": "0x127c000",
+        "virtual_size": 8649,
+        "file_offset": "0x1223a00",
+        "file_size": 8704
+      },
+      {
+        "name": ".reloc",
+        "rva": "0x127f000",
+        "virtual_size": 170425,
+        "file_offset": "0x1225c00",
+        "file_size": 170496
+      }
+    ],
+    "version_records": [
+      {
+        "file_offset": "0x1223cb8",
+        "file_version": "2.0.1020.0",
+        "product_version": "2.0.1020.0"
+      }
+    ]
+  },
+  "rea_pe_resources": {
+    "evidence_id": "ev_f571da4b02c2552eff684e66d96b1647792ec0330892aa15527d3c39dbae5d84",
+    "provider": {
+      "id": "rea-pe-resources",
+      "name": "REA PE resource parser",
+      "version": "1"
+    },
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 12,
+      "resources": 4
+    },
+    "resource_types": [
+      3,
+      14,
+      16,
+      24
+    ],
+    "retained_evidence_path": "evidence/artifacts/LogiDownloadAssistant/rea-pe-resources.json"
+  },
+  "selected_binary_strings": [
+    {
+      "file_offset": "0xc96d08",
+      "encoding": "ascii",
+      "text": "logi::download_assistant::CommandlineParser::Parse"
+    },
+    {
+      "file_offset": "0xc97350",
+      "encoding": "ascii",
+      "text": "lda_download_completed"
+    },
+    {
+      "file_offset": "0xc97370",
+      "encoding": "ascii",
+      "text": "lda_app_installer_launched"
+    },
+    {
+      "file_offset": "0xc97400",
+      "encoding": "ascii",
+      "text": "lda_manual_download"
+    },
+    {
+      "file_offset": "0xc97418",
+      "encoding": "ascii",
+      "text": "lda_turn_off_notification"
+    },
+    {
+      "file_offset": "0xc9a6d0",
+      "encoding": "ascii",
+      "text": "logi::download_assistant::DeviceConfiguration::DeviceConfiguration"
+    },
+    {
+      "file_offset": "0xc9a7a0",
+      "encoding": "ascii",
+      "text": "useDisplayNameFromFw"
+    },
+    {
+      "file_offset": "0xc9a7f0",
+      "encoding": "ascii",
+      "text": "supportedAppWin"
+    },
+    {
+      "file_offset": "0xc9a8a8",
+      "encoding": "ascii",
+      "text": "downloadBufferSizeInBytes"
+    },
+    {
+      "file_offset": "0xc9a910",
+      "encoding": "ascii",
+      "text": "versionRegistryKey"
+    },
+    {
+      "file_offset": "0xc9aa00",
+      "encoding": "ascii",
+      "text": "commandLineArg"
+    },
+    {
+      "file_offset": "0xc9aa50",
+      "encoding": "ascii",
+      "text": "manualInstall"
+    },
+    {
+      "file_offset": "0xc9aa90",
+      "encoding": "ascii",
+      "text": "numberOfReminders"
+    },
+    {
+      "file_offset": "0xc9aad0",
+      "encoding": "ascii",
+      "text": "learnMoreUrl"
+    },
+    {
+      "file_offset": "0xc9ad70",
+      "encoding": "ascii",
+      "text": "logi::download_assistant::DeviceConfiguration::FindNearestMatchingLangCode"
+    },
+    {
+      "file_offset": "0xc9da20",
+      "encoding": "ascii",
+      "text": "logi::download_assistant::Engine::Run"
+    },
+    {
+      "file_offset": "0xc9dae8",
+      "encoding": "ascii",
+      "text": "Skipping receiver with PID 0x%x."
+    },
+    {
+      "file_offset": "0xc9dcb0",
+      "encoding": "ascii",
+      "text": " Model id %s , Extended Model id: %s , Device Name: %s ,Pid is 0x%x ,Bustype is %d Registry Status %d , Reminder count %d"
+    },
+    {
+      "file_offset": "0xc9dd78",
+      "encoding": "ascii",
+      "text": "Notifications are turned off for model id: %s"
+    },
+    {
+      "file_offset": "0xc9ddb0",
+      "encoding": "ascii",
+      "text": "Software already installed for model id: %s"
+    },
+    {
+      "file_offset": "0xc9dde8",
+      "encoding": "ascii",
+      "text": "Reminders Count exceeded for model id: %s"
+    },
+    {
+      "file_offset": "0xc9de20",
+      "encoding": "ascii",
+      "text": "Download result of manifest file is %d"
+    },
+    {
+      "file_offset": "0xc9de50",
+      "encoding": "ascii",
+      "text": "No manifest available for model id: %s"
+    },
+    {
+      "file_offset": "0xc9de80",
+      "encoding": "ascii",
+      "text": "Failed to download manifest for %s"
+    },
+    {
+      "file_offset": "0xc9e180",
+      "encoding": "ascii",
+      "text": "Failed to download resources zip for %s"
+    },
+    {
+      "file_offset": "0xc9e1b0",
+      "encoding": "ascii",
+      "text": "Failed to unpack resources zip for %s"
+    },
+    {
+      "file_offset": "0xc9e218",
+      "encoding": "ascii",
+      "text": "Using device name from config file: %s"
+    },
+    {
+      "file_offset": "0xc9e6e0",
+      "encoding": "ascii",
+      "text": "No devices found"
+    },
+    {
+      "file_offset": "0xc9e7c0",
+      "encoding": "ascii",
+      "text": "https://updates.logitech.com"
+    },
+    {
+      "file_offset": "0xc9e7e8",
+      "encoding": "ascii",
+      "text": "controldevices"
+    },
+    {
+      "file_offset": "0xc9e800",
+      "encoding": "ascii",
+      "text": "LogiDownloadAssistant"
+    },
+    {
+      "file_offset": "0xc9e868",
+      "encoding": "ascii",
+      "text": "logi::download_assistant::Engine::InitializeDevio"
+    },
+    {
+      "file_offset": "0xc9e998",
+      "encoding": "ascii",
+      "text": "User cancelled download"
+    },
+    {
+      "file_offset": "0xc9e9b8",
+      "encoding": "ascii",
+      "text": "User pressed manual install"
+    },
+    {
+      "file_offset": "0xc9ecd0",
+      "encoding": "ascii",
+      "text": "Software Update"
+    },
+    {
+      "file_offset": "0xc9f050",
+      "encoding": "ascii",
+      "text": "logi::download_assistant::Engine::DownloadSoftware::<lambda_863eb0bcbbe1d67d3b4f56e477b54d56>::()::<lambda_f3ccf9756f85a6e2df1324d04bd3bb3c>::operator ()"
+    },
+    {
+      "file_offset": "0xc9f158",
+      "encoding": "ascii",
+      "text": "Launched installer from %s"
+    },
+    {
+      "file_offset": "0xc9f178",
+      "encoding": "ascii",
+      "text": "Waiting for installer to finish"
+    },
+    {
+      "file_offset": "0xc9f278",
+      "encoding": "ascii",
+      "text": "Software installed successfully"
+    },
+    {
+      "file_offset": "0xc9f2a0",
+      "encoding": "ascii",
+      "text": "Software not installed"
+    },
+    {
+      "file_offset": "0xc9f3c0",
+      "encoding": "ascii",
+      "text": "Removed manifest file for model id: %s"
+    },
+    {
+      "file_offset": "0xca11b0",
+      "encoding": "ascii",
+      "text": "logi::download_assistant::ToastHandler::ShowNotifySoftwarePrompt"
+    },
+    {
+      "file_offset": "0xca12d8",
+      "encoding": "ascii",
+      "text": "Software Available"
+    },
+    {
+      "file_offset": "0xce7c58",
+      "encoding": "ascii",
+      "text": "Report is a HID++ 2.0 notification"
+    },
+    {
+      "file_offset": "0xcf4368",
+      "encoding": "ascii",
+      "text": "HID++ 1.0"
+    },
+    {
+      "file_offset": "0xcf4378",
+      "encoding": "ascii",
+      "text": "HID++ 2.0"
+    },
+    {
+      "file_offset": "0xca5330",
+      "encoding": "utf-16le",
+      "text": "LogiDownloadAssistant"
+    }
+  ],
+  "bounded_string_searches": [
+    {
+      "name": "mx4_literal",
+      "regex": "(?i)\\b(?:mx\\s*master\\s*4|mx_master_?4|b042|b048)\\b",
+      "scope": "bin/logi_download_assistant.exe; ASCII and UTF-16LE printable runs of at least 4 characters",
+      "match_count": 0,
+      "matches": [],
+      "matches_truncated": false
+    },
+    {
+      "name": "specific_controller_literal",
+      "regex": "(?i)(?:\\bFeature19[bc]0|feature_(?:x)?19[bc]0|radial_menu|actions[ _]?ring|force_sensing)",
+      "scope": "bin/logi_download_assistant.exe; ASCII and UTF-16LE printable runs of at least 4 characters",
+      "match_count": 0,
+      "matches": [],
+      "matches_truncated": false
+    },
+    {
+      "name": "generic_haptic",
+      "regex": "(?i)haptic",
+      "scope": "bin/logi_download_assistant.exe; ASCII and UTF-16LE printable runs of at least 4 characters",
+      "match_count": 10,
+      "matches": [
+        {
+          "file_offset": "0xd9cad0",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.IKnownSimpleHapticsControllerWaveformsStatics"
+        },
+        {
+          "file_offset": "0xd9d1b0",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.IKnownSimpleHapticsControllerWaveformsStatics2"
+        },
+        {
+          "file_offset": "0xd9e010",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.ISimpleHapticsController"
+        },
+        {
+          "file_offset": "0xd9fc90",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.ISimpleHapticsControllerFeedback"
+        },
+        {
+          "file_offset": "0xda00d0",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.IVibrationDevice"
+        },
+        {
+          "file_offset": "0xda0510",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.IVibrationDeviceStatics"
+        },
+        {
+          "file_offset": "0xda0d60",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.KnownSimpleHapticsControllerWaveforms"
+        },
+        {
+          "file_offset": "0xda0e80",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.SimpleHapticsController"
+        },
+        {
+          "file_offset": "0xda0f10",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.SimpleHapticsControllerFeedback"
+        },
+        {
+          "file_offset": "0xda1030",
+          "encoding": "utf-16le",
+          "text": "Windows.Devices.Haptics.VibrationDevice"
+        }
+      ],
+      "matches_truncated": false
+    },
+    {
+      "name": "generic_hid",
+      "regex": "(?i)hid\\+\\+|hidpp|hpp10",
+      "scope": "bin/logi_download_assistant.exe; ASCII and UTF-16LE printable runs of at least 4 characters",
+      "match_count": 109,
+      "matches": [
+        {
+          "file_offset": "0xc9db58",
+          "encoding": "ascii",
+          "text": "Skipping device 0x%x: HPP10 InvalidSubid error (sys %lu)"
+        },
+        {
+          "file_offset": "0xc9dba0",
+          "encoding": "ascii",
+          "text": "Device 0x%x is unknown to HPP10 protocol (sys error %lu), skipping..."
+        },
+        {
+          "file_offset": "0xc9dc00",
+          "encoding": "ascii",
+          "text": "Skipping unknown device 0x%x: HPP10 UnknownDevice error (sys %lu)"
+        },
+        {
+          "file_offset": "0xce7c00",
+          "encoding": "ascii",
+          "text": "Report is a Hid++ 1.0 notification"
+        },
+        {
+          "file_offset": "0xce7c58",
+          "encoding": "ascii",
+          "text": "Report is a HID++ 2.0 notification"
+        },
+        {
+          "file_offset": "0xce7c88",
+          "encoding": "ascii",
+          "text": "Report is a Hid++ command response"
+        }
+      ],
+      "matches_truncated": true
+    }
+  ],
+  "header_declarations": [
+    {
+      "path": "include/logi/demalu/Demalu.h",
+      "sha256": "6608d59d7120297ab778442b697911ee40655be1143cea39553fba0a7d3fd980",
+      "line_count": 83,
+      "selected_declarations": [
+        {
+          "line": 13,
+          "file_offset": "0xe0",
+          "text": "struct HTTPConfiguration"
+        },
+        {
+          "line": 15,
+          "file_offset": "0x105",
+          "text": "std::string location;"
+        },
+        {
+          "line": 16,
+          "file_offset": "0x124",
+          "text": "std::string sigLocation;"
+        },
+        {
+          "line": 17,
+          "file_offset": "0x146",
+          "text": "std::string manifestLocation;"
+        },
+        {
+          "line": 18,
+          "file_offset": "0x16d",
+          "text": "std::string manifestSigLocation;"
+        },
+        {
+          "line": 19,
+          "file_offset": "0x197",
+          "text": "std::string forceLocation;"
+        },
+        {
+          "line": 30,
+          "file_offset": "0x297",
+          "text": "class Demalu"
+        },
+        {
+          "line": 33,
+          "file_offset": "0x2bd",
+          "text": "Demalu(const DemaluRequest &request);"
+        },
+        {
+          "line": 36,
+          "file_offset": "0x30a",
+          "text": "CheckResult checkUpdate();"
+        },
+        {
+          "line": 37,
+          "file_offset": "0x32e",
+          "text": "[[nodiscard]] DownloadResult downloadUpdate();"
+        },
+        {
+          "line": 38,
+          "file_offset": "0x366",
+          "text": "InstallResult installUpdate();"
+        },
+        {
+          "line": 40,
+          "file_offset": "0x390",
+          "text": "void abortCurrentOperation();"
+        },
+        {
+          "line": 42,
+          "file_offset": "0x3b9",
+          "text": "[[nodiscard]] std::string getDownloadPath() const;"
+        },
+        {
+          "line": 43,
+          "file_offset": "0x3f5",
+          "text": "[[nodiscard]] std::string getDownloadSigPath() const;"
+        },
+        {
+          "line": 46,
+          "file_offset": "0x476",
+          "text": "void setEvents(std::shared_ptr<DemaluEvents> events);"
+        },
+        {
+          "line": 64,
+          "file_offset": "0x6fb",
+          "text": "bool AuthenticatePayload(std::shared_ptr<PayloadKit> payload,"
+        },
+        {
+          "line": 67,
+          "file_offset": "0x7cb",
+          "text": "bool AuthenticatePayload(std::shared_ptr<PayloadKit> payload,"
+        },
+        {
+          "line": 70,
+          "file_offset": "0x896",
+          "text": "bool AuthenticatePayload(const std::string &payloadPath,"
+        },
+        {
+          "line": 78,
+          "file_offset": "0x9d9",
+          "text": "InstallResult UnpackZipFile(std::shared_ptr<PayloadKit> src, std::shared_ptr<PayloadKit> target);"
+        }
+      ]
+    },
+    {
+      "path": "include/logi/demalu/DemaluRequest.h",
+      "sha256": "52fbdf19178153ff96a274a99fedc808c9299f24d552533e241c22d4bcd77fd0",
+      "line_count": 189,
+      "selected_declarations": [
+        {
+          "line": 35,
+          "file_offset": "0x225",
+          "text": "struct RequestInfo"
+        },
+        {
+          "line": 37,
+          "file_offset": "0x244",
+          "text": "enum class UrlRequestVersion : unsigned int"
+        },
+        {
+          "line": 39,
+          "file_offset": "0x284",
+          "text": "Default = 1,"
+        },
+        {
+          "line": 40,
+          "file_offset": "0x29e",
+          "text": "V1 = 1,"
+        },
+        {
+          "line": 41,
+          "file_offset": "0x2b3",
+          "text": "V2 = 2"
+        },
+        {
+          "line": 45,
+          "file_offset": "0x337",
+          "text": "struct V2"
+        },
+        {
+          "line": 48,
+          "file_offset": "0x388",
+          "text": "std::string channel { \"0\" };"
+        },
+        {
+          "line": 51,
+          "file_offset": "0x401",
+          "text": "std::string osCountry { \"0\" };"
+        },
+        {
+          "line": 54,
+          "file_offset": "0x486",
+          "text": "bool preferLatest { true };"
+        },
+        {
+          "line": 62,
+          "file_offset": "0x529",
+          "text": "std::string serverHost;"
+        },
+        {
+          "line": 65,
+          "file_offset": "0x58d",
+          "text": "std::string businessUnit;"
+        },
+        {
+          "line": 68,
+          "file_offset": "0x5de",
+          "text": "std::string applicationName;"
+        },
+        {
+          "line": 71,
+          "file_offset": "0x63d",
+          "text": "std::string applicationVersion;"
+        },
+        {
+          "line": 74,
+          "file_offset": "0x69a",
+          "text": "std::string brand;"
+        },
+        {
+          "line": 76,
+          "file_offset": "0x6b8",
+          "text": "std::string productName;"
+        },
+        {
+          "line": 77,
+          "file_offset": "0x6da",
+          "text": "std::string productExtension;"
+        },
+        {
+          "line": 78,
+          "file_offset": "0x701",
+          "text": "std::string productVersion;"
+        },
+        {
+          "line": 79,
+          "file_offset": "0x726",
+          "text": "std::string osFlag;"
+        },
+        {
+          "line": 80,
+          "file_offset": "0x743",
+          "text": "std::string osBit;"
+        },
+        {
+          "line": 83,
+          "file_offset": "0x7d1",
+          "text": "std::string publicKeyPath;"
+        },
+        {
+          "line": 85,
+          "file_offset": "0x7f7",
+          "text": "std::string uniqueId;"
+        },
+        {
+          "line": 87,
+          "file_offset": "0x818",
+          "text": "std::vector<std::string> queryStrings;"
+        },
+        {
+          "line": 91,
+          "file_offset": "0x8e1",
+          "text": "std::string downloadDirectory;"
+        },
+        {
+          "line": 94,
+          "file_offset": "0x967",
+          "text": "std::string settingsDirectory;"
+        },
+        {
+          "line": 98,
+          "file_offset": "0xa24",
+          "text": "std::string targetDirectory;"
+        },
+        {
+          "line": 108,
+          "file_offset": "0xbac",
+          "text": "bool check { false };"
+        },
+        {
+          "line": 112,
+          "file_offset": "0xc69",
+          "text": "bool clean { false };"
+        },
+        {
+          "line": 115,
+          "file_offset": "0xcbd",
+          "text": "bool download { true };"
+        },
+        {
+          "line": 119,
+          "file_offset": "0xdaa",
+          "text": "bool execute { true };"
+        },
+        {
+          "line": 124,
+          "file_offset": "0xef4",
+          "text": "bool useMemoryPayloads { false };"
+        },
+        {
+          "line": 126,
+          "file_offset": "0xf21",
+          "text": "bool skipElevated { false };"
+        },
+        {
+          "line": 127,
+          "file_offset": "0xf47",
+          "text": "bool requireActiveSession { false };"
+        },
+        {
+          "line": 128,
+          "file_offset": "0xf75",
+          "text": "bool keepSignatureOnFailure { false };"
+        },
+        {
+          "line": 129,
+          "file_offset": "0xfa5",
+          "text": "bool reportPayloadExists { false };"
+        },
+        {
+          "line": 133,
+          "file_offset": "0x1045",
+          "text": "unsigned int bufferSize { 128 * 1024 };"
+        },
+        {
+          "line": 137,
+          "file_offset": "0x10fe",
+          "text": "UrlRequestVersion urlRequestVersion { UrlRequestVersion::Default };"
+        },
+        {
+          "line": 159,
+          "file_offset": "0x13fd",
+          "text": "explicit DemaluRequest(const RequestInfo &requestInfo);"
+        },
+        {
+          "line": 167,
+          "file_offset": "0x14e1",
+          "text": "bool isValid() const;"
+        },
+        {
+          "line": 169,
+          "file_offset": "0x1502",
+          "text": "[[nodiscard]] std::string createDownloadLocation() const;"
+        },
+        {
+          "line": 170,
+          "file_offset": "0x1545",
+          "text": "[[nodiscard]] std::string createQueryStringParameters(std::string ext_append = {}) const;"
+        },
+        {
+          "line": 171,
+          "file_offset": "0x15a8",
+          "text": "[[nodiscard]] std::string createTargetFileName() const;"
+        },
+        {
+          "line": 172,
+          "file_offset": "0x15e9",
+          "text": "[[nodiscard]] std::string createTargetPath() const;"
+        },
+        {
+          "line": 173,
+          "file_offset": "0x1626",
+          "text": "[[nodiscard]] std::string createCopyPath() const;"
+        }
+      ]
+    },
+    {
+      "path": "include/logi/demalu/Downloader.h",
+      "sha256": "b660f8205b5239d3126af3dab4bc202fdad4b048828f108ef03742bc6ffa11fe",
+      "line_count": 63,
+      "selected_declarations": [
+        {
+          "line": 11,
+          "file_offset": "0xa3",
+          "text": "class Downloader final : public IDownloader"
+        },
+        {
+          "line": 13,
+          "file_offset": "0xdb",
+          "text": "static constexpr uint32_t minBufferSize = 16 * 1024;"
+        },
+        {
+          "line": 14,
+          "file_offset": "0x119",
+          "text": "static constexpr uint32_t maxBufferSize = 16 * 1024 * 1024;"
+        },
+        {
+          "line": 27,
+          "file_offset": "0x2f0",
+          "text": "Downloader(std::string hostName,"
+        },
+        {
+          "line": 28,
+          "file_offset": "0x31a",
+          "text": "std::string location,"
+        },
+        {
+          "line": 29,
+          "file_offset": "0x344",
+          "text": "std::shared_ptr<PayloadKit> payload,"
+        },
+        {
+          "line": 30,
+          "file_offset": "0x37d",
+          "text": "unsigned int bufferSize,"
+        },
+        {
+          "line": 31,
+          "file_offset": "0x3aa",
+          "text": "std::shared_ptr<bool> abortRequest);"
+        },
+        {
+          "line": 36,
+          "file_offset": "0x47c",
+          "text": "Downloader(std::string hostName,"
+        },
+        {
+          "line": 37,
+          "file_offset": "0x4a6",
+          "text": "std::string location,"
+        },
+        {
+          "line": 38,
+          "file_offset": "0x4d0",
+          "text": "unsigned int bufferSize,"
+        },
+        {
+          "line": 39,
+          "file_offset": "0x4fd",
+          "text": "std::shared_ptr<bool> abortRequest);"
+        },
+        {
+          "line": 45,
+          "file_offset": "0x589",
+          "text": "virtual DownloaderResult download("
+        },
+        {
+          "line": 46,
+          "file_offset": "0x5b5",
+          "text": "IDownloader::progress_callback cb = IDownloader::progress_callback()) override;"
+        },
+        {
+          "line": 48,
+          "file_offset": "0x614",
+          "text": "virtual DownloadInfo getDownloadInfo() const override"
+        }
+      ]
+    },
+    {
+      "path": "include/logi/demalu/Downloader_Interface.h",
+      "sha256": "f801e64f3ed699bd0ff13e52c3c8d32d3af888789bbaed3b08cd850702049505",
+      "line_count": 24,
+      "selected_declarations": [
+        {
+          "line": 10,
+          "file_offset": "0x89",
+          "text": "struct DownloadInfo"
+        },
+        {
+          "line": 12,
+          "file_offset": "0xa9",
+          "text": "HttpStatusCode httpStatusCode;"
+        },
+        {
+          "line": 13,
+          "file_offset": "0xd1",
+          "text": "size_t contentLength;"
+        },
+        {
+          "line": 16,
+          "file_offset": "0xfa",
+          "text": "class IDownloader"
+        },
+        {
+          "line": 19,
+          "file_offset": "0x125",
+          "text": "using progress_callback = std::function<void(double)>;"
+        },
+        {
+          "line": 21,
+          "file_offset": "0x190",
+          "text": "virtual DownloaderResult download(progress_callback cb) = 0;"
+        },
+        {
+          "line": 22,
+          "file_offset": "0x1d6",
+          "text": "virtual DownloadInfo getDownloadInfo() const = 0;"
+        }
+      ]
+    },
+    {
+      "path": "include/logi/demalu/AuthenticateData.h",
+      "sha256": "fd8ae9898292563f8ab3ba19457ee5cbfcf53b89200d8cb6d4e1d47e200e8e4e",
+      "line_count": 25,
+      "selected_declarations": [
+        {
+          "line": 11,
+          "file_offset": "0xa6",
+          "text": "class AuthenticateData"
+        },
+        {
+          "line": 14,
+          "file_offset": "0xd6",
+          "text": "AuthenticateResult authenticate();"
+        },
+        {
+          "line": 16,
+          "file_offset": "0x104",
+          "text": "void setData(std::shared_ptr<PayloadKit> data);"
+        },
+        {
+          "line": 17,
+          "file_offset": "0x13d",
+          "text": "void setSignature(std::shared_ptr<PayloadKit> signature);"
+        },
+        {
+          "line": 18,
+          "file_offset": "0x180",
+          "text": "void setKeyPath(const logi::filesystem::path &keyPath);"
+        }
+      ]
+    },
+    {
+      "path": "include/logi/demalu/DemaluEvents_Interface.h",
+      "sha256": "151a1a470d4aff93eebb65f1a7caa82b71dc44b48d34e55189040df37a8132ff",
+      "line_count": 97,
+      "selected_declarations": [
+        {
+          "line": 14,
+          "file_offset": "0xb0",
+          "text": "class DemaluEvents"
+        },
+        {
+          "line": 17,
+          "file_offset": "0xdc",
+          "text": "virtual void onUpdateCheck(demalu::DemaluRequest request,"
+        },
+        {
+          "line": 23,
+          "file_offset": "0x1c6",
+          "text": "virtual void onEnforceAutomaticInstall(demalu::DemaluRequest request)"
+        },
+        {
+          "line": 27,
+          "file_offset": "0x22d",
+          "text": "virtual void onDownloadBegin(demalu::DemaluRequest request)"
+        },
+        {
+          "line": 31,
+          "file_offset": "0x28a",
+          "text": "virtual void onDownloadStatus(demalu::DemaluRequest request, uint8_t progress)"
+        },
+        {
+          "line": 35,
+          "file_offset": "0x2fa",
+          "text": "virtual void onDownloadEnd(demalu::DemaluRequest request,"
+        },
+        {
+          "line": 42,
+          "file_offset": "0x44a",
+          "text": "virtual void onInstallBegin(demalu::DemaluRequest request)"
+        },
+        {
+          "line": 46,
+          "file_offset": "0x4a6",
+          "text": "virtual void onInstallEnd(demalu::DemaluRequest request, demalu::InstallResult result, unsigned int exitCode)"
+        },
+        {
+          "line": 57,
+          "file_offset": "0x7a9",
+          "text": "virtual void onUnpackArchiveBegin(demalu::DemaluRequest request,"
+        },
+        {
+          "line": 71,
+          "file_offset": "0xae5",
+          "text": "virtual void onUnpackArchiveStatus(demalu::DemaluRequest request,"
+        },
+        {
+          "line": 87,
+          "file_offset": "0xf24",
+          "text": "virtual void onUnpackArchiveEnd(demalu::DemaluRequest request,"
+        }
+      ]
+    },
+    {
+      "path": "include/logi/demalu/PayloadKit.h",
+      "sha256": "1cd62ed1eda9418e6251f4b5713bb3ac94826e1c7766dc9890d0ceee0d93790e",
+      "line_count": 76,
+      "selected_declarations": [
+        {
+          "line": 12,
+          "file_offset": "0x8b",
+          "text": "class PayloadKit"
+        },
+        {
+          "line": 15,
+          "file_offset": "0xb5",
+          "text": "// Explicitly define size type regardless of architecture."
+        },
+        {
+          "line": 16,
+          "file_offset": "0xf9",
+          "text": "using size_type = uint64_t;"
+        },
+        {
+          "line": 17,
+          "file_offset": "0x11e",
+          "text": "using data_type = std::vector<char>;"
+        },
+        {
+          "line": 18,
+          "file_offset": "0x14c",
+          "text": "using name_type = std::string;"
+        },
+        {
+          "line": 28,
+          "file_offset": "0x314",
+          "text": "virtual bool createPayload(const PayloadKit::name_type &name, PayloadKit::size_type size) = 0;"
+        },
+        {
+          "line": 33,
+          "file_offset": "0x419",
+          "text": "virtual PayloadKit::size_type write(const PayloadKit::data_type &data) = 0;"
+        },
+        {
+          "line": 39,
+          "file_offset": "0x53f",
+          "text": "virtual PayloadKit::size_type write(const PayloadKit::data_type::value_type *data,"
+        },
+        {
+          "line": 43,
+          "file_offset": "0x631",
+          "text": "virtual bool empty() = 0;"
+        },
+        {
+          "line": 47,
+          "file_offset": "0x6f3",
+          "text": "virtual PayloadKit::size_type size() = 0;"
+        },
+        {
+          "line": 51,
+          "file_offset": "0x79c",
+          "text": "virtual bool clear() = 0;"
+        },
+        {
+          "line": 53,
+          "file_offset": "0x7c1",
+          "text": "virtual void flush() = 0;"
+        },
+        {
+          "line": 56,
+          "file_offset": "0x81a",
+          "text": "virtual void close() = 0;"
+        },
+        {
+          "line": 60,
+          "file_offset": "0x8be",
+          "text": "virtual PayloadKit::data_type getPayloadData() noexcept(false) = 0;"
+        },
+        {
+          "line": 64,
+          "file_offset": "0x994",
+          "text": "virtual PayloadKit::data_type getPayloadData(PayloadKit::size_type start,"
+        },
+        {
+          "line": 68,
+          "file_offset": "0xa80",
+          "text": "virtual PayloadKit::name_type getPayloadName() = 0;"
+        },
+        {
+          "line": 71,
+          "file_offset": "0xaf4",
+          "text": "virtual void lock() = 0;"
+        },
+        {
+          "line": 74,
+          "file_offset": "0xb4f",
+          "text": "virtual void unlock() = 0;"
+        }
+      ]
+    },
+    {
+      "path": "include/logi/demalu/Types.h",
+      "sha256": "17e5b1a12609fa4cc9e3ed3678fe9acf2a6ce73c90bfaa84c6a319803fc1075b",
+      "line_count": 122,
+      "selected_declarations": [
+        {
+          "line": 5,
+          "file_offset": "0x25",
+          "text": "enum class ArchiveType"
+        },
+        {
+          "line": 8,
+          "file_offset": "0x6a",
+          "text": "Zip,   // Zip archive"
+        },
+        {
+          "line": 23,
+          "file_offset": "0x2bd",
+          "text": "enum class AuthenticateResult"
+        },
+        {
+          "line": 25,
+          "file_offset": "0x2e7",
+          "text": "Success,"
+        },
+        {
+          "line": 26,
+          "file_offset": "0x2f9",
+          "text": "BadHash,     // Hash is missing/empty or bad"
+        },
+        {
+          "line": 27,
+          "file_offset": "0x32f",
+          "text": "Mismatch,    // Hash of content does not match expected hash"
+        },
+        {
+          "line": 28,
+          "file_offset": "0x375",
+          "text": "ApiFailure,  // Platform API-specific failure"
+        },
+        {
+          "line": 29,
+          "file_offset": "0x3ac",
+          "text": "MissingKey   // Missing public key, or unable to read public key"
+        },
+        {
+          "line": 32,
+          "file_offset": "0x400",
+          "text": "enum class CheckResult"
+        },
+        {
+          "line": 43,
+          "file_offset": "0x5a2",
+          "text": "enum class DemaluResult"
+        },
+        {
+          "line": 70,
+          "file_offset": "0x8c6",
+          "text": "enum class DownloadResult"
+        },
+        {
+          "line": 78,
+          "file_offset": "0xa1d",
+          "text": "DownloadPayloadFailed,    // Failed to download the payload file"
+        },
+        {
+          "line": 79,
+          "file_offset": "0xa67",
+          "text": "DownloadSignatureFailed,  // Failed to download the signature file"
+        },
+        {
+          "line": 81,
+          "file_offset": "0xafa",
+          "text": "AuthenticationFailed,     // The payload file did not match with signature hash"
+        },
+        {
+          "line": 89,
+          "file_offset": "0xcf1",
+          "text": "enum class DownloaderResult"
+        },
+        {
+          "line": 102,
+          "file_offset": "0xe13",
+          "text": "enum class InstallResult"
+        },
+        {
+          "line": 113,
+          "file_offset": "0x1052",
+          "text": "AuthenticationFailed,      // The payload file did not match with signature hash"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "classification": "inference from shipped diagnostic strings",
+      "statement": "The assistant discovers Logitech devices, retrieves per-model configuration/resources, checks installation and reminder status, displays software prompts, downloads software and launches its installer."
+    },
+    {
+      "classification": "observed C++ interface declarations",
+      "statement": "Demalu exposes update availability, download, install, abort, payload/signature authentication and archive unpacking; RequestInfo supplies application/product/OS selection, public-key path and behavior flags."
+    },
+    {
+      "classification": "bounded negative search",
+      "statement": "No MX Master 4/B042/B048 literal or specific feature_19B0/19C0, radial_menu, Actions Ring or force_sensing controller name was found by the stated executable string searches."
+    },
+    {
+      "classification": "observed generic framework names",
+      "statement": "Generic HID++/devio strings and Windows.Devices.Haptics WinRT type names are present; their presence does not establish MX4 settings, ring or haptic implementation."
+    }
+  ],
+  "limitations": [
+    "No program was executed and no embedded URL was followed.",
+    "Header declarations are interfaces and documentation, not proof their exact code paths execute in the assistant.",
+    "Native function bodies were not decompiled; string-based architectural conclusions remain inferences.",
+    "The main executable printable-string search excludes packed/encrypted/runtime-generated data; negative results do not prove absence of code.",
+    "Source inventory excludes the locally generated rea-pe-resources.json evidence record.",
+    "No remote device manifest was fetched, so model-specific software recommendation data and MX4 mapping are unknown."
+  ]
+}
