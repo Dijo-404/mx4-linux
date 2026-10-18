@@ -39,6 +39,8 @@ class ControlWindow(Adw.ApplicationWindow):
         self.desktop = DesktopController(self)
         self.connect("close-request", self.on_close)
         self.closed = False
+        self.quitting = False
+        self._quit_dialog = None
         self.device_refresh_source = 0
         self.device_monitor = None
         try:
@@ -48,6 +50,7 @@ class ControlWindow(Adw.ApplicationWindow):
             pass  # Manual refresh remains available if monitoring is unavailable.
 
         self.route = "home"
+        self.route_history = []
         self.selected_target = None
         from .reference_shell import ReferenceShell
         self.shell = ReferenceShell(self)
@@ -84,10 +87,68 @@ class ControlWindow(Adw.ApplicationWindow):
         toolbar.add_bottom_bar(status_bar)
         self.toasts = Adw.ToastOverlay(child=toolbar)
         self.set_content(self.toasts)
+        keys = Gtk.EventControllerKey()
+        # Native dropdowns and text editors get the first chance to use Escape.
+        keys.set_propagation_phase(Gtk.PropagationPhase.BUBBLE)
+        keys.connect("key-pressed", self._key_pressed)
+        self.add_controller(keys)
         self.reload()
         self.battery_source = GLib.timeout_add_seconds(30, self.refresh_battery)
 
     def on_close(self, *_):
+        if self.closed:
+            return False
+        if self.quitting:
+            return True
+        keep_running = ((self.desktop.config or {}).get("background", True)
+                        and (self.desktop.requested_enabled or self.desktop.session.running
+                             or self.desktop.starting))
+        if keep_running:
+            # Keep the same application window registered: GTK retains the
+            # process, its listener and unsaved controls while it is hidden.
+            self.set_visible(False)
+        else:
+            self.request_quit()
+        return True
+
+    def request_quit(self, *_):
+        """Explicit Quit waits for reporting restoration before ending GTK."""
+        if self.closed or self.quitting:
+            return
+        editor = self.desktop.editor
+        if editor is not None and editor.get_visible():
+            editor.close()
+            if editor.get_visible():
+                # Reuse the editor's existing unsaved-changes decision; a
+                # cancelled Quit must not remain armed for a later close.
+                dialog = editor.close_dialog
+                if dialog is not None and dialog is not self._quit_dialog:
+                    self._quit_dialog = dialog
+                    def answered(_dialog, response):
+                        self._quit_dialog = None
+                        if response == "discard":
+                            self.request_quit()
+                    dialog.connect_after("response", answered)
+                editor.present()
+                return
+        self.quitting = True
+        self.set_sensitive(False)
+        self._hardware_resume = None
+        self.operation_epoch += 1
+        self.hardware_cancelled.set()
+        self.desktop.wait_stopped(self._finish_quit)
+
+    def _finish_quit(self, _restored):
+        application = self.get_application()
+        self.shutdown()
+        self.destroy()
+        if application is not None:
+            application.quit()
+
+    def shutdown(self):
+        """Release resources once, including application shutdown paths."""
+        if self.closed:
+            return
         self.closed = True
         self._hardware_resume = None
         self.operation_epoch += 1
@@ -104,7 +165,6 @@ class ControlWindow(Adw.ApplicationWindow):
         if self.device_monitor:
             self.device_monitor.cancel()
         self.executor.shutdown(wait=False, cancel_futures=True)
-        return False
 
     def on_device_change(self, _monitor, file, _other_file, event):
         if self.demo or self.closed or not (file.get_basename() or "").startswith("hidraw"):
@@ -128,7 +188,7 @@ class ControlWindow(Adw.ApplicationWindow):
 
     def job(self, work, done, message, failed=None, *, device_bound=True):
         """Serialize work; only local-file callbacks may ignore device epochs."""
-        if self.busy or self.pending_hardware:
+        if self.busy or self.pending_hardware or self.quitting:
             return
         self.busy = True
         epoch = self.operation_epoch
@@ -139,7 +199,8 @@ class ControlWindow(Adw.ApplicationWindow):
         self.refresh.set_sensitive(False)
         self.spinner.set_visible(True)
         self.spinner.start()
-        self.status.set_text(message)
+        if message is not None:
+            self.status.set_text(message)
         self.update_desktop_status()
         future = self.executor.submit(work)
 
@@ -223,6 +284,10 @@ class ControlWindow(Adw.ApplicationWindow):
             raise ValueError("Unknown page")
         if route == "configuration":
             self.configuration_return = self.route if self.route in ("application", "settings") else "application"
+        if route == "home":
+            self.route_history.clear()
+        elif route != self.route:
+            self.route_history.append((self.route, self.selected_target))
         self.route = route
         self.selected_target = None
         self.shell.update_route()
@@ -238,18 +303,41 @@ class ControlWindow(Adw.ApplicationWindow):
 
     def close_inspector(self):
         self.selected_target = None
-        if self.route in ("settings", "easy-switch"):
-            self.navigate("buttons")
+        if self.route == "settings":
+            self.go_back()
         else:
             self.shell.update_route()
 
     def go_back(self):
-        if self.route == "configuration":
-            self.navigate(getattr(self, "configuration_return", "application"))
-        elif self.selected_target:
+        if self.selected_target:
             self.close_inspector()
+        elif self.route_history:
+            self.route, target = self.route_history.pop()
+            self.selected_target = target if target in self.shell.targets and self.current and self.current.get("online") else None
+            self.shell.update_route()
+        elif self.route == "configuration":
+            self.navigate(getattr(self, "configuration_return", "application"))
         else:
             self.navigate("home")
+
+    def _key_pressed(self, _controller, keyval, _keycode, state):
+        if keyval != Gdk.KEY_Escape or state & Gtk.accelerator_get_default_mod_mask():
+            return False
+        # A dialog owns its own dismissal and any unsaved-changes decision.
+        if getattr(self, "get_visible_dialog", lambda: None)() is not None:
+            return False
+        if any(window.get_visible() and window.get_modal() and window.get_transient_for() is self
+               for window in Gtk.Window.get_toplevels()):
+            return False
+        focus = self.get_focus()
+        while focus is not None:
+            if isinstance(focus, Gtk.Popover):
+                return False
+            focus = focus.get_parent()
+        if self.route == "home" and not self.selected_target:
+            return False
+        self.go_back()
+        return True
 
     def add_device(self):
         self.navigate("home")
@@ -264,7 +352,7 @@ class ControlWindow(Adw.ApplicationWindow):
         if self.desktop.config is None:
             self.status.set_text(self.desktop.error or "Local action configuration is unavailable.")
             return
-        if self.busy or self.pending_hardware or self.closed:
+        if self.busy or self.pending_hardware or self.closed or self.quitting:
             self.shell.sync_local_preferences()
             return
         def mutate(document):
@@ -420,6 +508,9 @@ class ControlWindow(Adw.ApplicationWindow):
                                                 and (active or (not self.busy and not self.pending_hardware and bool(self.current and self.current.get("online")))))
         if self.cancel_action:
             self.cancel_action.set_sensitive(self.desktop.action_busy)
+        editor = getattr(self.desktop, "editor", None)
+        if editor is not None and editor.get_visible():
+            editor.update_integration_status()
 
     def select_device(self, chooser, _param, result):
         if self.closed or self.busy or self.pending_hardware:
@@ -435,16 +526,15 @@ class ControlWindow(Adw.ApplicationWindow):
             self.render(result)
 
     def add_setting(self, group, setting):
+        from .reference_shell import choice_row
         if setting["kind"] == "map_choice":
             for key in setting.get("keys", []):
                 value = (setting.get("value") or {}).get(str(key["value"]))
                 if value is None:
                     value = (setting.get("value") or {}).get(key["value"])
-                row = Adw.ActionRow(use_markup=False, title=key["label"], subtitle="Built-in mouse function")
                 widget = self.choice(setting, key["choices"], value, key["value"])
                 widget.update_property([Gtk.AccessibleProperty.LABEL], [key["label"]])
-                row.add_suffix(widget)
-                group.add(row)
+                group.add(choice_row(key["label"], "Built-in mouse function", widget))
             return
         value = setting.get("value")
         row = Adw.ActionRow(use_markup=False, title=setting["label"], subtitle=setting.get("description", ""))
@@ -490,7 +580,7 @@ class ControlWindow(Adw.ApplicationWindow):
                 widget.set_value(confirmed_value)
                 confirmed.set_text(f"Current: {confirmed_value}")
             self.setting_widgets[(setting["name"], None)] = (widget, None, update)
-            apply_button = Gtk.Button(label="Apply", sensitive=value is not None)
+            apply_button = Gtk.Button(label="Apply", sensitive=value is not None, valign=Gtk.Align.CENTER)
             apply_button.set_tooltip_text(f"Apply {setting['label'].lower()}")
             apply_button.connect("clicked", lambda *_, spin=widget: self.change(setting, spin.get_value_as_int()))
             content.append(confirmed)
@@ -503,17 +593,9 @@ class ControlWindow(Adw.ApplicationWindow):
             return
         elif kind == "choice":
             widget = self.choice(setting, setting["choices"], value)
-            if setting["name"] == "haptic-play":
-                row = Adw.PreferencesRow()
-                content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
-                                  margin_start=14, margin_end=14, margin_top=12, margin_bottom=12)
-                heading = Gtk.Label(label=setting["label"], xalign=0, wrap=True)
-                heading.add_css_class("heading")
-                content.append(heading)
-                content.append(widget)
-                row.set_child(content)
-                group.add(row)
-                return
+            widget.update_property([Gtk.AccessibleProperty.LABEL], [setting["label"]])
+            group.add(choice_row(setting["label"], setting.get("description", ""), widget))
+            return
         else:
             return
         widget.update_property([Gtk.AccessibleProperty.LABEL], [setting["label"]])
@@ -529,10 +611,11 @@ class ControlWindow(Adw.ApplicationWindow):
         dropdown = bounded_dropdown(labels, accessible_name=setting["label"], max_chars=16)
         dropdown.set_enable_search(True)
         dropdown.set_valign(Gtk.Align.CENTER)
+        dropdown.set_hexpand(True)
         dropdown.set_selected(next((i for i, c in enumerate(choices) if c["value"] == value), Gtk.INVALID_LIST_POSITION))
         if setting["name"] == "haptic-play":
             box = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER)
-            play = Gtk.Button(label="Play")
+            play = Gtk.Button(label="Play", valign=Gtk.Align.CENTER)
             if choices and dropdown.get_selected() == Gtk.INVALID_LIST_POSITION:
                 dropdown.set_selected(0)
             play.set_sensitive(bool(choices))
@@ -654,7 +737,7 @@ class ControlWindow(Adw.ApplicationWindow):
 
     def hardware_job(self, work, done, message, failed=None, resume=True):
         """Pause temporary reporting and await confirmed child cleanup before mapping/profile changes."""
-        if self.busy or self.pending_hardware or self.closed:
+        if self.busy or self.pending_hardware or self.closed or self.quitting:
             return
         wait_token = object()
         self.set_hardware_wait(wait_token)
@@ -710,7 +793,9 @@ class ControlWindow(Adw.ApplicationWindow):
                 self.shell.update_battery()
         def failed(_message):
             loaded({})
-        self.job(lambda: self.backend.battery(device_id, identity), loaded, "Reading battery…", failed=failed)
+        # The battery labels already display the result. Periodic reads must not
+        # replace the last operation notice with a status that never completes.
+        self.job(lambda: self.backend.battery(device_id, identity), loaded, None, failed=failed)
         return GLib.SOURCE_CONTINUE
 
     def recover_current(self, replay=False, automatic=False):
@@ -868,6 +953,7 @@ class ControlWindow(Adw.ApplicationWindow):
         self.reload(notice)
 
     def add_profiles(self):
+        from .reference_shell import choice_row
         while child := self.profile_controls.get_first_child():
             self.profile_controls.remove(child)
         if not self.current or not self.current.get("online"):
@@ -877,14 +963,14 @@ class ControlWindow(Adw.ApplicationWindow):
             return
         group = Adw.PreferencesGroup(title="Profiles", description="Save current settings and apply them manually. Haptic playback is excluded.")
         self.profile_controls.append(group)
-        save_row = Adw.ActionRow(title="Save current settings")
-        entry = Gtk.Entry(placeholder_text="Profile name", max_length=64, valign=Gtk.Align.CENTER)
+        save_controls = Gtk.Box(spacing=8)
+        entry = Gtk.Entry(placeholder_text="Profile name", max_length=64, valign=Gtk.Align.CENTER, hexpand=True)
         entry.update_property([Gtk.AccessibleProperty.LABEL], ["Profile name"])
         save_button = Gtk.Button(label="Save", valign=Gtk.Align.CENTER, sensitive=False)
         entry.connect("changed", lambda *_: save_button.set_sensitive(bool(entry.get_text().strip())))
-        save_row.add_suffix(entry)
-        save_row.add_suffix(save_button)
-        group.add(save_row)
+        save_controls.append(entry)
+        save_controls.append(save_button)
+        group.add(choice_row("Save current settings", "", save_controls))
         def save(*_):
             name, device = entry.get_text(), self.current
             def saved(_result):
@@ -902,10 +988,11 @@ class ControlWindow(Adw.ApplicationWindow):
         if not profiles:
             return
         names = sorted(profiles)
-        load_row = Adw.ActionRow(title="Apply a saved profile")
+        load_controls = Gtk.Box(spacing=8)
         from .reference_shell import bounded_dropdown
         chooser = bounded_dropdown(names, accessible_name="Saved mouse profile", max_chars=22)
         chooser.set_valign(Gtk.Align.CENTER)
+        chooser.set_hexpand(True)
         apply_button = Gtk.Button(label="Apply", valign=Gtk.Align.CENTER)
         def apply(*_):
             profile = profiles[names[chooser.get_selected()]]
@@ -914,9 +1001,15 @@ class ControlWindow(Adw.ApplicationWindow):
                      lambda count: self.refresh_after_write(f"Profile applied · {count} changes."), "Applying profile…",
                      failed=self.refresh_after_write)
         apply_button.connect("clicked", apply)
-        load_row.add_suffix(chooser)
-        load_row.add_suffix(apply_button)
-        group.add(load_row)
+        load_controls.append(chooser)
+        load_controls.append(apply_button)
+        group.add(choice_row("Apply a saved profile", "", load_controls))
+
+
+def _control_window(application, *, demo=False):
+    window = next((w for w in application.get_windows()
+                   if isinstance(w, ControlWindow) and not w.closed), None)
+    return window if window is not None else ControlWindow(application, demo=demo)
 
 
 def run(demo=False, show_ring=False, preview_ring=False):
@@ -926,29 +1019,35 @@ def run(demo=False, show_ring=False, preview_ring=False):
         icons = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
         icons.add_search_path(str(Path(__file__).parent / "icons"))
         Gtk.Window.set_default_icon_name("io.github.mx4linux.Control")
+        quit_action = Gio.SimpleAction.new("quit", None)
+        quit_action.connect("activate", lambda *_: _control_window(app, demo=demo).request_quit())
+        app.add_action(quit_action)
+        app.set_accels_for_action("app.quit", ["<Primary>q"])
     app.connect("startup", startup)
     app.add_main_option("ring", 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE, "Open Actions Ring", None)
     app.add_main_option("preview-ring", 0, GLib.OptionFlags.NONE, GLib.OptionArg.NONE, "Preview without executing actions", None)
-    def control_window(application):
-        window = next((w for w in application.get_windows() if isinstance(w, ControlWindow)), None)
-        if not window:
-            window = ControlWindow(application, demo=demo)
-        return window
     def activate(application):
-        window = control_window(application)
+        window = _control_window(application, demo=demo)
         window.present()
     def command_line(application, command):
-        window = control_window(application)
+        window = _control_window(application, demo=demo)
+        if window.quitting:
+            return 0
         options = command.get_options_dict()
         if options.contains("ring"):
             window.desktop.open_ring(preview=options.contains("preview-ring"))
         else:
-            if not window.busy:
+            if not window.busy and not (window.desktop.requested_enabled or window.desktop.session.running):
                 window.reload()
             window.present()
         return 0
+    def shutdown(application):
+        for window in application.get_windows():
+            if isinstance(window, ControlWindow):
+                window.shutdown()
     app.connect("activate", activate)
     app.connect("command-line", command_line)
+    app.connect("shutdown", shutdown)
     argv = ["mx4-linux"]
     if show_ring:
         argv.append("--ring")

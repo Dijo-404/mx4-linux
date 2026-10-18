@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 
 pytest.importorskip("gi")
-from mx4_linux.gtk_support import Adw, Gio, GLib, Gtk
+from mx4_linux.gtk_support import Adw, Gdk, Gio, GLib, Gtk
 from mx4_linux.backend import BackendError
 from mx4_linux.gui import ControlWindow
 
@@ -40,6 +40,131 @@ def window(tmp_path, monkeypatch):
 
 def setting(window, name):
     return next(item for item in window.current["settings"] if item["name"] == name)
+
+
+def test_close_keeps_enabled_listener_and_reopens_existing_controls(window, monkeypatch):
+    from mx4_linux.gui import _control_window
+
+    application = window.get_application()
+    window.navigate("point")
+    window.select_target("pointer")
+    control = window.setting_widgets[("dpi", None)][0]
+    window.desktop.requested_enabled = True
+    window.desktop.session.ready = True
+    window.desktop._active_revision = window.desktop._context_revision
+    monkeypatch.setattr(window.desktop, "open_ring", Mock())
+    monkeypatch.setattr(window.desktop.session, "stop", Mock())
+    try:
+        window.set_visible(True)
+        assert window.on_close()
+        assert not window.get_visible()
+        assert not window.closed
+        assert window in application.get_windows()
+        window.desktop.session.stop.assert_not_called()
+        window.desktop.event({"type": "button", "control": window.desktop.config["ring_button"], "pressed": True})
+        window.desktop.open_ring.assert_called_once_with(held=True)
+        assert _control_window(application, demo=True) is window
+        window.present()
+        assert window.get_visible()
+        assert window.route == "point"
+        assert window.selected_target == "pointer"
+        assert window.setting_widgets[("dpi", None)][0] is control
+        window.backend.scan.assert_not_called()
+    finally:
+        window.shutdown()
+        window.destroy()
+
+
+def test_close_without_enabled_integration_exits_and_destroys_hidden_ring(window):
+    ring = Gtk.Window(application=window.get_application())
+    window.desktop.ring = ring
+    ring.hide_ring = Mock()
+    ring.dismiss = Mock()
+    application = window.get_application()
+    assert not window.desktop.requested_enabled
+    assert window.on_close()
+    assert window.closed and window.desktop.closed
+    assert window not in application.get_windows()
+    assert ring not in application.get_windows()
+
+
+def test_quit_and_disabled_background_wait_for_listener_restoration(window, monkeypatch):
+    window.desktop.requested_enabled = True
+    window.desktop.config["background"] = False
+    wait = Mock()
+    monkeypatch.setattr(window.desktop, "wait_stopped", wait)
+    application = window.get_application()
+    window.on_close()
+    assert window.quitting and not window.closed
+    assert not window.get_sensitive()
+    assert window in application.get_windows()
+    wait.assert_called_once()
+    submit = Mock()
+    monkeypatch.setattr(window.executor, "submit", submit)
+    window.job(lambda: None, lambda _: None, "Periodic refresh")
+    window.hardware_job(lambda: None, lambda _: None, "Write requested while quitting")
+    submit.assert_not_called()
+    window.request_quit()
+    assert wait.call_count == 1
+    wait.call_args.args[0](True)
+    assert window.closed and window.desktop.closed
+    assert window not in application.get_windows()
+
+
+def test_explicit_quit_after_background_close_stops_integration(window, monkeypatch):
+    window.desktop.requested_enabled = True
+    window.on_close()
+    wait = Mock()
+    monkeypatch.setattr(window.desktop, "wait_stopped", wait)
+    window.request_quit()
+    assert window.quitting and not window.closed
+    wait.call_args.args[0](True)
+    assert window.closed
+    assert not window.desktop.requested_enabled
+
+
+def test_cancelled_quit_preserves_editor_draft_and_does_not_arm_later_close(window, monkeypatch):
+    from mx4_linux.desktop_editor import DesktopEditor
+
+    editor = DesktopEditor(window, window.desktop.store, lambda: None)
+    window.desktop.editor = editor
+    editor.dirty = True
+    editor.present()
+    wait = Mock()
+    monkeypatch.setattr(window.desktop, "wait_stopped", wait)
+    try:
+        window.request_quit()
+        assert editor.close_dialog is not None
+        editor.close_dialog.response("cancel")
+        assert editor.dirty and editor.get_visible()
+        assert not window.quitting
+        wait.assert_not_called()
+        editor.allow_close = True
+        editor.close()
+        wait.assert_not_called()
+    finally:
+        editor.destroy()
+        window.desktop.editor = None
+
+
+def test_discarding_editor_draft_completes_explicit_quit(window, monkeypatch):
+    from mx4_linux.desktop_editor import DesktopEditor
+
+    editor = DesktopEditor(window, window.desktop.store, lambda: None)
+    window.desktop.editor = editor
+    editor.dirty = True
+    editor.present()
+    wait = Mock()
+    monkeypatch.setattr(window.desktop, "wait_stopped", wait)
+    try:
+        window.request_quit()
+        editor.close_dialog.response("discard")
+        assert window.quitting
+        wait.assert_called_once()
+        wait.call_args.args[0](True)
+        assert window.closed
+    finally:
+        editor.destroy()
 
 
 def test_confirmed_edit_updates_existing_widget_without_scan(window):
@@ -103,6 +228,35 @@ def test_hardware_job_keeps_action_cancellation_available(window):
     settle(window)
 
 
+def test_device_job_reenables_integration_in_visible_editor(window, monkeypatch):
+    import threading
+    from mx4_linux.desktop_editor import DesktopEditor
+
+    monkeypatch.setattr(window, "demo", False)
+    editor = DesktopEditor(window, window.desktop.store, lambda: None)
+    window.desktop.editor = editor
+    release = threading.Event()
+    try:
+        editor.set_visible(True)
+        assert editor.integration_toggle.get_sensitive()
+
+        def work():
+            assert release.wait(3)
+
+        window.job(work, lambda _result: None, "Reading settings…")
+        assert not editor.integration_toggle.get_sensitive()
+        release.set()
+        settle(window)
+        assert editor.integration_toggle.get_sensitive()
+        assert editor.integration_toggle.get_label() == "Enable"
+    finally:
+        release.set()
+        if window.busy:
+            settle(window)
+        window.desktop.editor = None
+        editor.close()
+
+
 def test_unchanged_value_does_not_write(window):
     window.backend.write = Mock()
     window.change(setting(window, "dpi"), 1000)
@@ -130,13 +284,103 @@ def test_uncertain_related_readback_refreshes_before_saving_profiles(window):
 
 
 def test_battery_tick_is_lightweight_and_failure_clears_old_percent(window):
+    window.status.set_text("Profile saved.")
     window.backend.battery = Mock(side_effect=BackendError('asleep'))
     window.refresh_battery()
+    assert window.status.get_text() == "Profile saved."
     settle(window)
     window.backend.battery.assert_called_once_with('demo', 'demo:mx-master-4')
     assert window.current['battery_percent'] is None
     assert window.current['battery_observed_at'] is None
+    assert window.status.get_text() == "Profile saved."
+    assert window.shell.device_battery.get_text() == "Battery unavailable"
     window.backend.scan.assert_not_called()
+
+
+def test_battery_refresh_updates_labels_without_replacing_operation_notice(window):
+    window.status.set_text("Sensitivity saved.")
+    window.backend.battery = Mock(return_value={"battery": "Battery: 75%", "battery_percent": 75,
+                                               "battery_observed_at": 12345})
+    window.refresh_battery()
+    assert window.status.get_text() == "Sensitivity saved."
+    settle(window)
+    assert window.current["battery_percent"] == 75
+    assert window.current["battery_observed_at"] == 12345
+    assert window.shell.device_battery.get_text() == "Battery: 75%"
+    assert "Battery: 75%" in window.shell.home_battery.get_text()
+    assert window.status.get_text() == "Sensitivity saved."
+    assert not window.spinner.get_visible()
+    window.backend.scan.assert_not_called()
+
+
+def test_escape_closes_inspector_then_returns_to_previous_page(window):
+    window.navigate("buttons")
+    window.navigate("point")
+    window.select_target("pointer")
+    assert window._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert window.route == "point" and window.selected_target is None
+    assert window._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert window.route == "buttons"
+    assert window._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert window.route == "home"
+    assert not window._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert not window.closed
+    window.backend.scan.assert_not_called()
+
+
+def test_back_restores_previous_inspector_after_opening_another_page(window):
+    window.navigate("point")
+    window.select_target("pointer")
+    window.navigate("profiles")
+    window.go_back()
+    assert window.route == "point" and window.selected_target == "pointer"
+    assert window.shell.inspector_stack.get_visible_child_name() == "pointer"
+
+
+def test_escape_returns_from_configuration_to_device_settings(window):
+    window.navigate("settings")
+    window.navigate("configuration")
+    assert window._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert window.route == "settings"
+    assert window.shell.inspector_stack.get_visible_child_name() == "device-settings"
+    assert window._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert window.route == "home"
+
+
+def test_dismissing_device_settings_returns_to_previous_menu_without_loop(window):
+    window.navigate("buttons")
+    window.navigate("settings")
+    window.close_inspector()
+    assert window.route == "buttons"
+    window.go_back()
+    assert window.route == "home"
+
+
+def test_escape_ignores_modifiers_and_other_keys(window):
+    window.navigate("point")
+    assert not window._key_pressed(None, Gdk.KEY_Escape, 0, Gdk.ModifierType.CONTROL_MASK)
+    assert not window._key_pressed(None, Gdk.KEY_Left, 0, 0)
+    assert window.route == "point"
+
+
+def test_escape_leaves_modal_dialog_in_control(window):
+    window.navigate("point")
+    dialog = Gtk.Window(transient_for=window, modal=True)
+    try:
+        dialog.set_visible(True)
+        assert not window._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+        assert window.route == "point"
+        assert dialog.get_visible()
+    finally:
+        dialog.destroy()
+
+
+def test_escape_leaves_focused_native_popover_in_control(window, monkeypatch):
+    window.navigate("point")
+    popover = window.shell.utility_menu.get_popover()
+    monkeypatch.setattr(window, "get_focus", lambda: popover.get_child().get_first_child())
+    assert not window._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert window.route == "point"
 
 
 def test_remember_opt_in_and_confirmed_changes_preserve_target(window):
