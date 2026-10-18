@@ -26,6 +26,7 @@ class EventSession:
         self._lock = threading.RLock()
         self._feedback_time = 0
         self._config_id = 0
+        self.restored = None
 
     @property
     def running(self):
@@ -52,9 +53,11 @@ class EventSession:
                 self._stop_process(process, session_id)
                 return False
 
-    def start(self, device_id, config):
+    def start(self, device_id, config, expected_stable_id=None):
         controls = sorted({config["ring_button"], *map(int, config["button_bindings"])})
         request = {"device_id": device_id, "controls": controls, "ring_button": config["ring_button"], "raw_xy": True}
+        if expected_stable_id is not None:
+            request["expected_stable_id"] = expected_stable_id
         _validate(request)
         with self._lock:
             if self.running:
@@ -69,6 +72,7 @@ class EventSession:
             self.ready, self.stopping = False, False
             self._feedback_time = 0
             self._config_id = 0
+            self.restored = None
         errors = deque(maxlen=8)
         errors_lock = threading.Lock()
 
@@ -147,7 +151,15 @@ class EventSession:
                     with errors_lock:
                         detail = " ".join(errors)
                     self._emit(process, session_id, {"type": "error", "message": "Mouse listener exited unexpectedly. " + detail})
-                self._emit(process, session_id, {**(stopped_event or {"type": "stopped"}), "exit_code": code})
+                restored = stopped_event.get("restored") if stopped_event else None
+                restored = restored if type(restored) is bool else None
+                if code != 0:
+                    restored = None
+                with self._lock:
+                    if self._current(process, session_id):
+                        self.restored = restored
+                self._emit(process, session_id, {**(stopped_event or {"type": "stopped"}),
+                                                "restored": restored, "exit_code": code})
 
         threading.Thread(target=events, daemon=True, name="mx4-event-reader").start()
 

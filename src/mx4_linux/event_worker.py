@@ -21,6 +21,7 @@ import threading
 import time
 
 from .device_worker import _device_id, _devices, _isolated_solaar, _load_solaar
+from .reporting_state import Ownership, configuration_lock, require_identity
 
 
 ALLOWED_CONTROLS = frozenset((82, 83, 86, 195, 196, 416))
@@ -180,7 +181,7 @@ def _selected_keys(dev, api, controls, ring, raw_xy):
     return result
 
 
-def _play_haptic(dev, api, waveform, cached):
+def _play_haptic(dev, api, waveform, cached, expected_stable_id=None):
     if type(waveform) is not int or not 0 <= waveform <= 255:
         raise ValueError("waveform must be an integer between 0 and 255")
     if not cached:
@@ -195,11 +196,55 @@ def _play_haptic(dev, api, waveform, cached):
     setting = cached[0]
     if waveform not in [int(choice) for choice in setting.choices]:
         raise ValueError("This waveform is not supported by the device")
+    require_identity(dev, expected_stable_id)
     if setting.write(waveform, save=False) is None:
         raise RuntimeError("Device did not acknowledge haptic playback")
 
 
-def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
+def recover_reporting(dev, api, ownership):
+    """Validate every orphan before restoring only our durable touched bits."""
+    record = ownership.read()
+    if record is None:
+        return
+    require_identity(dev, ownership.stable_id)
+    controls = [item["cid"] for item in record["controls"]]
+    selected = {int(key._cid): (key, flags, mapping) for key, flags, mapping in
+                _selected_keys(dev, api, controls, 416, False)}
+    for item in record["controls"]:
+        key, _flags, mapping = selected[item["cid"]]
+        if mapping != item["mapping"]:
+            raise RuntimeError("Previous reporting mapping conflicts with the current mouse; recovery remains pending.")
+        if item["touched"] & 16 and api.hidpp20.KeyFlag.RAW_XY not in key.flags:
+            raise RuntimeError("Previous raw reporting capability is unavailable; recovery remains pending.")
+    failures = []
+    for item in reversed(record["controls"]):
+        key = selected[item["cid"]][0]
+        try:
+            flags, mapping = _reporting(dev, api, key)
+            if mapping != item["mapping"]:
+                raise RuntimeError("Mapping changed during reporting restoration")
+            write_errors = []
+            for bit, setter in ((16, key.set_rawXY_reporting), (1, key.set_diverted)):
+                if item["touched"] & bit and flags & bit != item["flags"] & bit:
+                    try:
+                        ownership.touch(item["cid"], item["flags"], item["mapping"], bit)
+                        require_identity(dev, ownership.stable_id)
+                        setter(bool(item["flags"] & bit))
+                    except Exception as exc:
+                        # Continue restoring other owned bits; addressed readback
+                        # decides whether a lost ACK actually left an orphan.
+                        write_errors.append(str(exc))
+            actual, mapping = _reporting(dev, api, key)
+            if actual & item["touched"] != item["flags"] & item["touched"] or mapping != item["mapping"]:
+                raise RuntimeError("Reporting restoration was not confirmed" + (": " + "; ".join(write_errors) if write_errors else ""))
+        except Exception as exc:
+            failures.append(f"control {item['cid']}: {exc}")
+    if failures:
+        raise RuntimeError("Could not restore mouse reporting; wake/reconnect this mouse and retry recovery. " + "; ".join(failures))
+    ownership.clear()
+
+
+def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, ownership, outcome):
     feature = api.hidpp20_constants.SupportedFeature.REPROG_CONTROLS_V4
     index = dev.features[feature] if dev.features is not None else None
     if type(index) is not int or not 0 < index < 256:
@@ -246,6 +291,8 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
                 if flags & bit != desired & bit:
                     # A timed-out write can already have changed the firmware.
                     snapshots[cid][3] |= bit
+                    ownership.touch(cid, snapshots[cid][1], snapshots[cid][2], bit)
+                    require_identity(dev, ownership.stable_id)
                     setter(bool(desired & bit))
                     if decoder.active and decoder.pressed & relevant:
                         raise RuntimeError("A mouse control was pressed during reporting configuration; stopping safely")
@@ -286,7 +333,7 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
                     break
                 elif command.get("op") == "haptic":
                     try:
-                        _play_haptic(dev, api, command.get("waveform"), haptic)
+                        _play_haptic(dev, api, command.get("waveform"), haptic, ownership.stable_id)
                     except ValueError as error:
                         emit({"type": "warning", "source": "haptic", "message": str(error)})
                 elif command.get("op") == "configure":
@@ -319,24 +366,11 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event):
                 heartbeat = time.monotonic() + _HEARTBEAT_SECONDS
     finally:
         decoder.release()
-        failures = []
-        for key, flags, mapping, changed in reversed(tuple(snapshots.values())):
-            for bit, setter in ((raw, key.set_rawXY_reporting), (diversion, key.set_diverted)):
-                if changed & bit:
-                    try:
-                        setter(bool(flags & bit))
-                    except Exception as error:
-                        failures.append(f"control {key._cid}: {error}")
-            if changed:
-                try:
-                    actual, actual_mapping = _reporting(dev, api, key)
-                    if actual & changed != flags & changed or actual_mapping != mapping:
-                        raise RuntimeError("Reporting restoration was not confirmed")
-                except Exception as error:
-                    failures.append(f"control {key._cid}: {error}")
-        owner.handle = original
-        if failures:
-            raise RuntimeError("Could not restore mouse reporting: " + "; ".join(failures))
+        try:
+            recover_reporting(dev, api, ownership)
+            outcome[0] = True
+        finally:
+            owner.handle = original
 
 
 def run(request, api=None, commands=None, emit=None, stop_event=None):
@@ -352,6 +386,7 @@ def run(request, api=None, commands=None, emit=None, stop_event=None):
             # The parent disappeared. Finish restoration with stdout closed.
             stop_event.set()
 
+    outcome = [None]
     try:
         target, controls, ring, raw_xy = _validate(request)
         with contextlib.redirect_stdout(sys.stderr):
@@ -366,7 +401,11 @@ def run(request, api=None, commands=None, emit=None, stop_event=None):
                             continue
                         if not dev.online:
                             raise RuntimeError("Mouse is offline; wake it and scan again")
-                        _listen(dev, api, controls, ring, raw_xy, commands, send, stop_event)
+                        stable_id = require_identity(dev, request.get("expected_stable_id"))
+                        with configuration_lock(stable_id), Ownership(stable_id) as ownership:
+                            outcome[0] = False
+                            recover_reporting(dev, api, ownership)
+                            _listen(dev, api, controls, ring, raw_xy, commands, send, stop_event, ownership, outcome)
                         return True
                 detail = "; ".join(item["message"] for item in diagnostics)
                 raise RuntimeError("Selected mouse is unavailable; scan again" + (": " + detail if detail else ""))
@@ -377,7 +416,7 @@ def run(request, api=None, commands=None, emit=None, stop_event=None):
         send({"type": "error", "message": str(error) or type(error).__name__})
         return False
     finally:
-        send({"type": "stopped"})
+        send({"type": "stopped", "restored": outcome[0]})
 
 
 def _read_commands(stream, commands):
@@ -426,7 +465,7 @@ def main():
             _validate(request)
         except (ValueError, UnicodeError) as error:
             emit({"type": "error", "message": str(error)})
-            emit({"type": "stopped"})
+            emit({"type": "stopped", "restored": None})
             return
         threading.Thread(target=_read_commands, args=(stream, commands), daemon=True, name="mx4-event-commands").start()
         run(request, commands=commands, emit=emit, stop_event=stop_event)

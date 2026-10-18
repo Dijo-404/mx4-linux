@@ -81,7 +81,10 @@ def main(argv=None):
                 value = json.loads(args.value)
             except ValueError as exc:
                 raise BackendError("Use an integer choice ID or a JSON boolean (true/false).") from exc
-            result = Backend().write(args.device, args.setting, value, args.key)
+            backend = Backend()
+            device = select_device(backend.scan(), args.device)
+            result = backend.write(device["id"], args.setting, value, args.key,
+                                   expected_stable_id=device.get("stable_id"))
         elif args.command == "actions":
             from .actions import DesktopActions, DesktopConfigStore, validate_config, MAX_CONFIG_BYTES
             store = DesktopConfigStore()

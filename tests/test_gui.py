@@ -28,6 +28,7 @@ def window(tmp_path, monkeypatch):
         pytest.skip("A graphical session is needed for native control tests")
     Adw.init()
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     app = Adw.Application(application_id=f"io.github.mx4linux.GuiTests.t{uuid4().hex}", flags=Gio.ApplicationFlags.NON_UNIQUE)
     app.register(None)
     window = ControlWindow(app, demo=True)
@@ -126,3 +127,67 @@ def test_uncertain_related_readback_refreshes_before_saving_profiles(window):
     settle(window)
     window.backend.scan.assert_called_once()
     assert window.current is None
+
+
+def test_battery_tick_is_lightweight_and_failure_clears_old_percent(window):
+    window.backend.battery = Mock(side_effect=BackendError('asleep'))
+    window.refresh_battery()
+    settle(window)
+    window.backend.battery.assert_called_once_with('demo', 'demo:mx-master-4')
+    assert window.current['battery_percent'] is None
+    assert window.current['battery_observed_at'] is None
+    window.backend.scan.assert_not_called()
+
+
+def test_remember_opt_in_and_confirmed_changes_preserve_target(window):
+    window.remember_current(True)
+    settle(window)
+    window.setting_widgets[('dpi', None)][0].set_selected(3)
+    settle(window)
+    assert window.remembered.get(window.current, demo=True)['settings']['dpi'] == 1600
+    window.remember_current(False)
+    settle(window)
+    assert window.remembered.get(window.current, demo=True) is None
+    window.backend.scan.assert_not_called()
+
+
+def test_switch_waits_for_restoration_and_cancel_invalidates_pending_request(window):
+    pending = []
+    window.desktop.wait_stopped = lambda callback, **_kw: pending.append(callback)
+    window.backend.switch_host = Mock(return_value={'message': 'Switch requested; mouse may disconnect.'})
+    window.request_host_switch(1)
+    assert pending and not window.backend.switch_host.called
+    window.cancel_hardware()
+    pending[0](True)
+    assert not window.backend.switch_host.called
+
+
+@pytest.mark.parametrize('restored', [False, None])
+def test_unconfirmed_restoration_prevents_computer_switch(window, restored):
+    window.desktop.wait_stopped = lambda callback, **_kw: callback(restored)
+    window.backend.switch_host = Mock()
+    window.request_host_switch(1)
+    assert not window.backend.switch_host.called
+    assert 'not confirmed' in window.status.get_text()
+
+
+def test_valid_switch_stays_unconfirmed_and_does_not_change_channel(window):
+    window.backend.switch_host = Mock(return_value={'message': 'Switch requested; mouse may disconnect.'})
+    window.request_host_switch(1)
+    settle(window)
+    window.backend.switch_host.assert_called_once_with('demo', 1, 'demo:mx-master-4')
+    assert window.current['easy_switch']['current'] == 0
+    assert window.status.get_text() == 'Switch requested; mouse may disconnect.'
+
+
+def test_native_remap_waits_for_restoration_before_any_write(window):
+    pending = []
+    window.desktop.wait_stopped = lambda callback, **_kw: pending.append(callback)
+    window.backend.write = Mock(return_value={'ok': True, 'value': 86})
+    mapping = setting(window, 'reprogrammable-keys')
+    window.change(mapping, 86, 83)
+    window.backend.write.assert_not_called()
+    pending[0](True)
+    settle(window)
+    window.backend.write.assert_called_once()
+    assert mapping['value']['83'] == 86

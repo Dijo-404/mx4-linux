@@ -14,6 +14,16 @@ from mx4_linux.ring_model import RingState
 @pytest.fixture
 def controller():
     value = DesktopController.__new__(DesktopController)
+    value.cancelled = threading.Event()
+    value.hardware_paused = False
+    value.requested_enabled = False
+    value.target_identity = None
+    value._intent_generation = 0
+    value.reconnect_source = value.reconnect_attempt = 0
+    value._reconnect_busy = False
+    value._stop_waiters = []
+    value.restoration_confirmed = None
+    value.starting = False
     value.closed = False
     value._event_lock = threading.Lock()
     value._event_queue = deque()
@@ -31,7 +41,7 @@ def controller():
     value.context_available = None
     value._context_token = value._context_revision = value._active_revision = 0
     value._pending_configs = {}
-    value.window = SimpleNamespace(demo=False, current={"id": "mouse", "online": True})
+    value.window = SimpleNamespace(demo=False, current={"id": "mouse", "online": True, "stable_id": "unit:a1b2c3d4"})
     value.ring = SimpleNamespace(state=SimpleNamespace(visible=True), dismiss=Mock(), release_button=Mock(), motion=Mock())
     value.notify = Mock()
     value.target = {"window_id": 10}
@@ -178,7 +188,7 @@ def runtime(controller):
     value.action_busy = False
     value.actions = Mock()
     value.cancelled = threading.Event()
-    value.window = SimpleNamespace(demo=False, current={'id': 'mouse', 'online': True}, update_desktop_status=Mock())
+    value.window = SimpleNamespace(demo=False, current={'id': 'mouse', 'online': True, 'stable_id': 'unit:a1b2c3d4'}, update_desktop_status=Mock())
     value.session.configure = Mock(return_value=1)
     value.session.feedback = Mock()
     value.session.stop = Mock()
@@ -849,3 +859,107 @@ def test_no_target_general_command_adjustment_remains_available(wheel_runtime, m
     proof.timers.pop()()
     proof.finish()
     assert [call[1] for call in proof.calls] == ['copy']
+
+
+def test_unknown_restoration_never_reports_restored(controller):
+    controller.event({'type': 'stopped', 'restored': None})
+    assert 'not confirmed' in controller.notify.call_args.args[0]
+
+
+def test_manual_stop_cancels_requested_resume_and_pending_callbacks(controller):
+    controller.requested_enabled = True
+    controller._intent_generation = 3
+    controller.reconnect_source = 0
+    controller._stop_waiters = []
+    controller.stop()
+    assert controller.requested_enabled is False
+    assert controller._intent_generation == 4
+
+
+def test_wait_stopped_uses_final_restoration_outcome_after_exit(runtime, monkeypatch):
+    callbacks, seen = [], []
+    runtime.session.running = True
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda _ms, fn: callbacks.append(fn) or len(callbacks))
+    runtime.wait_stopped(seen.append)
+    assert seen == []
+    runtime.session.running = runtime.session.stopping = False
+    runtime.event({'type': 'stopped', 'restored': False})
+    assert seen == [False]
+    callbacks[0]()
+    assert seen == [False]
+
+
+def test_reconnect_same_unit_new_connection_recovers_then_starts_once(runtime, monkeypatch):
+    runtime.window.busy = False
+    runtime.requested_enabled = True
+    runtime.hardware_paused = False
+    runtime.target_identity = 'unit:a1b2c3d4'
+    runtime.config['resume_integration'] = True
+    runtime.session.running = runtime.session.stopping = False
+    device = {'id': 'new-connection', 'online': True, 'stable_id': 'unit:a1b2c3d4', 'settings': []}
+    result = {'devices': [dict(device, id='other', stable_id='unit:d1e2f3a4'), device], 'diagnostics': []}
+    runtime.window.backend = SimpleNamespace(scan=Mock(return_value=result), recover=Mock())
+    runtime.window.render = Mock()
+    runtime.window.job = lambda work, done, _msg, failed: done(work())
+    runtime.start = Mock()
+    replay = Mock(return_value=0)
+    monkeypatch.setattr('mx4_linux.profiles.replay_remembered', replay)
+    runtime._reconnect(runtime._intent_generation)
+    runtime.window.backend.recover.assert_called_once_with('new-connection', 'unit:a1b2c3d4')
+    assert replay.call_count == 1
+    assert runtime.window.selected_id == 'new-connection'
+    runtime.start.assert_called_once_with(automatic=True)
+
+
+def test_manual_stop_while_reconnect_probe_pending_prevents_recovery_replay_start(runtime, monkeypatch):
+    runtime.window.busy = False
+    runtime.requested_enabled = True
+    runtime.hardware_paused = False
+    runtime.target_identity = 'unit:a1b2c3d4'
+    runtime.session.running = runtime.session.stopping = False
+    device = {'id': 'mouse', 'online': True, 'stable_id': 'unit:a1b2c3d4', 'settings': []}
+    runtime.window.backend = SimpleNamespace(scan=Mock(return_value={'devices': [device]}), recover=Mock())
+    queued = []
+    runtime.window.job = lambda work, done, _msg, failed: queued.append((work, done, failed))
+    runtime.start = Mock()
+    replay = Mock()
+    monkeypatch.setattr('mx4_linux.profiles.replay_remembered', replay)
+    runtime._reconnect(runtime._intent_generation)
+    runtime.stop()
+    with pytest.raises(RuntimeError, match='not awake'):
+        queued[0][0]()
+    queued[0][2]('cancelled')
+    runtime.window.backend.recover.assert_not_called()
+    replay.assert_not_called()
+    runtime.start.assert_not_called()
+    assert not runtime._reconnect_busy
+
+
+def test_reconnect_budget_and_preference_are_bounded(runtime, monkeypatch):
+    scheduled = []
+    runtime.requested_enabled = True
+    runtime.hardware_paused = False
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda delay, fn: scheduled.append((delay, fn)) or len(scheduled))
+    runtime._schedule_reconnect()
+    assert scheduled == []  # Opt in is required.
+    runtime.config['resume_integration'] = True
+    for index, seconds in enumerate((1, 2, 5, 10, 20, 30)):
+        runtime.reconnect_source = 0
+        runtime.reconnect_attempt = index
+        runtime._schedule_reconnect()
+        assert scheduled[-1][0] == seconds * 1000
+    runtime.reconnect_source = 0
+    runtime.reconnect_attempt = 6
+    runtime._schedule_reconnect()
+    assert len(scheduled) == 6
+    assert 'enable integration to retry' in runtime.notify.call_args.args[0]
+
+
+def test_explicit_recovery_can_clear_prior_unknown_stop_for_next_operation(runtime):
+    runtime.session.running = runtime.session.stopping = False
+    runtime.session.process = object()
+    runtime.session.restored = None
+    runtime.restoration_confirmed = True  # Confirmed by a separate same-unit recovery operation.
+    seen = []
+    runtime.wait_stopped(seen.append)
+    assert seen == [True]

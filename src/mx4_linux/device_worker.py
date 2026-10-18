@@ -11,11 +11,15 @@ import errno
 import importlib
 import json
 import logging
+import math
 import os
 import re
 import struct
 import sys
+import time
 from types import SimpleNamespace
+
+from .reporting_state import Ownership, configuration_lock, require_identity, stable_identity, valid_identity
 
 
 ALLOWED_SETTINGS = (
@@ -198,6 +202,10 @@ def _describe_setting(setting, dev, api):
     if kind == "range":
         minimum, maximum = setting.range
         result.update(minimum=int(minimum), maximum=int(maximum))
+        if setting.name == "force-sensing":
+            default = getattr(button, "default", None)
+            if type(default) is int and minimum <= default <= maximum:
+                result["default"] = default
     elif kind == "choice":
         result["choices"] = _choice_items(setting.choices)
     elif kind == "map_choice":
@@ -303,6 +311,114 @@ def _devices(api, diagnostics, target_id=None):
                     diagnostics.append(_diagnostic(info.path, error))
 
 
+def _battery(dev):
+    result = {"battery": None, "battery_percent": None, "battery_observed_at": None}
+    battery = dev.battery()
+    if battery is not None:
+        result["battery"] = battery.to_str() or None
+        level = getattr(battery, "level", None)
+        # Approximate enum levels can be inferred from status. They are not percentages.
+        if type(level) in (int, float) and math.isfinite(level) and 0 <= level <= 100:
+            result.update(battery_percent=level, battery_observed_at=time.time())
+    return result
+
+
+def _easy_switch(dev):
+    """GET-only host metadata; Solaar's get_host_names also SETS the local name."""
+    result = {"supported": False, "count": 0, "current": None, "hosts": []}
+    features = getattr(dev, "features", None)
+    if features is None or 0x1814 not in features:
+        return result
+    reply = dev.feature_request(0x1814, 0x00)
+    if not isinstance(reply, bytes) or len(reply) < 2:
+        raise RuntimeError("Easy-Switch channel information is unavailable")
+    count, current = reply[:2]
+    if not 1 <= count <= 3 or not 0 <= current < count:
+        raise RuntimeError("Easy-Switch channel information is invalid")
+    result.update(supported=True, count=count, current=current)
+    hosts = [{"index": i, "name": f"Computer {i + 1}", "paired": None} for i in range(count)]
+    result["hosts"] = hosts
+    if 0x1815 not in features:
+        return result
+    state = dev.feature_request(0x1815, 0)
+    if not isinstance(state, bytes) or len(state) < 4:
+        return result
+    if state[2] != count or state[3] != current:
+        raise RuntimeError("Easy-Switch host information changed; refresh before switching")
+    for host in hosts:
+        index = host["index"]
+        try:
+            info = dev.feature_request(0x1815, 0x10, index)
+            if not isinstance(info, bytes) or len(info) < 6 or info[0] != index or info[1] not in (0, 1):
+                continue
+            length, maximum = info[4:6]
+            if length > maximum or length > 96:
+                continue
+            host["paired"] = bool(info[1])
+            if not state[0] & 1 or not length:
+                continue
+            chunks = []
+            for offset in range(0, length, 14):
+                part = dev.feature_request(0x1815, 0x30, index, offset)
+                size = min(14, length - offset)
+                if not isinstance(part, bytes) or len(part) < 2 + size or part[:2] != bytes((index, offset)):
+                    raise ValueError("Invalid host-name chunk")
+                chunks.append(part[2:2 + size])
+            name = b"".join(chunks).decode('utf-8')
+            if name.strip() and all(c.isprintable() for c in name):
+                host["name"] = name
+        except Exception:
+            # Names are optional; a failed name read must not disappear the device.
+            continue
+    return result
+
+
+def _target_request(request, api):
+    if not valid_identity(request.get("expected_stable_id")):
+        raise ValueError("A verified expected mouse identity is required")
+    target = request.get("device_id")
+    if not isinstance(target, str) or not target or len(target) > 1024:
+        raise ValueError("A valid device_id is required")
+    diagnostics = []
+    with contextlib.closing(_devices(api, diagnostics, target)) as devices:
+        for dev, path in devices:
+            if _device_id(path, dev.number) != target:
+                continue
+            if not dev.online:
+                raise RuntimeError("Mouse is offline; wake it and refresh")
+            identity = require_identity(dev, request.get("expected_stable_id"))
+            op = request["op"]
+            if op == "battery":
+                try:
+                    return {"ok": True, "stable_id": identity, **_battery(dev)}
+                except Exception:
+                    return {"ok": True, "stable_id": identity, "battery": None,
+                            "battery_percent": None, "battery_observed_at": None}
+            with configuration_lock(identity), Ownership(identity) as ownership:
+                if op == "recover":
+                    from .event_worker import recover_reporting
+                    if not hasattr(api, 'hidpp20'):
+                        api.hidpp20 = importlib.import_module('logitech_receiver.hidpp20')
+                    recover_reporting(dev, api, ownership)
+                    return {"ok": True, "restored": True}
+                if ownership.read() is not None:
+                    raise RuntimeError("Previous mouse reporting needs recovery before switching computers")
+                host = request.get("index")
+                if type(host) is not int:
+                    raise ValueError("Host channel must be an integer")
+                metadata = _easy_switch(dev)
+                if not metadata["supported"] or not 0 <= host < metadata["count"]:
+                    raise ValueError("Host channel is unavailable")
+                if host == metadata["current"]:
+                    return {"ok": True, "requested": False, "message": "This computer is already selected."}
+                if metadata["hosts"][host]["paired"] is not True:
+                    raise ValueError("This channel has no confirmed paired computer; refresh before switching")
+                require_identity(dev, identity)
+                dev.feature_request(0x1814, 0x10, host, no_reply=True)
+                return {"ok": True, "requested": True, "message": "Switch requested; mouse may disconnect."}
+    raise RuntimeError("Selected mouse is unavailable; wake it and refresh")
+
+
 def _scan(api):
     devices, diagnostics = [], []
     with contextlib.closing(_devices(api, diagnostics)) as discovered:
@@ -313,16 +429,23 @@ def _scan(api):
                 "online": bool(dev.online),
                 "path": str(path),
                 "number": int(dev.number),
-                "battery": None,
+                "battery": None, "battery_percent": None, "battery_observed_at": None,
+                "stable_id": None, "identity_source": None,
+                "easy_switch": {"supported": False, "count": 0, "current": None, "hosts": []},
                 "settings": [],
             }
             if dev.online:
                 try:
-                    battery = dev.battery()
-                    if battery is not None:
-                        result["battery"] = battery.to_str() or None
+                    result.update(_battery(dev))
                 except Exception as error:
                     diagnostics.append(_diagnostic(path, RuntimeError(f"Battery: {error}")))
+                result["stable_id"] = stable_identity(dev)
+                if result["stable_id"]:
+                    result["identity_source"] = result["stable_id"].split(":", 1)[0]
+                try:
+                    result["easy_switch"] = _easy_switch(dev)
+                except Exception as error:
+                    diagnostics.append(_diagnostic(path, RuntimeError(f"Easy-Switch: {error}")))
                 for setting in _discover_settings(dev, api, path, diagnostics):
                     try:
                         descriptor = _describe_setting(setting, dev, api)
@@ -375,6 +498,8 @@ def _write(request, api):
                 continue
             if not dev.online:
                 raise RuntimeError("Device is offline; wake it and scan again")
+            if request.get("expected_stable_id") is not None:
+                require_identity(dev, request["expected_stable_id"])
             names = [name]
             if name in ("smart-shift", "scroll-ratchet"):
                 names.append("scroll-ratchet" if name == "smart-shift" else "smart-shift")
@@ -390,10 +515,16 @@ def _write(request, api):
                 raise ValueError("Setting is not editable on the connected device")
             value, key = request["value"], request.get("key")
             _validate_value(descriptor, value, key)
-            if descriptor["kind"] == "map_choice":
-                written = setting.write_key_value(key, value, save=False)
-            else:
-                written = setting.write(value, save=False)
+            lock = Ownership(require_identity(dev)) if name == "reprogrammable-keys" else contextlib.nullcontext()
+            with lock as ownership:
+                if ownership and ownership.read() is not None:
+                    raise RuntimeError("Recover previous button reporting before changing button mappings")
+                if request.get("expected_stable_id") is not None:
+                    require_identity(dev, request["expected_stable_id"])
+                if descriptor["kind"] == "map_choice":
+                    written = setting.write_key_value(key, value, save=False)
+                else:
+                    written = setting.write(value, save=False)
             if written is None:
                 raise RuntimeError("Device did not acknowledge the setting write")
             if name == "haptic-play":
@@ -432,13 +563,17 @@ def handle_request(request, api=None):
     try:
         if not isinstance(request, dict):
             raise ValueError("Request must be a JSON object")
-        if request.get("op") not in ("scan", "write"):
+        if request.get("op") not in ("scan", "write", "battery", "recover", "switch_host"):
             raise ValueError("Unknown operation; use scan or write")
         # Solaar and optional native dependencies may print during imports.
         with contextlib.redirect_stdout(sys.stderr):
             api = api or _load_solaar()
             with _isolated_solaar(api):
-                return _scan(api) if request["op"] == "scan" else _write(request, api)
+                if request["op"] == "scan":
+                    return _scan(api)
+                if request["op"] == "write":
+                    return _write(request, api)
+                return _target_request(request, api)
     except Exception as error:
         return {"ok": False, "error": str(error) or error.__class__.__name__}
 
