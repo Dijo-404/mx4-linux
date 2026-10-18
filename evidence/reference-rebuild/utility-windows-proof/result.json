@@ -1,0 +1,18 @@
+{
+  "mode": "private demo; all saved actions literal /usr/bin/true",
+  "input_emitted": false,
+  "hid_access": false,
+  "clipboard_access": false,
+  "audio_requested": false,
+  "stopwatch_presented": true,
+  "stopwatch_close_removes_timer": true,
+  "stopwatch_hide_removes_timer": true,
+  "tap_tempo_presented_measured_reset_closed": true,
+  "controller_shutdown_destroys_utilities_and_timer": true,
+  "ok": true,
+  "prior_focus_restored": true,
+  "source_commit": "83a2607b627f083940a5492d817441bb5cbcdb33",
+  "collection": "Owner-collected native private-demo Wayland proof; root inspected result and both app-only captures",
+  "proof_source_sha256": "8c09b7f0859b44e7b1332a0b46229f05ce9f796c7f8695ef3e28a210e22ca137",
+  "scope": "Actual native widget mapping and programmatically emitted GTK button callbacks, not human taps or synthetic desktop input. No clipboard/audio/HID operations."
+}
