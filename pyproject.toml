@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mx4-linux"
+version = "0.2.0"
+description = "A native Linux control panel for Logitech MX Master 4"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+dependencies = ["solaar==1.1.20"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+mx4-linux = "mx4_linux.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
