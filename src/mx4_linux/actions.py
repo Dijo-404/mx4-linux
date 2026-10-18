@@ -285,6 +285,20 @@ class ToggleState(MutableMapping):
     def __init__(self, entries=None):
         self.lock = threading.RLock()
         self._entries = dict(entries or {})
+        self.definitions = None
+
+    def observe_definitions(self, actions):
+        detached = deepcopy(actions)
+        with self.lock:
+            previous = self.definitions or {}
+            self.definitions = {
+                action_id: (previous[action_id] if action_id in previous and previous[action_id][0] == action
+                            else (action, object()))
+                for action_id, action in detached.items()}
+
+    def cycle_tokens(self):
+        with self.lock:
+            return {action_id: entry[1] for action_id, entry in (self.definitions or {}).items()}
 
     def __getitem__(self, key):
         with self.lock:
@@ -309,7 +323,7 @@ class ToggleState(MutableMapping):
 
 class ExecutionSelection:
     """One detached branch and its session-cycle commit token for an invocation."""
-    def __init__(self, action_id, action, adjustment=None, toggle_state=None):
+    def __init__(self, action_id, action, adjustment=None, toggle_state=None, *, cycle_token=None):
         self.action_id = action_id
         self.action = deepcopy(action)
         self.adjustment = adjustment
@@ -319,10 +333,17 @@ class ExecutionSelection:
         self.steps = deepcopy(execution_steps(self.action, adjustment, captured, action_id))
         definition, index = self.toggle_entry if self.toggle_entry is not None else (None, 0)
         self.toggle_index = index if definition == self.action else 0
-        self.current = True
+        definitions = getattr(state, "definitions", None)
+        definition, token = definitions.get(action_id, (None, None)) if definitions is not None else (None, None)
+        self.cycle_token = token
+        self.current = (definitions is None or
+                        (definition == self.action and (cycle_token is None or cycle_token is token)))
 
     def may_advance(self, config, toggle_state):
-        return (self.current and config["actions"].get(self.action_id) == self.action
+        definitions = getattr(toggle_state, "definitions", None)
+        same_generation = (definitions is None or
+                           definitions.get(self.action_id, (None, None))[1] is self.cycle_token)
+        return (self.current and same_generation and config["actions"].get(self.action_id) == self.action
                 and toggle_state.get(self.action_id) is self.toggle_entry)
 
 

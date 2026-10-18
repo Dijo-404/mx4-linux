@@ -442,3 +442,116 @@ def test_no_native_handler_keeps_preview_and_skipped_condition_effect_free(monke
     monkeypatch.setattr(actions, 'focused_context', lambda: {'app_id': 'other', 'window_id': 1})
     assert runner.execute('test')['skipped']
     earlier.assert_not_called()
+
+
+def test_failed_helper_cleanup_also_kills_descendant_after_leader_exit(monkeypatch):
+    import os
+    import signal
+    import sys
+    from mx4_linux import action_utilities
+    spawned = []
+    popen = action_utilities.subprocess.Popen
+    def spawn(*args, **kwargs):
+        child = popen(*args, **kwargs)
+        spawned.append(child)
+        return child
+    monkeypatch.setattr(action_utilities.subprocess, 'Popen', spawn)
+    # The owned leader exits only after its child installs its TERM handler.
+    # Child holds stdout open, simulating a wedged helper descendant.
+    code = '''import os,signal,time
+r,w=os.pipe()
+pid=os.fork()
+if pid:
+ os.close(w);os.read(r,1);os._exit(0)
+os.close(r);signal.signal(signal.SIGTERM,signal.SIG_IGN)
+os.write(w,b'1');os.close(w);time.sleep(30)
+'''
+    try:
+        with pytest.raises(RuntimeError, match='timed out'):
+            action_utilities.clipboard_process([sys.executable, '-c', code], lambda: None, limit=128)
+        assert spawned[0].poll() == 0
+        try:
+            os.killpg(spawned[0].pid, 0)
+        except ProcessLookupError:
+            return
+        pytest.fail('Failed helper descendant remains alive after leader exited and TERM was ignored')
+    finally:
+        if spawned:
+            try:
+                os.killpg(spawned[0].pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            spawned[0].wait()
+
+
+
+@pytest.mark.parametrize('leader_exits', [False, True])
+def test_failed_helper_group_cleanup_escalates_after_term_ignoring_descendant(monkeypatch, leader_exits):
+    import os
+    import signal
+    import sys
+    from mx4_linux import action_utilities
+    children = []
+    popen = action_utilities.subprocess.Popen
+    def spawn(*args, **kwargs):
+        child = popen(*args, **kwargs)
+        children.append(child)
+        return child
+    monkeypatch.setattr(action_utilities.subprocess, 'Popen', spawn)
+    code = '''import os,signal,time,sys
+r,w=os.pipe()
+pid=os.fork()
+if pid:
+ os.close(w);os.read(r,1)
+ if sys.argv[1]=='exit': os._exit(0)
+ time.sleep(30)
+else:
+ os.close(r);signal.signal(signal.SIGTERM,signal.SIG_IGN)
+ os.write(w,b'1');os.close(w);time.sleep(30)
+'''
+    try:
+        with pytest.raises(RuntimeError, match='timed out'):
+            action_utilities.clipboard_process([sys.executable, '-c', code, 'exit' if leader_exits else 'wait'],
+                                                lambda: None, limit=128)
+        assert children[0].poll() is not None
+        with pytest.raises(ProcessLookupError):
+            os.killpg(children[0].pid, 0)
+    finally:
+        if children:
+            try:
+                os.killpg(children[0].pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            children[0].wait()
+
+
+def test_successful_clipboard_helper_preserves_selection_owner_descendant(monkeypatch):
+    import os
+    import signal
+    import sys
+    from mx4_linux import action_utilities
+    children = []
+    popen = action_utilities.subprocess.Popen
+    def spawn(*args, **kwargs):
+        child = popen(*args, **kwargs)
+        children.append(child)
+        return child
+    monkeypatch.setattr(action_utilities.subprocess, 'Popen', spawn)
+    code = '''import os,time
+r,w=os.pipe()
+pid=os.fork()
+if pid:
+ os.close(w);os.read(r,1);os._exit(0)
+os.close(r);os.write(w,b'1');os.close(w);time.sleep(30)
+'''
+    try:
+        action_utilities.clipboard_process([sys.executable, '-c', code], lambda: None)
+        assert children[0].poll() == 0
+        os.killpg(children[0].pid, 0)  # Successful clipboard owners must survive their parent.
+    finally:
+        if children:
+            try:
+                os.killpg(children[0].pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            children[0].wait()

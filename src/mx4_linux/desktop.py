@@ -94,13 +94,16 @@ class DesktopController:
     def _toggle_session(self):
         if not isinstance(getattr(self, "_toggle_state", None), ToggleState):
             self._toggle_state = ToggleState(getattr(self, "_toggle_state", None))
+        if self._toggle_state.definitions is None:
+            self._toggle_state.observe_definitions((self.config or {}).get("actions", {}))
         return self._toggle_state
 
     def _reset_changed_toggles(self, document):
         state = self._toggle_session()
         with state.lock:
+            state.observe_definitions(document["actions"])
             selection = getattr(self, "_action_selection", None)
-            if selection is not None and selection.action != document["actions"].get(selection.action_id):
+            if selection is not None and state.cycle_tokens().get(selection.action_id) is not selection.cycle_token:
                 selection.current = False
             for action_id in tuple(state):
                 if state[action_id][0] != document["actions"].get(action_id):
@@ -510,6 +513,7 @@ class DesktopController:
         self._pending_motion = [0, 0]
         self._opening_motion.clear()
         document = deepcopy(self.config)
+        cycle_tokens = self._toggle_session().cycle_tokens()
         future = self.executor.submit(focused_context)
         def show():
             if self.closed or token != self._open_token:
@@ -536,6 +540,7 @@ class DesktopController:
                     self.notify("Application assignments changed; release and open the ring again.")
                     return GLib.SOURCE_REMOVE
                 self.target, self._ring_config = target, snapshot
+                self._ring_cycle_tokens = cycle_tokens
                 if self.ring is None:
                     from .ring import ActionsRing
                     self.ring = ActionsRing(self.window.get_application(), self.selected, self.dismissed, self.hovered, self.adjusted)
@@ -622,11 +627,12 @@ class DesktopController:
     def selected(self, action_id, preview):
         target = deepcopy(self.target)
         config = deepcopy(self._ring_config or self.effective_config or self.config)
+        cycle_token = getattr(self, "_ring_cycle_tokens", {}).get(action_id)
         self._stop_ring_context()
         self._cancel_adjustments()
         self.feedback("select", config=config, preview=preview)
         token = self._dispatch_token
-        self._selection_pending = (token, action_id, target, preview, config)
+        self._selection_pending = (token, action_id, target, preview, config, cycle_token)
         self._selection_ready = False
         def dispatch():
             if not self.closed and token == self._dispatch_token:
@@ -641,9 +647,10 @@ class DesktopController:
                 or getattr(self, "_adjustment_running", False)):
             return
         self._selection_pending = None
-        token, action_id, target, preview, config = selection
+        token, action_id, target, preview, config, cycle_token = selection
         if not self.closed and token == self._dispatch_token:
-            self.execute(action_id, target=target, preview=preview, config=config)
+            kwargs = {"cycle_token": cycle_token} if cycle_token is not None else {}
+            self.execute(action_id, target=target, preview=preview, config=config, **kwargs)
 
     def _cancel_adjustments(self):
         self._adjustment_token = getattr(self, "_adjustment_token", 0) + 1
@@ -809,7 +816,7 @@ class DesktopController:
             abandoned.set()
             raise
 
-    def execute(self, action_id, target=None, preview=False, config=None, adjustment=None, completed=None):
+    def execute(self, action_id, target=None, preview=False, config=None, adjustment=None, completed=None, cycle_token=None):
         if self.closed:
             return
         if (self.action_busy or self.opening
@@ -824,7 +831,8 @@ class DesktopController:
         state = self._toggle_session()
         try:
             with state.lock:
-                selection = ExecutionSelection(action_id, snapshot["actions"][action_id], adjustment, state)
+                selection = ExecutionSelection(action_id, snapshot["actions"][action_id], adjustment, state,
+                                               cycle_token=cycle_token)
                 self._action_selection = selection
         except (KeyError, RuntimeError) as exc:
             self.action_busy = False

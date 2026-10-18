@@ -1678,3 +1678,74 @@ def test_toggle_state_lock_is_not_held_across_action_effect(runtime, monkeypatch
         callbacks.pop(0)()
     assert futures[-1].result()['completed'] == 1
     assert 'test' not in runtime._toggle_state
+
+
+def test_stale_ring_snapshot_must_not_restart_cycle_after_prior_definition_reset(runtime, monkeypatch):
+    from mx4_linux import actions
+    cfg = actions.default_config()
+    old = {'label': 'Old action', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+           'toggle_steps': [[{'type': 'delay', 'milliseconds': 1}]]}
+    cfg['actions']['test'] = old
+    origin = {'app_id': 'editor', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime._toggle_state = actions.ToggleState({'test': (deepcopy(old), 1)})
+    newer = deepcopy(cfg)
+    newer['actions']['test']['label'] = 'Changed while a ring retained its detached document'
+    runtime.config = newer
+    runtime._reset_changed_toggles(newer)
+    assert 'test' not in runtime._toggle_state
+    effect = Mock(return_value={'type': 'delay'})
+    monkeypatch.setattr(actions.DesktopActions, '_step', effect)
+    # Production selected()/dispatch_selection() intentionally passes the ring's older document.
+    runtime.execute('test', target=origin, config=cfg)
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 1
+    # Pinned effects can complete; they must not establish obsolete future-cycle state.
+    assert 'test' not in runtime._toggle_state
+
+
+@pytest.mark.parametrize('change', ['edit', 'remove', 'change-back', 'remove-recreate'])
+def test_old_ring_cycle_token_survives_delayed_dispatch_without_advancing_future_cycle(runtime, monkeypatch, change):
+    from mx4_linux import actions
+    cfg = actions.default_config()
+    action = {'label': 'Original', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+        'toggle_steps': [[{'type': 'delay', 'milliseconds': 1}], [{'type': 'delay', 'milliseconds': 2}]]}
+    cfg['actions']['test'] = action
+    origin = {'app_id': 'editor', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    state = runtime._toggle_session()
+    runtime._reset_changed_toggles(cfg)
+    runtime.reconcile_config = Mock()
+    runtime._watch_ring_context = Mock()
+    runtime.ring.preview = False
+    runtime.ring.show_ring = Mock()
+    runtime.open_ring()
+    callbacks.pop(0)()
+    assert runtime._ring_cycle_tokens == state.cycle_tokens()
+    timeouts = []
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda _ms, fn: timeouts.append(fn))
+    runtime.selected('test', False)
+    newer = deepcopy(cfg)
+    if change in ('remove', 'remove-recreate'):
+        del newer['actions']['test']
+    else:
+        newer['actions']['test']['label'] = 'Changed definition'
+    runtime.config = newer
+    runtime._reset_changed_toggles(newer)
+    newer_entry = None
+    if change in ('change-back', 'remove-recreate'):
+        runtime.config = deepcopy(cfg)
+        runtime._reset_changed_toggles(cfg)
+        newer_entry = (deepcopy(action), 2)
+        state['test'] = newer_entry
+    effect = Mock(return_value={'type': 'delay'})
+    monkeypatch.setattr(actions.DesktopActions, '_step', effect)
+    timeouts.pop()()
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 1
+    if newer_entry is None:
+        assert 'test' not in state
+    else:
+        assert state['test'] is newer_entry
