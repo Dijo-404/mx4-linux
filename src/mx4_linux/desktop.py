@@ -758,14 +758,14 @@ class DesktopController:
             return GLib.SOURCE_REMOVE
         future.add_done_callback(lambda _: GLib.idle_add(finished))
 
-    def configure(self, cid=None):
+    def configure(self, cid=None, page="ring"):
         if self.action_busy:
             self.notify("Wait for or cancel the running routine before editing.")
             return
         self.stop()
         try:
             from .desktop_editor import present_desktop_editor
-            present_desktop_editor(self.window, self.store, self.saved, cid=cid)
+            present_desktop_editor(self.window, self.store, self.saved, cid=cid, page=page)
         except (RuntimeError, OSError) as exc:
             self.notify(str(exc))
 

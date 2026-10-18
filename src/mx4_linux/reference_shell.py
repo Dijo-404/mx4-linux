@@ -8,10 +8,12 @@ from pathlib import Path
 from .actions import resolve_config
 from .gtk_support import Adw, Gdk, Gtk
 from .mouse_view import ASSETS, BUTTONS, ModelPicture, MouseView
+from gi.repository import Pango
 
 DEVICE_ROUTES = {'buttons': 'Buttons', 'point': 'Point, Scroll, Press', 'haptics': 'Haptic Feedback',
                  'easy-switch': 'Easy-Switch', 'settings': 'Settings'}
 TITLES = {'home': 'MX4 Linux', **DEVICE_ROUTES, 'actions': 'Actions Ring & Smart Actions',
+          'ring': 'Actions Ring', 'smart-actions': 'Smart Actions', 'configuration': 'Local Configuration',
           'profiles': 'Mouse profiles', 'application': 'Application Settings', 'guide': 'Meet your MX Master 4'}
 TARGET_TITLES = {**{f'button:{cid}': item[0] for cid, item in BUTTONS.items()},
                  'wheel': 'Scroll wheel', 'thumb': 'Thumb wheel', 'pointer': 'Pointer speed',
@@ -41,6 +43,35 @@ def page_box(spacing=18):
 
 def scroll(child):
     return Gtk.ScrolledWindow(child=child, hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
+
+
+def bounded_dropdown(strings, *, accessible_name, max_chars=18):
+    """Keep closed controls small without changing exact model identities."""
+    choice = Gtk.DropDown.new_from_strings(strings)
+    choice.set_enable_search(True)
+    choice.update_property([Gtk.AccessibleProperty.LABEL], [accessible_name])
+    def factory(chars):
+        value = Gtk.SignalListItemFactory()
+        def setup(_factory, item):
+            item.set_child(Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END,
+                                     max_width_chars=chars, single_line_mode=True))
+        def bind(_factory, item):
+            text = item.get_item().get_string()
+            child = item.get_child()
+            child.set_text(text)
+            child.set_tooltip_text(text)
+            child.update_property([Gtk.AccessibleProperty.LABEL], [text])
+        value.connect('setup', setup)
+        value.connect('bind', bind)
+        return value
+    choice.set_factory(factory(max_chars))
+    choice.set_list_factory(factory(48))
+    def selected(widget, _property):
+        item = widget.get_selected_item()
+        widget.set_tooltip_text(item.get_string() if item else '')
+    choice.connect('notify::selected-item', selected)
+    selected(choice, None)
+    return choice
 
 
 class ReferenceShell:
@@ -73,8 +104,8 @@ class ReferenceShell:
         self.heading.set_single_line_mode(True)
         self.header.pack_start(self.heading)
         self.utilities = Gtk.Box(spacing=4)
-        for text, route, icon in [('Smart Actions', 'actions', 'emblem-ok-symbolic'),
-                                  ('Actions Ring', 'actions', 'view-grid-symbolic'),
+        for text, route, icon in [('Smart Actions', 'smart-actions', 'emblem-ok-symbolic'),
+                                  ('Actions Ring', 'ring', 'view-grid-symbolic'),
                                   ('Application Settings', 'application', 'emblem-system-symbolic')]:
             self.utilities.append(button(text, lambda route=route: window.navigate(route), icon=icon))
         self.header.pack_end(self.utilities)
@@ -94,12 +125,16 @@ class ReferenceShell:
         self.context_bar.append(Gtk.Image(icon_name='view-grid-symbolic'))
         self.context_label = label('Assignments for')
         self.context_bar.append(self.context_label)
-        self.context = Gtk.DropDown.new_from_strings(['General'])
+        self.context = bounded_dropdown(['General'], accessible_name='Assignment context')
         self.context.set_tooltip_text('Preview existing assignments for this application context')
         self.context.update_property([Gtk.AccessibleProperty.LABEL], ['Assignment context'])
         self.context.connect('notify::selected', self.context_changed)
         self.context_bar.append(self.context)
         self.context_detail = label('General', 'mx4-subtle')
+        self.context_detail.set_wrap(False)
+        self.context_detail.set_max_width_chars(24)
+        self.context_detail.set_ellipsize(Pango.EllipsizeMode.END)
+        self.context_detail.set_single_line_mode(True)
         self.context_detail.set_hexpand(True)
         self.context_bar.append(self.context_detail)
         self.context_bar.append(button('Edit actions', lambda: window.desktop.configure()))
@@ -108,7 +143,7 @@ class ReferenceShell:
         self.device_page.append(self.context_reveal)
         compact = Gtk.Box(spacing=8)
         compact.append(Gtk.Image(icon_name='view-grid-symbolic'))
-        self.header_context = Gtk.DropDown.new_from_strings(['General'])
+        self.header_context = bounded_dropdown(['General'], accessible_name='Assignment context')
         self.header_context.set_tooltip_text('Assignment context · preview existing application profiles')
         self.header_context.update_property([Gtk.AccessibleProperty.LABEL], ['Assignment context'])
         self.header_context.connect('notify::selected', self.context_changed)
@@ -132,11 +167,12 @@ class ReferenceShell:
         self.stack.add_named(scroll(Adw.Clamp(child=self.actions_box, maximum_size=800)), 'actions')
         profiles = page_box()
         profiles.append(label('A setup for every task', 'mx4-heading'))
-        profiles.append(label('Save confirmed hardware settings for this mouse. Application assignments are available in Edit profiles.', 'mx4-subtle'))
+        profiles.append(label('Save confirmed hardware settings for this mouse. Button shortcuts and ring positions are configured separately.', 'mx4-subtle'))
         self.profile_controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
         profiles.append(self.profile_controls)
         self.stack.add_named(scroll(Adw.Clamp(child=profiles, maximum_size=800)), 'profiles')
         self.build_application()
+        self.build_configuration()
         self.build_guide()
         self.update_context()
 
@@ -144,6 +180,14 @@ class ReferenceShell:
         home = page_box()
         self.add_device_button = button('Add device', self.window.add_device)
         self.header.pack_end(self.add_device_button)
+        self.updating_devices = False
+        self.device_result = {'devices': [], 'diagnostics': []}
+        self.device_selector = bounded_dropdown([], accessible_name='Connected mouse', max_chars=28)
+        self.device_selector.connect('notify::selected', self.device_selected)
+        self.device_chooser_row = Gtk.Box(spacing=12, halign=Gtk.Align.CENTER, visible=False)
+        self.device_chooser_row.append(label('Mouse'))
+        self.device_chooser_row.append(self.device_selector)
+        home.append(self.device_chooser_row)
         if self.window.demo:
             home.append(label('PREVIEW · All device controls are simulated. No hardware is accessed.', 'mx4-subtle'))
         grid = Gtk.Box(spacing=32, vexpand=True, valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER, margin_start=60)
@@ -200,7 +244,23 @@ class ReferenceShell:
         help_group.add(row)
         body.append(help_group)
         body.append(label('Local assignments and mouse settings work without a vendor account.', 'mx4-subtle'))
+        local = Adw.PreferencesGroup(title='Local configuration')
+        row = Adw.ActionRow(title='Backup and reset', subtitle='Local action, preference and mouse profile files.')
+        row.add_suffix(button('Open', lambda: self.window.navigate('configuration')))
+        local.add(row)
+        body.append(local)
         self.stack.add_named(scroll(Adw.Clamp(child=body, maximum_size=760)), 'application')
+
+    def build_configuration(self):
+        body = page_box()
+        self.configuration_status = label('Actions and preferences are stored locally. Backup and reset controls are not yet available here.', 'mx4-subtle')
+        body.append(self.configuration_status)
+        self.configuration_paths = label(f'Actions and preferences: {self.window.desktop.store.path}\n\nMouse profiles: {self.window.store.path}\n\nRemembered mouse settings: {self.window.remembered.path}')
+        self.configuration_paths.set_selectable(True)
+        body.append(self.configuration_paths)
+        body.append(button('Copy configuration locations', lambda: self.copy_text(self.configuration_paths.get_text())))
+        body.append(label('Opening this page does not change settings or reset a device.', 'mx4-subtle'))
+        self.stack.add_named(scroll(Adw.Clamp(child=body, maximum_size=760)), 'configuration')
 
     def build_guide(self):
         body = page_box(24)
@@ -211,7 +271,7 @@ class ReferenceShell:
             ('Point, scroll and press', 'Set pointer resolution, wheel behavior and the supported panel threshold.', 'point'),
             ('Feel your actions', 'Adjust physical strength and choose local Actions Ring feedback events.', 'haptics'),
             ('Your paired computers', 'Read the three channels and explicitly request a paired channel.', 'easy-switch'),
-            ('Actions, close at hand', 'Preview the ring safely, then build your own local routines.', 'actions'),
+            ('Actions, close at hand', 'Preview the ring safely, then build your own local routines.', 'ring'),
         ]:
             group = Adw.PreferencesGroup()
             row = Adw.ActionRow(title=title, subtitle=detail, use_markup=False)
@@ -245,7 +305,10 @@ class ReferenceShell:
         pid = active.get(self.context_app) or active.get('*')
         text = config.get('assignment_profiles', {}).get(pid, {}).get('label', 'Default General Profile')
         self.context_detail.set_text(text)
-        self.header_context.set_tooltip_text(f'Assignment context · {text}')
+        self.context_detail.set_tooltip_text(text)
+        context_text = self.context_app or 'General'
+        self.header_context.set_tooltip_text(f'Assignment context · {context_text}\n{text}')
+        self.context.set_tooltip_text(f'Assignment context · {context_text}\n{text}')
 
     def context_changed(self, dropdown, _param):
         if self.updating_context or dropdown.get_selected() >= len(self.context_ids):
@@ -265,6 +328,45 @@ class ReferenceShell:
             return {'actions': {}, 'button_bindings': {}, 'ring_button': None}
         return resolve_config(self.window.desktop.config, self.context_app)
 
+    def update_devices(self, result):
+        self.device_result = result
+        self.updating_devices = True
+        try:
+            names = [d['name'] for d in self.window.devices]
+            current = self.device_selector.get_model()
+            if names != [current.get_string(i) for i in range(current.get_n_items())]:
+                self.device_selector.set_model(Gtk.StringList.new(names))
+            index = next((i for i, device in enumerate(self.window.devices) if device['id'] == self.window.selected_id), Gtk.INVALID_LIST_POSITION)
+            self.device_selector.set_selected(index)
+        finally:
+            self.updating_devices = False
+        self.device_chooser_row.set_visible(len(self.window.devices) > 1)
+
+    def device_selected(self, chooser, parameter):
+        if self.updating_devices:
+            return
+        if self.window.busy or self.window.pending_hardware:
+            self.update_devices(self.device_result)
+            return
+        self.window.select_device(chooser, parameter, self.device_result)
+
+    def connection_summary(self):
+        device = self.window.current or {}
+        if self.window.demo:
+            return 'Preview · simulated connection'
+        if device.get('transport'):
+            return str(device['transport'])
+        path = device.get('path')
+        state = 'Connected' if device.get('online') else 'Offline'
+        return f'{state} · {path}' if path else f'{state} · transport not reported'
+
+    def update_battery(self):
+        device = self.window.current or {}
+        text = device.get('battery') or 'Battery unavailable'
+        self.home_battery.set_text(f'{text}  ·  {self.connection_summary()}')
+        if hasattr(self, 'device_battery'):
+            self.device_battery.set_text(text)
+
     def update_home(self):
         device = self.window.current
         self.device_card.set_sensitive(bool(device))
@@ -274,9 +376,8 @@ class ReferenceShell:
             self.home_battery.set_text('No device available')
         else:
             self.home_name.set_text(device['name'])
-            battery = device.get('battery') or 'Battery unavailable'
-            connection = device.get('transport') or ('Preview' if self.window.demo else 'Connected' if device.get('online') else 'Offline')
-            self.home_battery.set_text(f'{battery}  ·  {connection}')
+            self.update_battery()
+        self.device_selector.set_sensitive(len(self.window.devices) > 1 and not self.window.busy and not self.window.pending_hardware)
         self.home_integration.set_text('Integration enabled' if self.window.desktop.session.running else 'Integration off')
 
     def build_workspace(self):
@@ -297,7 +398,7 @@ class ReferenceShell:
         inspector_body.append(self.inspector_stack)
         self.inspector = Adw.OverlaySplitView(sidebar=inspector_body, sidebar_position=Gtk.PackType.END,
                                               min_sidebar_width=300, max_sidebar_width=370,
-                                              sidebar_width_fraction=.34, show_sidebar=False)
+                                              sidebar_width_fraction=.34, show_sidebar=False, pin_sidebar=True)
         self.inspector.set_enable_show_gesture(False)
         self.inspector.connect("notify::show-sidebar", self.inspector_visibility_changed)
         workspace = Gtk.Box()
@@ -420,7 +521,7 @@ class ReferenceShell:
             item['keys'] = [supported[cid]]
             window.add_setting(native, item)
             body.append(native)
-            body.append(button('Edit Smart Actions', lambda cid=cid: window.desktop.configure(cid=cid)))
+            body.append(button('Edit Smart Actions', lambda cid=cid: window.desktop.configure(cid=cid, page='actions')))
 
     def build_local_binding(self, body, cid):
         config = self.effective_config()
@@ -435,7 +536,8 @@ class ReferenceShell:
         else:
             row = Adw.ActionRow(title='Smart Action', subtitle='Default keeps the built-in mouse function.')
             keys = [None, *config['actions']]
-            dropdown = Gtk.DropDown.new_from_strings(['Default', *[config['actions'][key]['label'] for key in keys[1:]]])
+            dropdown = bounded_dropdown(['Default', *[config['actions'][key]['label'] for key in keys[1:]]],
+                                        accessible_name=f'Local assignment for {BUTTONS[cid][0]}', max_chars=16)
             assigned = config['button_bindings'].get(str(cid))
             dropdown.set_selected(keys.index(assigned) if assigned in keys else 0)
             dropdown.update_property([Gtk.AccessibleProperty.LABEL], [f'Local assignment for {BUTTONS[cid][0]}'])
@@ -488,24 +590,34 @@ class ReferenceShell:
         handler = power.connect('notify::active', lambda row, _p: self.window.save_local_preference('haptic_power_save', row.get_active()))
         self.preference_widgets[('haptic_power_save', None)] = (power, handler, power.set_active)
         group.add(power)
-        body.append(button('Open Actions Ring', lambda: self.window.navigate('actions')))
+        body.append(button('Open Actions Ring', lambda: self.window.navigate('ring')))
+
+    def copy_text(self, text):
+        Gdk.Display.get_default().get_clipboard().set(text)
 
     def build_metadata(self):
         device = self.window.current
         group = Adw.PreferencesGroup(title='About this mouse')
         self.device_body.prepend(group)
-        for field, title in [('name', 'Device'), ('firmware', 'Firmware'), ('serial', 'Serial number'),
-                             ('transport', 'Connection'), ('identity_source', 'Identity source')]:
+        self.metadata_copy_buttons = {}
+        for field, title in [('name', 'Device model'), ('stable_id', 'Device identifier'),
+                             ('firmware', 'Firmware'), ('serial', 'Serial number'), ('identity_source', 'Identity source')]:
             value = device.get(field)
             if value is None:
                 continue
             row = Adw.ActionRow(title=title, subtitle=str(value), use_markup=False)
             row.set_subtitle_selectable(True)
-            if field == 'serial':
-                row.add_suffix(button('Copy', lambda value=str(value): Gdk.Display.get_default().get_clipboard().set(value)))
+            if field in ('name', 'stable_id', 'serial'):
+                copy = button('Copy', lambda value=str(value): self.copy_text(value))
+                row.add_suffix(copy)
+                self.metadata_copy_buttons[field] = copy
             group.add(row)
+        group.add(Adw.ActionRow(title='Connection', subtitle=self.connection_summary(), use_markup=False))
         row = Adw.ActionRow(title='Local hardware profiles', subtitle='Save and apply confirmed settings for this mouse.')
         row.add_suffix(button('Open', lambda: self.window.navigate('profiles')))
+        group.add(row)
+        row = Adw.ActionRow(title='Backup and reset', subtitle='Local configuration files.')
+        row.add_suffix(button('Open', lambda: self.window.navigate('configuration')))
         group.add(row)
         row = Adw.ActionRow(title='Feature guide')
         row.add_suffix(button('Start', lambda: self.window.navigate('guide')))
@@ -513,7 +625,7 @@ class ReferenceShell:
         row = Adw.ActionRow(title='Support')
         row.add_suffix(button('Open', self.window.open_support))
         group.add(row)
-        self.host_body.append(button('Configure Actions Ring', lambda: self.window.desktop.configure()))
+        self.host_body.append(button('Configure Actions Ring', lambda: self.window.navigate('ring')))
         self.host_body.append(label('Switch requests are sent once. The mouse may disconnect; the app does not assume a successful channel change.', 'mx4-subtle'))
 
     def callout_specs(self):
@@ -560,7 +672,7 @@ class ReferenceShell:
         self.back.set_visible(route != 'home')
         self.add_device_button.set_visible(route == 'home')
         self.heading.set_text('MX Master 4' if route in DEVICE_ROUTES else TITLES[route])
-        self.stack.set_visible_child_name('device' if route in DEVICE_ROUTES else route)
+        self.stack.set_visible_child_name('device' if route in DEVICE_ROUTES else 'actions' if route in ('ring', 'smart-actions') else route)
         self.context_reveal.set_reveal_child(self.narrow and route in ('buttons', 'point', 'haptics'))
         self.header_context_reveal.set_reveal_child(not self.narrow and route in ('buttons', 'point', 'haptics'))
         if self.inspector is None or not window.current:
@@ -576,10 +688,19 @@ class ReferenceShell:
         self.art_preview.set_visible(route in ('point', 'haptics'))
         self.art_preview.set_label('Preview feedback' if route == 'haptics' else 'Preview wheel')
         self.art_preview.set_tooltip_text('Animate the illustration without changing the mouse')
-        self.device_battery.set_text(window.current.get('battery') or 'Battery unavailable')
+        self.update_battery()
         target = window.selected_target
         show = bool(target) or special
-        self.inspector.set_show_sidebar(show)
+        if self.inspector.get_width() == 0:
+            # A context/device rebuild can enter a selected inspector before
+            # its first allocation. Set the native split state while unmapped
+            # so its reveal animation cannot divide a zero-sized content area.
+            visible = self.inspector.get_visible()
+            self.inspector.set_visible(False)
+            self.inspector.set_show_sidebar(show)
+            self.inspector.set_visible(visible)
+        else:
+            self.inspector.set_show_sidebar(show)
         self.sidebar.set_reveal_child(not bool(target))
         if special:
             target = 'hosts' if route == 'easy-switch' else 'device-settings'
