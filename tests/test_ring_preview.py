@@ -83,3 +83,11 @@ def test_preview_fits_620_pixels_and_keeps_saved_scale(preview, scale):
         assert x >= 0
         assert x + child.get_width() <= 620
     assert not selected
+
+def test_narrow_preview_actual_label_allocations_fit_even_long_native_text(preview):
+    widget, _ = preview
+    widget.allocate(320, 390, -1, None)
+    for label in widget.labels:
+        x, _ = widget.get_child_position(label)
+        assert x >= 0
+        assert x + label.get_width() <= 320

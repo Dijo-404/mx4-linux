@@ -539,6 +539,7 @@ def wheel_runtime(runtime, monkeypatch):
     runtime._adjustment_pending = runtime._adjustment_yield = runtime._selection_pending = None
     runtime._adjustment_active = runtime._adjustment_running = False
     runtime._adjustment_token = 0
+    runtime._ring_focus_lost = threading.Event()
     runtime._ring_config = deepcopy(runtime.config)
     runtime._ring_config['actions']['copy']['adjustment'] = {
         'increase': [{'type': 'text', 'text': '+'}], 'decrease': [{'type': 'text', 'text': '-'}]}
@@ -557,6 +558,7 @@ def wheel_runtime(runtime, monkeypatch):
     runtime.executor = SimpleNamespace(submit=submit)
     monkeypatch.setattr('mx4_linux.desktop.DesktopActions', runner)
     monkeypatch.setattr('mx4_linux.desktop.restore_focus', lambda _wid: {'app_id': 'editor', 'window_id': 7})
+    monkeypatch.setattr('mx4_linux.desktop.focused_context', lambda: {'app_id': 'editor', 'window_id': 7})
     monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: idle.append(fn))
     monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda _ms, fn: timers.append(fn))
     def finish():
@@ -682,3 +684,48 @@ def test_unknown_pinned_target_cannot_type_into_later_focused_application(wheel_
     proof.timers.pop()()
     proof.finish()
     assert not proof.calls
+
+def test_standalone_ring_owns_observer_and_stale_focus_callbacks_cannot_cancel_next_ring(wheel_runtime, monkeypatch):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.session.running = False
+    callbacks, observers = [], []
+    def observer(callback):
+        callbacks.append(callback)
+        value = SimpleNamespace(start=Mock(), stop=Mock())
+        observers.append(value)
+        return value
+    monkeypatch.setattr('mx4_linux.desktop.NiriFocusObserver', observer)
+    runtime._watch_ring_context()
+    observers[0].start.assert_called_once()
+    runtime.dismissed()
+    observers[0].stop.assert_called_once()
+    runtime._watch_ring_context()
+    callbacks[0]({'type': 'context', 'context': {'app_id': 'other', 'window_id': 99}})
+    runtime.flush_events()
+    assert not runtime._ring_focus_lost.is_set()
+    callbacks[1]({'type': 'context', 'context': {'app_id': 'other', 'window_id': 99}})
+    runtime.flush_events()
+    assert runtime._ring_focus_lost.is_set()
+    assert not runtime.ring.state.visible
+
+
+def test_delayed_adjustment_cancellation_predicate_rechecks_exact_pinned_window(wheel_runtime, monkeypatch):
+    proof = wheel_runtime
+    runtime = proof.controller
+    current = {'app_id': 'editor', 'window_id': 7}
+    monkeypatch.setattr('mx4_linux.desktop.focused_context', lambda: current.copy())
+    def create_runner(_config, **_kwargs):
+        def execute(_action, cancelled, **_kw):
+            assert not cancelled()
+            current['window_id'] = 99
+            if cancelled():
+                raise RuntimeError('cancelled before text')
+            pytest.fail('The delayed branch would type into a different focused window')
+        return SimpleNamespace(execute=execute, close=Mock())
+    monkeypatch.setattr('mx4_linux.desktop.DesktopActions', create_runner)
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    proof.finish()
+    runtime.ring.resume_keyboard.assert_not_called()
+    assert not runtime.ring.state.visible

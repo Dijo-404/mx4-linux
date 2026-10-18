@@ -51,6 +51,9 @@ class DesktopController:
         self._adjustment_token = 0
         self._adjustment_yield = None
         self._selection_pending = None
+        self._ring_observer = None
+        self._ring_context_token = 0
+        self._ring_focus_lost = threading.Event()
         self.reload_config()
 
     def queue_event(self, event):
@@ -74,6 +77,7 @@ class DesktopController:
         return GLib.SOURCE_REMOVE
 
     def reload_config(self):
+        self._stop_ring_context()
         self._cancel_adjustments()
         self._dispatch_token += 1
         if self.ring and self.ring.state.visible:
@@ -145,6 +149,7 @@ class DesktopController:
         future.add_done_callback(lambda _: GLib.idle_add(begin))
 
     def stop(self):
+        self._stop_ring_context()
         self._cancel_adjustments()
         self._open_token += 1
         self._dispatch_token += 1
@@ -204,7 +209,11 @@ class DesktopController:
         if event.get("session_id", session_id) != session_id:
             return GLib.SOURCE_REMOVE
         kind = event.get("type")
-        if kind in ("context", "context-unavailable"):
+        if kind == "ring-context":
+            if event.get("ring_context_token") == getattr(self, "_ring_context_token", 0):
+                if self._ring_focus_lost.is_set() and self.ring and self.ring.state.visible:
+                    self.ring.dismiss()
+        elif kind in ("context", "context-unavailable"):
             self._context_event(event)
         elif kind == "configured":
             update = self._pending_configs.pop(event.get("config_id"), None)
@@ -317,6 +326,7 @@ class DesktopController:
                 if self.ring is None:
                     from .ring import ActionsRing
                     self.ring = ActionsRing(self.window.get_application(), self.selected, self.dismissed, self.hovered, self.adjusted)
+                self._watch_ring_context()
                 self.ring.show_ring(self._ring_config, held=held, preview=preview or self.window.demo)
                 self.feedback("open", config=self._ring_config, preview=preview or self.window.demo)
                 if held:
@@ -350,13 +360,37 @@ class DesktopController:
                 return
         self.session.feedback(config.get("haptic_waveforms", {}).get(source, 0))
 
+    def _stop_ring_context(self):
+        self._ring_context_token = getattr(self, "_ring_context_token", 0) + 1
+        observer = getattr(self, "_ring_observer", None)
+        self._ring_observer = None
+        if observer:
+            observer.stop()
+
+    def _watch_ring_context(self):
+        self._stop_ring_context()
+        self._ring_focus_lost = threading.Event()
+        if self.observer is not None:
+            return  # Integration already owns an observer; action boundaries also verify focus.
+        token, target, lost = self._ring_context_token, deepcopy(self.target), self._ring_focus_lost
+        def receive(event):
+            context = event.get("context")
+            if (event.get("type") == "context" and context and context != target
+                    and not context.get("app_id", "").startswith("io.github.mx4linux")):
+                lost.set()  # Cancel worker delays even before GTK drains the event queue.
+            self.queue_event({"type": "ring-context", "ring_context_token": token})
+        self._ring_observer = NiriFocusObserver(receive)
+        self._ring_observer.start()
+
     def dismissed(self):
+        self._stop_ring_context()
         self._cancel_adjustments()
         self._dispatch_token += 1
 
     def selected(self, action_id, preview):
         target = deepcopy(self.target)
         config = deepcopy(self._ring_config or self.effective_config or self.config)
+        self._stop_ring_context()
         self._cancel_adjustments()
         self.feedback("select", config=config, preview=preview)
         token = self._dispatch_token
@@ -446,7 +480,10 @@ class DesktopController:
         if not success:
             self._adjustment_pending = None
         if token == self._adjustment_token:
-            self._drain_adjustment(token)
+            if getattr(self, "_ring_focus_lost", None) and self._ring_focus_lost.is_set():
+                self.ring.dismiss()
+            else:
+                self._drain_adjustment(token)
         self._dispatch_selection()
 
     def execute(self, action_id, target=None, preview=False, config=None, adjustment=None, completed=None):
@@ -463,6 +500,7 @@ class DesktopController:
         snapshot = deepcopy(config or self.effective_config or self.config)
         session_id, dispatch_token = self.session.session_id, self._dispatch_token
         self.cancelled.clear()
+        focus_lost = getattr(self, "_ring_focus_lost", threading.Event())
         self.notify("Previewing action…" if preview else "Running Smart Action…")
         def run():
             if self.closed or dispatch_token != self._dispatch_token or self.cancelled.is_set():
@@ -470,17 +508,32 @@ class DesktopController:
             runner = DesktopActions(snapshot, dry_run=preview)
             try:
                 action = snapshot["actions"][action_id]
+                steps = action["adjustment"][adjustment] if adjustment else action["steps"]
+                sends_input = any(step["type"] in ("shortcut", "text") for step in steps)
                 if not preview:
+                    if adjustment and target:
+                        before = focused_context()
+                        if focus_lost.is_set() or (before != target and (
+                                not before or not before.get("app_id", "").startswith("io.github.mx4linux"))):
+                            focus_lost.set()
+                            raise RuntimeError("The original window lost focus; the adjustment was cancelled.")
                     context = restore_focus(target["window_id"]) if target else focused_context()
-                    steps = action["adjustment"][adjustment] if adjustment else action["steps"]
-                    if any(step["type"] in ("shortcut", "text") for step in steps):
+                    if sends_input:
                         if (not context or context["app_id"].startswith("io.github.mx4linux")
                                 or (adjustment and not target)):
                             raise RuntimeError("Open the ring from another application using the haptic panel or mx4-linux ring before sending shortcuts or text.")
                 if self.cancelled.is_set() or dispatch_token != self._dispatch_token:
                     raise RuntimeError("Action cancelled before execution.")
+                def cancelled():
+                    if self.cancelled.is_set() or (adjustment and focus_lost.is_set()):
+                        return True
+                    # This runs on the action worker at every step/delay/input boundary.
+                    if adjustment and sends_input and focused_context() != target:
+                        focus_lost.set()
+                        return True
+                    return False
                 kwargs = {"adjustment": adjustment} if adjustment else {}
-                return runner.execute(action_id, cancelled=self.cancelled.is_set, **kwargs)
+                return runner.execute(action_id, cancelled=cancelled, **kwargs)
             finally:
                 runner.close()
         future = self.executor.submit(run)
@@ -527,6 +580,7 @@ class DesktopController:
         self.notify(self.error or "Configuration saved. Enable mouse integration to use the new assignments.")
 
     def close(self):
+        self._stop_ring_context()
         self._cancel_adjustments()
         self.closed = True
         with self._event_lock:
