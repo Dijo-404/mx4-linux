@@ -11,7 +11,13 @@ license = "GPL-3.0-or-later"
 dependencies = ["solaar==1.1.20"]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8,<10"]
+dev = ["ruff>=0.14,<1", "build>=1.2,<2"]
+
+[project.urls]
+Homepage = "https://github.com/Dijo-404/mx4-linux"
+Issues = "https://github.com/Dijo-404/mx4-linux/issues"
+Changelog = "https://github.com/Dijo-404/mx4-linux/blob/main/CHANGELOG.md"
 
 [project.scripts]
 mx4-linux = "mx4_linux.cli:main"
@@ -24,3 +30,10 @@ mx4_linux = ["icons/*.svg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
