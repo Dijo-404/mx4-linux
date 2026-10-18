@@ -111,6 +111,52 @@ def test_invalid_config_cannot_overwrite_saved_document(tmp_path):
     assert store.path.read_bytes() == original
 
 
+def test_locked_update_preserves_concurrent_changes_and_returns_committed_document(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    path = tmp_path / 'desktop.json'
+    first, second = DesktopConfigStore(path), DesktopConfigStore(path)
+    first.save(default_config())
+    entered, release = threading.Event(), threading.Event()
+    def preference(document):
+        entered.set()
+        assert release.wait(2)
+        document['appearance'] = 'light'
+    def assignment(document):
+        document['button_bindings']['83'] = 'copy'
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        saved_preference = executor.submit(first.update, preference)
+        assert entered.wait(1)
+        saved_assignment = executor.submit(second.update, assignment)
+        release.set()
+        assert saved_preference.result()['appearance'] == 'light'
+        latest = saved_assignment.result()
+    assert latest['appearance'] == 'light'
+    assert latest['button_bindings']['83'] == 'copy'
+    assert first.read() == latest
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_locked_update_rejects_invalid_mutation_without_replacing_document(tmp_path):
+    store = DesktopConfigStore(tmp_path / 'desktop.json')
+    store.save(default_config())
+    original = store.path.read_bytes()
+    with pytest.raises(RuntimeError, match='exactly eight'):
+        store.update(lambda document: document.update(ring=[]))
+    with pytest.raises(TypeError, match='must be callable'):
+        store.update(None)
+    assert store.path.read_bytes() == original
+
+
+def test_locked_update_does_not_repair_or_replace_corrupt_document(tmp_path):
+    path = tmp_path / 'desktop.json'
+    path.write_text('broken')
+    mutate = lambda document: document.update(appearance='light')
+    with pytest.raises(RuntimeError, match='Cannot read'):
+        DesktopConfigStore(path).update(mutate)
+    assert path.read_text() == 'broken'
+
+
 @pytest.mark.parametrize("contents", ["broken", "[]", '{"version":9}', "{}"])
 def test_corrupt_document_read_is_reported(tmp_path, contents):
     path = tmp_path / "desktop.json"
