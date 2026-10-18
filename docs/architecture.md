@@ -72,7 +72,7 @@ Setup installs into a local virtual environment with system site packages for GO
 
 The npm launcher is a thin distribution boundary around the same Python modules. Its tarball includes source and assets, with no npm dependencies or install hooks. Explicit setup builds a versioned environment under the user's XDG data directory with access to system GObject bindings. The launcher forwards CLI arguments and termination signals, loads its own bundled source, and leaves device access to the existing optional installers. A readiness marker prevents an interrupted setup from being selected as a completed runtime.
 
-Python runtime requirements live in `pyproject.toml`; `requirements.txt` installs that project. CI checks supported Python and Node versions, native GTK demo widgets, subprocess cleanup, and installation of the actual npm archive. Release workflows build Python/npm archives with checksums after CI passes and verify release tags against the package version. Publishing remains a separate maintainer action.
+Python runtime dependencies and optional test/development tools live in `pyproject.toml`. CI installs the project and its extras directly, checks supported Python and Node versions, native GTK demo widgets, subprocess cleanup, and installation of the actual npm archive. Release workflows build Python/npm archives with checksums after CI passes and verify release tags against the package version. Publishing remains a separate maintainer action.
 
 ## Verification boundaries
 
