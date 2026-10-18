@@ -1,0 +1,10 @@
+# Active local desktop access to Logi Bolt and MX Master 4 hidraw only.
+# Must run before 73-seat-late.rules, which applies uaccess ACLs.
+ACTION=="remove", GOTO="mx4_linux_end"
+SUBSYSTEM!="hidraw", GOTO="mx4_linux_end"
+# USB Logi Bolt receiver (device settings are reached through the receiver).
+ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c548", TAG+="uaccess"
+# Bluetooth: regular MX Master 4 B042 and Business B048.
+KERNELS=="0005:046D:B042.*", TAG+="uaccess"
+KERNELS=="0005:046D:B048.*", TAG+="uaccess"
+LABEL="mx4_linux_end"
