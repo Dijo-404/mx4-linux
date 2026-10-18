@@ -21,6 +21,7 @@ function run(command, arguments_) {
 
 function setup() {
   if (args.length !== 1) throw new Error('Usage: mx4-linux setup (select the system interpreter with PYTHON=/path/to/python3).');
+  run('bash', [join(root, 'scripts', 'setup-font.sh')]);
   const python = process.env.PYTHON || 'python3';
   run(python, ['-c', `
 import sys
@@ -62,7 +63,7 @@ function launch() {
     || (existsSync(join(root, '.venv', 'bin', 'python')) ? join(root, '.venv', 'bin', 'python') : null);
   if (!python) {
     if (args[0] === '--help' || args[0] === '-h') {
-      console.log('MX4 Linux — native Linux mouse controls\n\n  mx4-linux setup          Install the per-user Python runtime\n  mx4-linux [gui --demo]   Open the control panel\n  mx4-linux doctor        Check device access\n\nInstall system GTK 4.12+, Libadwaita 1.4+ and Python GObject first.\nAfter setup, mx4-linux --help lists every application command.');
+      console.log('MX4 Linux — native Linux mouse controls\n\n  mx4-linux setup          Install the per-user Python runtime\n  mx4-linux [gui --demo]   Open the control panel\n  mx4-linux doctor        Check device access\n\nInstall system GTK 4.12+, Libadwaita 1.4+, Python GObject and fontconfig first.\nSetup installs bundled JetBrains Mono fonts when needed.\nAfter setup, mx4-linux --help lists every application command.');
       return;
     }
     throw new Error('Run mx4-linux setup first (or npm run setup in a checkout). See docs/install.md for system dependencies.');
