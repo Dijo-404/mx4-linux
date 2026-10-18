@@ -59,7 +59,7 @@ class RingPreview(Gtk.Box):
             button.connect("clicked", self._clicked, index)
             self.put(button, 320 + x - BUTTON_RADIUS, 190 + y - BUTTON_RADIUS)
             label = Gtk.Label(width_request=140, wrap=True, wrap_mode=Pango.WrapMode.WORD_CHAR,
-                              max_width_chars=14, lines=2, ellipsize=Pango.EllipsizeMode.END,
+                              max_width_chars=1, lines=2, ellipsize=Pango.EllipsizeMode.END,
                               justify=Gtk.Justification.CENTER)
             label.add_css_class("preview-ring-label")
             label.set_can_target(False)
