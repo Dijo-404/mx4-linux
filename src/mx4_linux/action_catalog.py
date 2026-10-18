@@ -110,8 +110,8 @@ def catalog_action(preset_id, value=None):
     elif preset_id in ("file", "folder"):
         if not isinstance(value, str) or not 1 <= len(value) <= 4096 or not value.isprintable() or not value.strip():
             raise RuntimeError("An explicit nonempty file or folder path is required.")
-        # xdg-open treats leading hyphens as options unless the path is prefixed.
-        path = "./" + value if value.startswith("-") else value
+        # Prefix relative paths so xdg-open cannot interpret options or URI schemes.
+        path = value if value.startswith("/") else "./" + value
         action["steps"] = [{"type": "command", "argv": ["xdg-open", path]}]
     elif preset_id == "url":
         action["steps"] = [{"type": "command", "argv": ["xdg-open", _url(value)]}]
