@@ -8,7 +8,7 @@ import math
 import threading
 import time
 
-from .actions import (BUTTON_IDS, DesktopActions, DesktopConfigStore, apply_local_assignment, execution_steps,
+from .actions import (BUTTON_IDS, DesktopActions, DesktopConfigStore, apply_local_assignment, ExecutionSelection,
                       focused_context, resolve_config, restore_focus, steps_send_input)
 from .context import NiriFocusObserver
 from .event_session import EventSession
@@ -92,6 +92,9 @@ class DesktopController:
         return GLib.SOURCE_REMOVE
 
     def _reset_changed_toggles(self, document):
+        selection = getattr(self, "_action_selection", None)
+        if selection is not None and selection.action != document["actions"].get(selection.action_id):
+            selection.current = False
         state = getattr(self, "_toggle_state", {})
         for action_id in tuple(state):
             if state[action_id][0] != document["actions"].get(action_id):
@@ -782,6 +785,7 @@ class DesktopController:
                 if getattr(self, "utilities", None) is None:
                     from .local_utilities import UtilityWindows
                     self.utilities = UtilityWindows(self.window)
+                check()
                 self.utilities.show(step["operation"])
             except Exception as exc:
                 errors.append(exc)
@@ -811,6 +815,15 @@ class DesktopController:
             return
         self.action_busy = True
         snapshot = deepcopy(config or self.effective_config or self.config)
+        if not hasattr(self, "_toggle_state"):
+            self._toggle_state = {}
+        try:
+            selection = ExecutionSelection(action_id, snapshot["actions"][action_id], adjustment, self._toggle_state)
+        except (KeyError, RuntimeError) as exc:
+            self.action_busy = False
+            self.notify(str(exc))
+            return
+        self._action_selection = selection
         session_id, dispatch_token = self.session.session_id, self._dispatch_token
         self.cancelled.clear()
         focus_lost = getattr(self, "_ring_focus_lost", threading.Event())
@@ -819,15 +832,12 @@ class DesktopController:
         def run():
             if self.closed or dispatch_token != self._dispatch_token or self.cancelled.is_set():
                 raise RuntimeError("Action cancelled before dispatch.")
-            if not hasattr(self, "_toggle_state"):
-                self._toggle_state = {}
             origin = None
             runner = DesktopActions(snapshot, dry_run=preview, toggle_state=self._toggle_state,
                                     local_handler=lambda step, check: self._local_step(step, check, origin),
                                     local_preflight=lambda steps: self._preflight_local(steps, origin))
             try:
-                action = snapshot["actions"][action_id]
-                steps = execution_steps(action, adjustment, self._toggle_state, action_id)
+                steps = selection.steps
                 sends_input = steps_send_input(steps)
                 guarded_utility = any(step["type"] in ("date", "clipboard") for step in steps)
                 if not preview:
@@ -858,12 +868,14 @@ class DesktopController:
                         return True
                     return False
                 kwargs = {"adjustment": adjustment} if adjustment else {}
-                return runner.execute(action_id, cancelled=cancelled, **kwargs)
+                return runner.execute(action_id, cancelled=cancelled, selection=selection, **kwargs)
             finally:
                 runner.close()
         future = self.executor.submit(run)
         def finished():
             self.action_busy = False
+            if getattr(self, "_action_selection", None) is selection:
+                self._action_selection = None
             if self.closed:
                 if completed:
                     completed(False)

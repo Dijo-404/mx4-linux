@@ -279,6 +279,25 @@ def execution_steps(action, adjustment=None, toggle_state=None, action_id=None):
     return action["steps"]
 
 
+class ExecutionSelection:
+    """One detached branch and its session-cycle commit token for an invocation."""
+    def __init__(self, action_id, action, adjustment=None, toggle_state=None):
+        self.action_id = action_id
+        self.action = deepcopy(action)
+        self.adjustment = adjustment
+        state = toggle_state if toggle_state is not None else {}
+        self.toggle_entry = state.get(action_id)
+        captured = {action_id: self.toggle_entry} if self.toggle_entry is not None else {}
+        self.steps = deepcopy(execution_steps(self.action, adjustment, captured, action_id))
+        definition, index = self.toggle_entry if self.toggle_entry is not None else (None, 0)
+        self.toggle_index = index if definition == self.action else 0
+        self.current = True
+
+    def may_advance(self, config, toggle_state):
+        return (self.current and config["actions"].get(self.action_id) == self.action
+                and toggle_state.get(self.action_id) is self.toggle_entry)
+
+
 def _validate_trigger(value):
     if value is not None and (type(value) is not int or value not in BUTTON_IDS):
         _fail("ring_button must be null or one of 82, 83, 86, 195, 196 or 416.")
@@ -578,13 +597,18 @@ class DesktopActions:
                 self._keyboard.close()
                 self._keyboard = None
 
-    def execute(self, action_id, cancelled=None, adjustment=None):
+    def execute(self, action_id, cancelled=None, adjustment=None, *, selection=None):
         with self._lock:
             validate_config(self.config)
             if not isinstance(action_id, str) or action_id not in self.config["actions"]:
                 raise RuntimeError(f"Unknown Smart Action {action_id!r}.")
             action = deepcopy(self.config["actions"][action_id])
-            steps = execution_steps(action, adjustment, self.toggle_state, action_id)
+            if selection is None:
+                selection = ExecutionSelection(action_id, action, adjustment, self.toggle_state)
+            elif (not isinstance(selection, ExecutionSelection) or selection.action_id != action_id
+                  or selection.action != action or selection.adjustment != adjustment):
+                raise RuntimeError("The execution selection does not match this Smart Action snapshot.")
+            steps = selection.steps
             result = {"ok": True, "action_id": action_id, "label": action["label"], "completed": 0,
                       "dry_run": self.dry_run, "steps": []}
             if adjustment is not None:
@@ -602,24 +626,27 @@ class DesktopActions:
                     if context is None or context["app_id"] != action["app_id"]:
                         result.update(ok=False, skipped=True, reason=f"Requires focused app_id {action['app_id']!r}.")
                         return result
-                if self.local_preflight and any(step["type"] == "local" for step in steps):
-                    self.local_preflight(steps)
-                    self._check(cancelled, deadline)
+                if any(step["type"] == "local" for step in steps):
+                    if self.local_handler is None:
+                        raise RuntimeError("Local utilities require the native controller.")
+                    if self.local_preflight:
+                        self.local_preflight(steps)
+                        self._check(cancelled, deadline)
                 for step in steps:
                     self._check(cancelled, deadline)
                     performed = self._step(step, cancelled, deadline)
                     result["steps"].append(performed)
                     result["completed"] += 1
                 self._check(cancelled, deadline)
-                if adjustment is None and "toggle_steps" not in action:
-                    self.toggle_state.pop(action_id, None)
-                if adjustment is None and "toggle_steps" in action:
-                    definition, index = self.toggle_state.get(action_id, (None, 0))
-                    index = index if definition == action else 0
-                    self.toggle_state[action_id] = (deepcopy(action), (index + 1) % (1 + len(action["toggle_steps"])))
-                    # The validated document bounds this controller-session map.
-                    for removed in self.toggle_state.keys() - self.config["actions"].keys():
-                        del self.toggle_state[removed]
+                if adjustment is None and selection.may_advance(self.config, self.toggle_state):
+                    if "toggle_steps" not in action:
+                        self.toggle_state.pop(action_id, None)
+                    else:
+                        self.toggle_state[action_id] = (
+                            deepcopy(action), (selection.toggle_index + 1) % (1 + len(action["toggle_steps"])))
+                        # The validated document bounds this controller-session map.
+                        for removed in self.toggle_state.keys() - self.config["actions"].keys():
+                            del self.toggle_state[removed]
                 return result
             except (RuntimeError, OSError) as exc:
                 raise RuntimeError(f"Smart Action {action['label']!r} stopped after {result['completed']}/{len(steps)} steps: {exc}") from exc

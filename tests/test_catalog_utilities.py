@@ -430,3 +430,15 @@ def test_date_dry_run_does_not_read_clock_or_input_helper(monkeypatch):
 def test_valid_html_numeric_escape_with_leading_zeroes_stays_bounded():
     from mx4_linux.action_utilities import transform_clipboard
     assert transform_clipboard('html-decode', ('&#' + '0' * 5000 + '65;').encode()) == b'A'
+
+
+def test_no_native_handler_keeps_preview_and_skipped_condition_effect_free(monkeypatch):
+    cfg = document([{'type': 'delay', 'milliseconds': 0}, {'type': 'local', 'operation': 'bell'}], app_id='expected')
+    runner = actions.DesktopActions(cfg, dry_run=True)
+    earlier = Mock(side_effect=AssertionError('No branch effect allowed'))
+    monkeypatch.setattr(runner, '_step', earlier)
+    assert runner.execute('test')['dry_run']
+    runner.dry_run = False
+    monkeypatch.setattr(actions, 'focused_context', lambda: {'app_id': 'other', 'window_id': 1})
+    assert runner.execute('test')['skipped']
+    earlier.assert_not_called()
