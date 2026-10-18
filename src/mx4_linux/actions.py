@@ -367,12 +367,31 @@ class DesktopConfigStore:
     def save(self, config):
         config = deepcopy(config)
         validate_config(config)
+        self._commit(config=config)
+
+    def update(self, mutate):
+        """Mutate the latest document under its file lock and return the saved copy.
+
+        ``mutate(document)`` edits in place; its return value is ignored. An
+        invalid mutation or unreadable document leaves the existing file intact.
+        The mutator must not call save/update on the same configuration file.
+        """
+        if not callable(mutate):
+            raise TypeError("Configuration mutator must be callable.")
+        return self._commit(mutate=mutate)
+
+    def _commit(self, *, config=None, mutate=None):
         filename = None
         try:
             self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             fd = os.open(self.path.with_suffix(self.path.suffix + ".lock"), os.O_CREAT | os.O_RDWR, 0o600)
             with os.fdopen(fd, "w") as lock:
                 fcntl.flock(lock, fcntl.LOCK_EX)
+                if mutate is not None:
+                    config = self.read()
+                    mutate(config)
+                    config = deepcopy(config)
+                    validate_config(config)
                 with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.path.parent, delete=False) as stream:
                     filename = stream.name
                     os.fchmod(stream.fileno(), 0o600)
@@ -381,6 +400,7 @@ class DesktopConfigStore:
                     stream.flush()
                     os.fsync(stream.fileno())
                 os.replace(filename, self.path)
+            return config
         except OSError as exc:
             raise RuntimeError(f"Cannot save {self.path}: {exc}") from exc
         finally:

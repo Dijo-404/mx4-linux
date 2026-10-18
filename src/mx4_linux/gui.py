@@ -125,13 +125,14 @@ class ControlWindow(Adw.ApplicationWindow):
         self.reload()
         return GLib.SOURCE_REMOVE
 
-    def job(self, work, done, message, failed=None):
+    def job(self, work, done, message, failed=None, *, device_bound=True):
+        """Serialize work; only local-file callbacks may ignore device epochs."""
         if self.busy or self.pending_hardware:
             return
         self.busy = True
         epoch = self.operation_epoch
         self.hardware_cancelled.clear()
-        self.cancel_device.set_visible(True)
+        self.cancel_device.set_visible(device_bound)
         self.controls.set_sensitive(False)
         self.profile_controls.set_sensitive(False)
         self.refresh.set_sensitive(False)
@@ -151,11 +152,15 @@ class ControlWindow(Adw.ApplicationWindow):
             self.refresh.set_sensitive(True)
             self.spinner.stop()
             self.spinner.set_visible(False)
-            self.update_desktop_status()
-            if epoch != self.operation_epoch:
+            stale = epoch != self.operation_epoch
+            if stale:
                 self.current = None
+                self.selected_target = None
                 self.clear_controls()
+                self.wheel.set_visible(False)
                 self.add_profiles()
+            self.update_desktop_status()
+            if stale and device_bound:
                 # Always consume completion, including confirmed partial counts,
                 # while refusing callbacks that could apply an old readback.
                 try:
@@ -261,23 +266,17 @@ class ControlWindow(Adw.ApplicationWindow):
         if self.busy or self.pending_hardware or self.closed:
             self.shell.sync_local_preferences()
             return
-        document = deepcopy(self.desktop.config)
-        if subkey is None:
-            document[name] = value
-        else:
-            document.setdefault(name, {})[subkey] = value
+        def mutate(document):
+            if subkey is None:
+                document[name] = value
+            else:
+                document.setdefault(name, {})[subkey] = value
         def saved(_result):
-            self.desktop.reload_config()
-            self.desktop._configure_context()
-            self.shell.sync_local_preferences()
-            if name == "appearance":
-                self.shell.apply_appearance(value)
-            self.shell.update_readback()
-            self.status.set_text("Local preference saved.")
+            self.local_config_finished("Local preference saved.")
         def failed(error):
-            self.shell.sync_local_preferences()
-            self.status.set_text(error)
-        self.job(lambda: self.desktop.store.save(document), saved, "Saving local preference…", failed=failed)
+            self.local_config_finished(error)
+        self.job(lambda: self.desktop.store.update(mutate), saved, "Saving local preference…",
+                 failed=failed, device_bound=False)
 
     def save_button_assignment(self, cid, action_id, app_id=None):
         if self.desktop.config is None:
@@ -286,22 +285,35 @@ class ControlWindow(Adw.ApplicationWindow):
         if self.busy or self.pending_hardware or self.closed:
             return
         self.desktop.stop()
-        document = deepcopy(self.desktop.config)
-        active = document.get("active_profiles", {})
-        profile_id = active.get(app_id) or active.get("*")
-        target = document["assignment_profiles"][profile_id] if profile_id else document
-        if action_id is None:
-            target["button_bindings"].pop(str(cid), None)
-        else:
-            target["button_bindings"][str(cid)] = action_id
+        def mutate(document):
+            active = document.get("active_profiles", {})
+            profile_id = active.get(app_id) or active.get("*")
+            target = document["assignment_profiles"][profile_id] if profile_id else document
+            if action_id is None:
+                target["button_bindings"].pop(str(cid), None)
+            else:
+                target["button_bindings"][str(cid)] = action_id
         def saved(_result):
-            self.desktop.reload_config()
-            self.shell.update_readback()
-            self.status.set_text("Local assignment saved. Enable mouse integration to use it.")
+            self.local_config_finished("Local assignment saved. Enable mouse integration to use it.")
         def failed(error):
-            self.status.set_text(error)
-            self.render_workspace()
-        self.job(lambda: self.desktop.store.save(document), saved, "Saving local assignment…", failed=failed)
+            self.local_config_finished(error)
+            if self.current and self.current.get("online"):
+                self.render_workspace()
+        self.job(lambda: self.desktop.store.update(mutate), saved, "Saving local assignment…",
+                 failed=failed, device_bound=False)
+
+    def local_config_finished(self, message):
+        # Atomic replacement may already have committed even when completion
+        # reports an error. Reconcile from disk, independently of device epochs.
+        self.desktop.reload_config()
+        self.desktop._configure_context()
+        self.shell.sync_local_preferences()
+        if self.desktop.config is not None:
+            self.shell.apply_appearance(self.desktop.config.get("appearance", "dark"))
+        self.shell.update_context()
+        self.shell.update_readback()
+        self.update_desktop_status()
+        self.status.set_text(self.desktop.error or message)
 
     def desktop_config_changed(self):
         self.shell.update_context()

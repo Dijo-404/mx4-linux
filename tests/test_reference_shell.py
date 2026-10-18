@@ -178,7 +178,7 @@ def test_failed_local_policy_save_reverts_switch_without_hardware_write(window):
     window.navigate('haptics')
     window.select_target('haptics')
     master = window.shell.preference_widgets[('haptic_feedback', None)][0]
-    window.desktop.store.save = Mock(side_effect=RuntimeError('Disk full'))
+    window.desktop.store.update = Mock(side_effect=RuntimeError('Disk full'))
     window.backend.write = Mock()
     master.set_active(False)
     settle(window)
@@ -478,3 +478,121 @@ def test_rebuilt_context_can_open_inspector_before_first_allocation(window, capf
     assert window.shell.inspector.get_width() > 0
     assert window.shell.inspector_stack.get_visible_child_name() == 'button:83'
     assert 'attempt to allocate AdwBin' not in capfd.readouterr().err
+
+
+def test_cancelled_device_completion_clears_home_and_selection(window):
+    import threading
+    release = threading.Event()
+    try:
+        window.navigate('buttons')
+        window.select_target('button:83')
+        window.job(lambda: release.wait(3), lambda _: None, 'Delayed device operation')
+        window.cancel_hardware()
+        release.set()
+        settle(window)
+        assert window.current is None
+        assert window.selected_target is None
+        assert not window.shell.device_card.get_sensitive()
+        assert window.shell.home_battery.get_text() == 'No device available'
+        assert not window.wheel.get_visible()
+    finally:
+        release.set()
+
+
+@pytest.mark.parametrize('assignment', [False, True], ids=['preference', 'assignment'])
+@pytest.mark.parametrize('completion_error', [False, True], ids=['success', 'post-commit-error'])
+def test_cancelled_local_commit_reconciles_file_cache_and_theme(window, monkeypatch, assignment, completion_error):
+    import threading
+    import mx4_linux.actions as actions
+    release, committed = threading.Event(), threading.Event()
+    replace = actions.os.replace
+    def delayed_replace(*args):
+        replace(*args)
+        committed.set()
+        assert release.wait(3)
+        if completion_error:
+            raise OSError('Completion interrupted after replacement')
+    monkeypatch.setattr(actions.os, 'replace', delayed_replace)
+    try:
+        if assignment:
+            window.save_button_assignment(83, 'copy')
+        else:
+            window.navigate('application')
+            window.shell.preference_widgets[('appearance', None)][0].set_selected(1)
+        assert committed.wait(1)
+        window.cancel_hardware()
+        release.set()
+        settle(window)
+        saved = window.desktop.store.read()
+        assert window.desktop.config == saved
+        if assignment:
+            assert saved['button_bindings']['83'] == 'copy'
+        else:
+            assert saved['appearance'] == 'light'
+            assert window.has_css_class('mx4-light')
+            assert window.shell.preference_widgets[('appearance', None)][0].get_selected() == 1
+        if completion_error:
+            assert 'Completion interrupted' in window.status.get_text()
+    finally:
+        release.set()
+
+
+@pytest.mark.parametrize('assignment', [False, True], ids=['preference', 'assignment'])
+def test_local_update_preserves_newer_unrelated_file_edit(window, assignment):
+    document = deepcopy(window.desktop.config)
+    document['background'] = False
+    window.desktop.store.save(document)
+    assert window.desktop.config != document
+    if assignment:
+        window.save_button_assignment(83, 'copy')
+    else:
+        window.save_local_preference('appearance', 'light')
+    settle(window)
+    assert window.desktop.store.read()['background'] is False
+    assert window.desktop.config['background'] is False
+
+
+def test_local_completion_reconciles_latest_file_instead_of_requested_theme(window, monkeypatch):
+    update = window.desktop.store.update
+    def newer_edit(mutate):
+        committed = update(mutate)
+        latest = deepcopy(committed)
+        latest['appearance'] = 'dark'
+        window.desktop.store.save(latest)
+        return committed
+    monkeypatch.setattr(window.desktop.store, 'update', newer_edit)
+    window.save_local_preference('appearance', 'light')
+    settle(window)
+    assert window.desktop.config['appearance'] == 'dark'
+    assert not window.has_css_class('mx4-light')
+
+
+def test_local_completion_after_close_skips_ui_reconciliation(window, monkeypatch):
+    import threading
+    release, committed, finished = threading.Event(), threading.Event(), threading.Event()
+    update = window.desktop.store.update
+    def delayed_update(mutate):
+        try:
+            result = update(mutate)
+            committed.set()
+            assert release.wait(3)
+            return result
+        finally:
+            finished.set()
+    monkeypatch.setattr(window.desktop.store, 'update', delayed_update)
+    window.local_config_finished = Mock()
+    try:
+        window.save_local_preference('appearance', 'light')
+        assert committed.wait(1)
+        # The fixture stays unmapped; invoke its close-request handler directly.
+        window.on_close()
+        assert window.closed
+        release.set()
+        assert finished.wait(1)
+        window.executor.shutdown(wait=True)  # Ensure its idle completion was queued.
+        while GLib.MainContext.default().pending():
+            GLib.MainContext.default().iteration(False)
+        assert window.desktop.store.read()['appearance'] == 'light'
+        window.local_config_finished.assert_not_called()
+    finally:
+        release.set()
