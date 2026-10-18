@@ -6,6 +6,8 @@ from pathlib import PurePath
 def action_icon(action, grouped=False):
     if grouped:
         return "view-app-grid-symbolic"
+    if action.get("icon"):
+        return action["icon"]
     steps = action.get("steps", [])
     if not steps:
         return "system-run-symbolic"
@@ -18,6 +20,8 @@ def action_icon(action, grouped=False):
                  ("CTRL", "SHIFT", "Z"): "edit-redo-symbolic", ("PLAYPAUSE",): "media-playback-start-symbolic",
                  ("SYSRQ",): "camera-photo-symbolic"}
         return icons.get(keys, "input-keyboard-symbolic")
+    if kind == "application":
+        return "application-x-executable-symbolic"
     if kind == "command":
         argv = step.get("argv", [])
         command = PurePath(argv[0]).name if argv else ""

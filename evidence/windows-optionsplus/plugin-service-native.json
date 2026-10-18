@@ -1,0 +1,410 @@
+{
+  "scope": "Two additional plugin-service support artifacts; static identity/import/string triage only",
+  "string_search_scope": "All original-file ASCII and UTF-16LE printable runs of at least four characters",
+  "artifacts": [
+    {
+      "file_name": "LogiPluginServiceExt.exe",
+      "bytes": 3740312,
+      "sha256": "c17a71b385b534067b21f0aff60ee85603659e89897746419313720683812d45",
+      "format": "PE32+",
+      "machine": "0x8664",
+      "coff_timestamp": 1788938945,
+      "image_base": "0x140000000",
+      "entry_rva": "0x4f224",
+      "sections": [
+        {
+          "name": ".text",
+          "rva": "0x1000",
+          "virtual_size": 2360292,
+          "file_offset": "0x400",
+          "file_size": 2360320
+        },
+        {
+          "name": ".rdata",
+          "rva": "0x242000",
+          "virtual_size": 902312,
+          "file_offset": "0x240800",
+          "file_size": 902656
+        },
+        {
+          "name": ".data",
+          "rva": "0x31f000",
+          "virtual_size": 543624,
+          "file_offset": "0x31ce00",
+          "file_size": 339456
+        },
+        {
+          "name": ".pdata",
+          "rva": "0x3a4000",
+          "virtual_size": 88404,
+          "file_offset": "0x36fc00",
+          "file_size": 88576
+        },
+        {
+          "name": ".rsrc",
+          "rva": "0x3ba000",
+          "virtual_size": 480,
+          "file_offset": "0x385600",
+          "file_size": 512
+        },
+        {
+          "name": ".reloc",
+          "rva": "0x3bb000",
+          "virtual_size": 36968,
+          "file_offset": "0x385800",
+          "file_size": 37376
+        }
+      ],
+      "cli_directory": {
+        "rva": "0x0",
+        "bytes": 0
+      },
+      "classification": "native PE image",
+      "version_records": [],
+      "imported_dll_names": [
+        "CRYPT32.dll",
+        "WINTRUST.dll",
+        "imagehlp.dll",
+        "KERNEL32.dll",
+        "USER32.dll",
+        "ADVAPI32.dll",
+        "MSVCP140.dll",
+        "WS2_32.dll",
+        "VCRUNTIME140_1.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "ole32.dll"
+      ],
+      "selected_strings": [
+        {
+          "file_offset": "0x241f38",
+          "encoding": "ascii",
+          "text": "LocalClientImpl::callback: creating new connection."
+        },
+        {
+          "file_offset": "0x242008",
+          "encoding": "ascii",
+          "text": "LocalClientImpl::start(): posting initial connection attempt."
+        },
+        {
+          "file_offset": "0x242438",
+          "encoding": "ascii",
+          "text": "\\\\.\\pipe\\"
+        },
+        {
+          "file_offset": "0x245710",
+          "encoding": "ascii",
+          "text": "devio::Feature19a1ContextualDisplay::getCapabilities"
+        },
+        {
+          "file_offset": "0x2457b0",
+          "encoding": "ascii",
+          "text": "Feature19a1ContextualDisplay::getDisplayInfo() displayShape=%u, dimension=%u, resHorizontal=%u, resVertical=%u"
+        },
+        {
+          "file_offset": "0x245ae8",
+          "encoding": "ascii",
+          "text": "devio::Feature19a1ContextualDisplay::setImage"
+        },
+        {
+          "file_offset": "0x288188",
+          "encoding": "ascii",
+          "text": "LogiPluginService"
+        },
+        {
+          "file_offset": "0x28b218",
+          "encoding": "ascii",
+          "text": "Invalid signature"
+        },
+        {
+          "file_offset": "0x28b230",
+          "encoding": "ascii",
+          "text": "Header hash mismatch"
+        },
+        {
+          "file_offset": "0x28b2a0",
+          "encoding": "ascii",
+          "text": "Message hash mismatch"
+        },
+        {
+          "file_offset": "0x28b6d8",
+          "encoding": "ascii",
+          "text": "DeviceConnected"
+        },
+        {
+          "file_offset": "0x28b7c0",
+          "encoding": "ascii",
+          "text": "ButtonReleased"
+        },
+        {
+          "file_offset": "0x28b7d0",
+          "encoding": "ascii",
+          "text": "DeviceDisconnected"
+        },
+        {
+          "file_offset": "0x28b808",
+          "encoding": "ascii",
+          "text": "ButtonPressed"
+        },
+        {
+          "file_offset": "0x28b8b8",
+          "encoding": "ascii",
+          "text": "EncoderRotated"
+        },
+        {
+          "file_offset": "0x28b9e0",
+          "encoding": "ascii",
+          "text": "SetDisplayImage"
+        },
+        {
+          "file_offset": "0x28ba60",
+          "encoding": "ascii",
+          "text": "GetBrightness"
+        },
+        {
+          "file_offset": "0x28ba88",
+          "encoding": "ascii",
+          "text": "SetBrightness"
+        },
+        {
+          "file_offset": "0x28ba98",
+          "encoding": "ascii",
+          "text": "Jpeg"
+        },
+        {
+          "file_offset": "0x28badc",
+          "encoding": "ascii",
+          "text": "Rgb565"
+        },
+        {
+          "file_offset": "0x28bb10",
+          "encoding": "ascii",
+          "text": "EnterDfuMode"
+        },
+        {
+          "file_offset": "0x28bb20",
+          "encoding": "ascii",
+          "text": "GetDeviceInfo"
+        },
+        {
+          "file_offset": "0x28bb40",
+          "encoding": "ascii",
+          "text": "GetDeviceState"
+        },
+        {
+          "file_offset": "0x28bb68",
+          "encoding": "ascii",
+          "text": "SetDeviceState"
+        },
+        {
+          "file_offset": "0x28bb80",
+          "encoding": "ascii",
+          "text": "StartKeepAlive"
+        },
+        {
+          "file_offset": "0x28bbd0",
+          "encoding": "ascii",
+          "text": "ForceDeviceReset"
+        },
+        {
+          "file_offset": "0x28bbe8",
+          "encoding": "ascii",
+          "text": "ExitDfuMode"
+        },
+        {
+          "file_offset": "0x28bc50",
+          "encoding": "ascii",
+          "text": "StopKeepAlive"
+        },
+        {
+          "file_offset": "0x272118",
+          "encoding": "utf-16le",
+          "text": "Logi_Devio_MainWindow"
+        },
+        {
+          "file_offset": "0x28c050",
+          "encoding": "utf-16le",
+          "text": "Global\\LogiPluginServiceExt-Semaphore"
+        },
+        {
+          "file_offset": "0x28c240",
+          "encoding": "utf-16le",
+          "text": "Global\\LogiPluginServiceExtServer"
+        },
+        {
+          "file_offset": "0x28c2b0",
+          "encoding": "utf-16le",
+          "text": "Loupedeck2ExtWindowClass"
+        },
+        {
+          "file_offset": "0x28c490",
+          "encoding": "utf-16le",
+          "text": "Loupedeck2ExtWin"
+        }
+      ],
+      "bounded_searches": [
+        {
+          "name": "mx4",
+          "regex": "(?i)\\b(?:MX\\s*Master\\s*4|B042|B048)\\b",
+          "match_count": 0,
+          "matches": []
+        },
+        {
+          "name": "ring",
+          "regex": "(?i)radial_menu|actions[ _]?ring",
+          "match_count": 0,
+          "matches": []
+        },
+        {
+          "name": "specific_haptic_force",
+          "regex": "(?i)feature_(?:x)?19[bc]0|\\bFeature19[bc]0|force_sensing",
+          "match_count": 0,
+          "matches": []
+        }
+      ]
+    },
+    {
+      "file_name": "NativeApi.dll",
+      "bytes": 284824,
+      "sha256": "35328d0e4506ef94261b3f0d6f4b9ff7f5675f818a44d0bdacaac64e26ff107c",
+      "format": "PE32+",
+      "machine": "0x8664",
+      "coff_timestamp": 1788938930,
+      "image_base": "0x180000000",
+      "entry_rva": "0x0",
+      "sections": [
+        {
+          "name": ".text",
+          "rva": "0x2000",
+          "virtual_size": 271948,
+          "file_offset": "0x200",
+          "file_size": 272384
+        },
+        {
+          "name": ".rsrc",
+          "rva": "0x46000",
+          "virtual_size": 1536,
+          "file_offset": "0x42a00",
+          "file_size": 1536
+        }
+      ],
+      "cli_directory": {
+        "rva": "0x2000",
+        "bytes": 72
+      },
+      "classification": "managed PE/CLI assembly",
+      "version_records": [
+        {
+          "file_offset": "0x42a80",
+          "file_version": "6.4.2.3414",
+          "product_version": "6.4.2.3414"
+        }
+      ],
+      "imported_dll_names": [],
+      "selected_strings": [
+        {
+          "file_offset": "0x36018",
+          "encoding": "ascii",
+          "text": "GetClipboardData"
+        },
+        {
+          "file_offset": "0x36029",
+          "encoding": "ascii",
+          "text": "SetClipboardData"
+        },
+        {
+          "file_offset": "0x3831e",
+          "encoding": "ascii",
+          "text": "OverlayBase"
+        },
+        {
+          "file_offset": "0x39430",
+          "encoding": "ascii",
+          "text": "MouseClick"
+        },
+        {
+          "file_offset": "0x3949c",
+          "encoding": "ascii",
+          "text": "KeyboardHook"
+        },
+        {
+          "file_offset": "0x394a9",
+          "encoding": "ascii",
+          "text": "WindowsHook"
+        },
+        {
+          "file_offset": "0x3965e",
+          "encoding": "ascii",
+          "text": "MessageHookMouseLowLevel"
+        },
+        {
+          "file_offset": "0x3bdcd",
+          "encoding": "ascii",
+          "text": "CaptureAllScreens"
+        },
+        {
+          "file_offset": "0x3cf3c",
+          "encoding": "ascii",
+          "text": "SendKeyboardEvent"
+        },
+        {
+          "file_offset": "0x3d42e",
+          "encoding": "ascii",
+          "text": "SendKeyboardShortcut"
+        },
+        {
+          "file_offset": "0x3d513",
+          "encoding": "ascii",
+          "text": "SendInput"
+        }
+      ],
+      "bounded_searches": [
+        {
+          "name": "mx4",
+          "regex": "(?i)\\b(?:MX\\s*Master\\s*4|B042|B048)\\b",
+          "match_count": 0,
+          "matches": []
+        },
+        {
+          "name": "ring",
+          "regex": "(?i)radial_menu|actions[ _]?ring",
+          "match_count": 0,
+          "matches": []
+        },
+        {
+          "name": "specific_haptic_force",
+          "regex": "(?i)feature_(?:x)?19[bc]0|\\bFeature19[bc]0|force_sensing",
+          "match_count": 0,
+          "matches": []
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "classification": "inference from native diagnostics and method-name literals",
+      "statement": "LogiPluginServiceExt.exe appears to bridge the plugin service to Loupedeck/contextual-display device IO through local IPC; image formats, brightness, key/encoder events, keepalive and firmware-update methods are present."
+    },
+    {
+      "classification": "observed PE/CLI directory and metadata strings",
+      "statement": "NativeApi.dll is managed despite its name. Its strings expose OS input, clipboard, screen capture, window/hook and overlay abstractions; method bodies are outside this triage."
+    }
+  ],
+  "limitations": [
+    "No target execution, native decompilation or live IPC observation.",
+    "String presence is not proof of registration, reachability or runtime behavior.",
+    "Negative searches cannot rule out packed/encrypted/generated names or functions without those names.",
+    "No dedicated MX4, ring, haptic or force-controller literal matched the stated patterns in either artifact.",
+    "Managed body and call-edge analysis of NativeApi.dll is delegated separately."
+  ]
+}

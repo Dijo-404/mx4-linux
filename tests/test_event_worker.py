@@ -19,7 +19,13 @@ from mx4_linux import event_worker as worker
 from mx4_linux.device_worker import _device_id
 
 
+@pytest.fixture(autouse=True)
+def private_reporting_state(tmp_path, monkeypatch):
+    monkeypatch.setenv('XDG_STATE_HOME', str(tmp_path))
+
+
 FEATURE = 0x1B04
+HAPTIC = 0x19B0
 INDEX = 9
 TARGET = _device_id("/dev/hidraw-test", 255)
 
@@ -31,6 +37,7 @@ def notification(address=0, data=b"\0" * 8, number=255, index=INDEX):
 class FakeDevice:
     def __init__(self):
         self.name, self.number, self.online = "MX Master 4", 255, True
+        self.id = self.unitId = "a1b2c3d4"
         self.handle, self.receiver = 23, None
         self.features = {FEATURE: INDEX}
         # Persistent and analytics bits deliberately survive temporary changes.
@@ -45,6 +52,10 @@ class FakeDevice:
         self.feature_request = Mock(side_effect=self._feature_request)
 
     def _feature_request(self, feature, function, *data):
+        if feature == 3 and function == 0:
+            return b'\0' + bytes.fromhex(self.id) + b'\0' * 8
+        if feature == HAPTIC and function == 0x10:
+            return b'\x01\x32\x00'
         assert feature == FEATURE
         payload = bytes(data)
         cid = int.from_bytes(payload[:2])
@@ -67,7 +78,7 @@ def setup_session():
     dev, commands, events = FakeDevice(), queue.Queue(), []
     api = SimpleNamespace(
         hidpp20=hidpp20,
-        hidpp20_constants=SimpleNamespace(SupportedFeature=SimpleNamespace(REPROG_CONTROLS_V4=FEATURE)),
+        hidpp20_constants=SimpleNamespace(SupportedFeature=SimpleNamespace(REPROG_CONTROLS_V4=FEATURE, HAPTIC=HAPTIC)),
         configuration=SimpleNamespace(persister=Mock()),
         hidpp10=SimpleNamespace(set_configuration_pending_flags=Mock()),
         settings_templates=SimpleNamespace(SETTINGS=[], check_feature=Mock()),
@@ -104,7 +115,7 @@ def test_real_solaar_setters_restore_flags_and_keep_all_mappings():
     assert run(dev, api, commands, events, controls=[82, 416])
     assert events == [
         {"type": "ready", "controls": [82, 416], "ring_button": 416, "raw_xy": True},
-        {"type": "stopped"},
+        {"type": "stopped", "restored": True},
     ]
     assert dev.reporting == before
     assert {cid for cid, _, _ in dev.writes} == {82, 416}
@@ -138,6 +149,30 @@ def test_listener_uses_separate_software_id_for_discovery_events_and_restore():
     assert dev.reporting[416] == (0x104, 416)
 
 
+def test_hidpp_enable_failure_is_readable_and_still_stops_without_ready():
+    from logitech_receiver.exceptions import FeatureCallError
+
+    dev, api, commands, events = setup_session()
+    # A live reporting read fails before the worker writes any flags.
+    original = dev._feature_request
+
+    def request(feature, function, *args):
+        if feature == FEATURE and function == 0x20:
+            raise FeatureCallError(number=2, request=2893, error=5, params=b"\x00")
+        return original(feature, function, *args)
+
+    dev.feature_request.side_effect = request
+    assert not run(dev, api, commands, events)
+    assert not dev.writes
+    assert not any(event["type"] == "ready" for event in events)
+    assert events[0] == {
+        "type": "error",
+        "message": "The mouse rejected this request with a device-specific error. "
+                   "(HID++ error 0x05, request 0x0B4D)",
+    }
+    assert events[-1] == {"type": "stopped", "restored": True}
+
+
 def test_preexisting_diversion_and_raw_motion_remain_enabled_without_writes():
     dev, api, commands, events = setup_session()
     dev.reporting[416] = (0x115, 416)
@@ -157,7 +192,7 @@ def test_invalid_request_never_changes_any_device(config):
     assert not run(dev, api, commands, events, **config)
     assert dev.writes == []
     assert events[0]["type"] == "error"
-    assert events[-1] == {"type": "stopped"}
+    assert events[-1] == {"type": "stopped", "restored": None}
 
 
 @pytest.mark.parametrize("bad_flags", [0, 0x20, 0x1A0])
@@ -182,7 +217,7 @@ def test_acknowledgement_failure_after_firmware_change_still_restores():
 
 def test_failed_live_snapshot_never_accepts_solaar_fallback_defaults():
     dev, api, commands, events = setup_session()
-    dev.feature_request.side_effect = lambda *_args: None
+    dev.feature_request.side_effect = lambda feature, function, *args: dev._feature_request(feature, function, *args) if feature == 3 else None
     assert not run(dev, api, commands, events)
     assert dev.writes == []
     assert "No live reporting reply" in events[0]["message"]
@@ -288,6 +323,133 @@ def test_haptic_request_notifications_use_same_decoder_and_are_not_swallowed():
     ]
 
 
+@pytest.mark.parametrize("failure", ["discovery", "playback", "no-acknowledgement", "unsupported"])
+def test_optional_haptic_failure_warns_once_and_keeps_button_and_motion_events(failure):
+    from logitech_receiver.exceptions import FeatureCallError
+
+    dev, api, commands, events = setup_session()
+    before = dict(dev.reporting)
+    rejection = FeatureCallError(number=2, request=2893, error=5, params=b"\x00")
+    setting = SimpleNamespace(choices=[0], write=Mock(return_value=0))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    api.settings_templates.check_feature.return_value = setting
+    if failure == "discovery":
+        api.settings_templates.check_feature.side_effect = rejection
+    elif failure == "playback":
+        setting.write.side_effect = rejection
+    elif failure == "no-acknowledgement":
+        setting.write.return_value = None
+    else:
+        api.settings_templates.check_feature.return_value = None
+
+    def read(*_args):
+        assert dev.reporting[416][0] & 0x11 == 0x11
+        dev.handle.notifications_hook(notification(data=struct.pack("!4H", 416, 0, 0, 0)))
+        dev.handle.notifications_hook(notification(address=16, data=struct.pack("!hh", 8, -5)))
+        commands.put({"op": "stop"})
+
+    api.base.read.side_effect = read
+    for _ in range(3):
+        commands.put({"op": "haptic", "waveform": 0})
+    assert run(dev, api, commands, events)
+    assert [event["type"] for event in events] == ["ready", "warning", "button", "motion", "button", "stopped"]
+    warning = events[1]
+    assert warning["source"] == "haptic"
+    assert "Mouse integration remains enabled" in warning["message"]
+    if failure in ("discovery", "playback"):
+        assert "HID++ error 0x05, request 0x0B4D" in warning["message"]
+        assert "'params'" not in warning["message"]
+    assert events[2:4] == [
+        {"type": "button", "control": 416, "pressed": True},
+        {"type": "motion", "dx": 8, "dy": -5},
+    ]
+    assert events[-1] == {"type": "stopped", "restored": True}
+    assert dev.reporting == before
+    api.settings_templates.check_feature.assert_called_once()
+    assert setting.write.call_count == int(failure in ("playback", "no-acknowledgement"))
+
+
+@pytest.mark.parametrize("invalid", [True, -1, 256, 2])
+def test_invalid_haptic_waveform_does_not_block_later_valid_feedback(invalid):
+    dev, api, commands, events = setup_session()
+    setting = SimpleNamespace(choices=[1], write=Mock(return_value=1))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    api.settings_templates.check_feature.return_value = setting
+    commands.put({"op": "haptic", "waveform": invalid})
+    commands.put({"op": "haptic", "waveform": 1})
+    assert run(dev, api, commands, events)
+    assert [event["type"] for event in events] == ["ready", "warning", "stopped"]
+    setting.write.assert_called_once_with(1, save=False)
+
+
+@pytest.mark.parametrize("status", [b"\x00\x32\x00", None, b"\x01"])
+def test_haptic_disabled_or_unreadable_status_never_plays_or_changes_hardware_settings(status):
+    dev, api, commands, events = setup_session()
+    setting = SimpleNamespace(choices=[0], write=Mock(return_value=0))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    api.settings_templates.check_feature.return_value = setting
+    original = dev._feature_request
+
+    def request(feature, function, *data):
+        if feature == HAPTIC:
+            assert function == 0x10 and not data  # Only the documented state GET is allowed.
+            return status
+        return original(feature, function, *data)
+
+    dev.feature_request.side_effect = request
+    for _ in range(2):
+        commands.put({"op": "haptic", "waveform": 0})
+    assert run(dev, api, commands, events)
+    assert [event["type"] for event in events] == ["ready", "warning", "stopped"]
+    assert "Mouse integration remains enabled" in events[1]["message"]
+    assert ("turned off on the mouse" if status and len(status) >= 2 else "did not report") in events[1]["message"]
+    setting.write.assert_not_called()
+    assert len([call for call in dev.feature_request.call_args_list if call.args[0] == HAPTIC]) == 1
+
+
+def test_haptic_identity_precondition_failure_remains_fatal():
+    dev, api, commands, events = setup_session()
+    setting = SimpleNamespace(choices=[0], write=Mock(return_value=0))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    feedback_pending = [False]
+
+    def discover(*_args):
+        feedback_pending[0] = True
+        return setting
+
+    original_identity = worker.require_identity
+
+    def identity(*args):
+        if feedback_pending[0]:
+            feedback_pending[0] = False
+            raise RuntimeError("Mouse identity is unavailable or changed.")
+        return original_identity(*args)
+
+    api.settings_templates.check_feature.side_effect = discover
+    commands.put({"op": "haptic", "waveform": 0})
+    with patch.object(worker, "require_identity", side_effect=identity):
+        assert not run(dev, api, commands, events)
+    assert events[1] == {"type": "error", "message": "Mouse identity is unavailable or changed."}
+    assert not any(event["type"] == "warning" for event in events)
+    assert events[-1] == {"type": "stopped", "restored": True}
+    setting.write.assert_not_called()
+
+
+@pytest.mark.parametrize("stage", ["discovery", "playback"])
+def test_haptic_path_never_downgrades_reporting_ownership_conflicts(stage):
+    dev, api, commands, events = setup_session()
+    setting = SimpleNamespace(choices=[0], write=Mock(return_value=0))
+    api.settings_templates.SETTINGS = [SimpleNamespace(name="haptic-play")]
+    api.settings_templates.check_feature.return_value = setting
+    operation = api.settings_templates.check_feature if stage == "discovery" else setting.write
+    operation.side_effect = worker.OwnershipConflict("Reporting ownership changed.")
+    commands.put({"op": "haptic", "waveform": 0})
+    assert not run(dev, api, commands, events)
+    assert events[1] == {"type": "error", "reason": "ownership-conflict", "message": "Reporting ownership changed."}
+    assert not any(event["type"] == "warning" for event in events)
+    assert events[-1] == {"type": "stopped", "restored": True}
+
+
 def test_eof_command_reader_and_malformed_command_are_handled():
     dev, api, commands, events = setup_session()
     worker._read_commands(io.BytesIO(b"{bad\n[]\n"), commands)
@@ -309,7 +471,7 @@ def test_sigterm_uses_normal_restore_path_and_restores_signal_handlers():
         assert worker.run({"device_id": TARGET}, api, commands, events.append, stop)
     assert signal.getsignal(signal.SIGTERM) == old_handler
     assert dev.reporting[416] == (0x104, 416)
-    assert events[-1] == {"type": "stopped"}
+    assert events[-1] == {"type": "stopped", "restored": True}
 
 
 def test_unplug_reports_error_and_attempts_all_restoration():
@@ -337,7 +499,7 @@ def test_cleanup_failure_is_reported_and_other_controls_still_restore():
     assert dev.reporting[82] == (0x104, 83)
     assert not dev.reporting[416][0] & 16
     assert "Could not restore mouse reporting" in events[-2]["message"]
-    assert events[-1] == {"type": "stopped"}
+    assert events[-1] == {"type": "stopped", "restored": False}
     dev.close.assert_called_once()
 
 
@@ -508,3 +670,373 @@ event_worker.main()
         process.stdin.close()
         process.stdout.close()
         process.stderr.close()
+
+
+def add_control(dev, cid):
+    dev.reporting[cid] = (0x104, cid)
+    dev.keys.append(hidpp20.ReprogrammableKeyV4(dev, len(dev.keys), cid, cid, 0x120, 0, 0, 0))
+
+
+def test_profile_transition_restores_native_mapping_and_retains_original_on_reacquire():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    phases = []
+    def read(*_):
+        phases.append(dict(dev.reporting))
+        if len(phases) == 1:
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [83, 416], 'ring_button': 416, 'raw_xy': True})
+        elif len(phases) == 2:
+            commands.put({'op': 'configure', 'config_id': 2, 'controls': [82, 416], 'ring_button': 416, 'raw_xy': True})
+        else:
+            commands.put({'op': 'stop'})
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events, controls=[82, 416])
+    assert phases[0][82] == (0x105, 83) and phases[0][83] == before[83]
+    assert phases[1][82] == before[82] and phases[1][83] == (0x105, 83)
+    assert phases[2][82] == (0x105, 83) and phases[2][83] == before[83]
+    assert dev.reporting == before
+    assert [e['config_id'] for e in events if e['type'] == 'configured'] == [1, 2]
+
+
+def test_profile_transition_defers_until_held_button_released_without_false_edges():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    count = 0
+    def read(*_):
+        nonlocal count
+        count += 1
+        if count == 1:
+            dev.handle.notifications_hook(notification(data=struct.pack('!4H', 82, 0, 0, 0)))
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [83, 416], 'ring_button': 416, 'raw_xy': True})
+        elif count == 2:
+            assert dev.reporting[82][0] & 1
+            assert not any(e['type'] == 'configured' for e in events)
+            dev.handle.notifications_hook(notification(data=b'\0' * 8))
+        else:
+            assert not dev.reporting[82][0] & 1
+            commands.put({'op': 'stop'})
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events, controls=[82, 416])
+    assert [e for e in events if e['type'] == 'button'] == [
+        {'type': 'button', 'control': 82, 'pressed': True},
+        {'type': 'button', 'control': 82, 'pressed': False}]
+
+
+@pytest.mark.parametrize('command', [
+    {'op': 'configure', 'controls': [80], 'config_id': 1},
+    {'op': 'configure', 'controls': [416], 'config_id': True},
+    {'op': 'configure', 'controls': [416], 'config_id': 1, 'raw_xy': 1},
+    {'op': 'configure', 'controls': [416], 'config_id': 1, 'device_id': 'other'},
+])
+def test_invalid_profile_transition_stops_and_restores(command):
+    dev, api, commands, events = setup_session()
+    before = dict(dev.reporting)
+    commands.put(command)
+    assert not run(dev, api, commands, events)
+    assert dev.reporting == before
+    assert events[-2]['type'] == 'error'
+
+
+def test_failed_profile_transition_restores_old_and_newly_touched_controls():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    def read(*_):
+        commands.put({'op': 'configure', 'config_id': 1, 'controls': [83, 416], 'ring_button': 416, 'raw_xy': True})
+        dev.fail_after_write = len(dev.writes) + 2
+    api.base.read.side_effect = read
+    assert not run(dev, api, commands, events, controls=[82, 416])
+    assert dev.reporting == before
+    assert not any(e['type'] == 'configured' for e in events)
+
+
+def test_press_received_during_transition_snapshot_defers_before_any_write():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    original = dev._feature_request
+    trigger = False
+    count = 0
+    def request(feature, function, *data):
+        nonlocal trigger
+        if trigger and function == 0x20:
+            trigger = False
+            dev.handle.notifications_hook(notification(data=struct.pack('!4H', 82, 0, 0, 0)))
+        return original(feature, function, *data)
+    def read(*_):
+        nonlocal count, trigger
+        count += 1
+        if count == 1:
+            trigger = True
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [83, 416], 'ring_button': 416, 'raw_xy': True})
+        elif count == 2:
+            assert dev.reporting[82][0] & 1
+            assert not any(e['type'] == 'configured' for e in events)
+            dev.handle.notifications_hook(notification(data=b'\0' * 8))
+        else:
+            commands.put({'op': 'stop'})
+    dev.feature_request.side_effect = request
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events, controls=[82, 416])
+    assert any(e['type'] == 'configured' for e in events)
+
+
+def test_malformed_configure_requires_explicit_control_and_reporting_fields():
+    dev, api, commands, events = setup_session()
+    commands.put({'op': 'configure', 'config_id': 1})
+    assert not run(dev, api, commands, events)
+    assert dev.reporting[416] == (0x104, 416)
+
+
+def test_journal_precedes_each_setter_and_clears_only_after_confirmed_stop(monkeypatch):
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    original = dev._feature_request
+    def request(feature, function, *args):
+        if feature == FEATURE and function == 0x30:
+            # Both acquire and restore have a durable original snapshot first.
+            record = Ownership('unit:a1b2c3d4').read()
+            assert record and record['controls'][0]['flags'] == 0x104
+        return original(feature, function, *args)
+    dev.feature_request.side_effect = request
+    assert run(dev, api, commands, events)
+    assert events[-1]['restored'] is True
+    assert Ownership('unit:a1b2c3d4').read() is None
+
+
+def test_persistence_failure_before_setter_does_not_change_firmware(monkeypatch):
+    monkeypatch.setattr('mx4_linux.reporting_state.atomic_json', Mock(side_effect=OSError('disk full')))
+    dev, api, commands, events = setup_session()
+    assert not run(dev, api, commands, events)
+    assert dev.writes == []
+
+
+def test_orphan_recovers_before_new_baseline_and_already_restored_needs_no_write():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+    dev.reporting[416] = (0x115, 416)
+    assert run(dev, api, commands, events)
+    assert dev.reporting[416] == (0x104, 416)
+    assert dev.writes[:2] == [(416, 32, 0), (416, 2, 0)]
+    assert Ownership('unit:a1b2c3d4').read() is None
+    before = list(dev.writes)
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+        worker.recover_reporting(dev, api, owner)
+        assert owner.read() is None
+    assert before == dev.writes
+
+
+def test_orphan_mapping_conflict_validated_before_any_recovery_write():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(82, 0x104, 83, 1)
+        owner.touch(416, 0x104, 416, 17)
+    dev.reporting[82] = (0x105, 83)
+    dev.reporting[416] = (0x115, 86)
+    assert not run(dev, api, commands, events)
+    assert dev.writes == []
+    assert events[-1]['restored'] is False
+    assert Ownership('unit:a1b2c3d4').read()
+
+
+def test_reporting_lock_contention_never_writes():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4'):
+        assert not run(dev, api, commands, events)
+    assert not dev.writes
+    assert events[-1]['restored'] is None
+
+
+def test_fresh_identity_change_stops_before_setter_and_keeps_orphan():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    original = dev._feature_request
+    id_reads = 0
+    def requests(feature, function, *args):
+        nonlocal id_reads
+        if feature == 3:
+            id_reads += 1
+            if id_reads > 2:
+                return b'\0' + bytes.fromhex('d1e2f3a4') + b'\0' * 8
+        return original(feature, function, *args)
+    dev.feature_request.side_effect = requests
+    assert not run(dev, api, commands, events)
+    assert len(dev.writes) <= 1
+    assert Ownership('unit:a1b2c3d4').read()
+
+
+def test_restore_timeout_after_firmware_change_can_be_confirmed_live():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    # Enabling writes two flags; the first restore write changes firmware then
+    # raises. Its live original value still authorizes confirmed cleanup.
+    dev.fail_after_write = 3
+    assert run(dev, api, commands, events)
+    assert events[-1]['restored'] is True
+    assert dev.reporting[416] == (0x104, 416)
+    assert Ownership('unit:a1b2c3d4').read() is None
+
+
+def test_external_owned_bit_change_is_not_reasserted_by_reconfiguration():
+    dev, api, commands, events = setup_session()
+    changed_at = []
+    def emit(event):
+        events.append(event)
+        if event['type'] == 'ready':
+            flags, mapping = dev.reporting[416]
+            dev.reporting[416] = (flags & ~16, mapping)
+            changed_at.append(len(dev.writes))
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [416], 'ring_button': 416, 'raw_xy': True})
+    assert not worker.run({'device_id': TARGET}, api, commands, emit)
+    assert not any(event['type'] == 'configured' for event in events)
+    # Cleanup may restore the remaining diverted bit, but never re-enable RAW_XY.
+    assert all(not (change & 16) for _cid, change, _mapping in dev.writes[changed_at[0]:])
+
+
+@pytest.mark.parametrize('swap_on_reporting_read', [1, 2, 3])
+def test_recovery_never_clears_original_journal_using_reused_slot_readback(swap_on_reporting_read):
+    from mx4_linux.reporting_state import Ownership
+    dev, api, _commands, _events = setup_session()
+    original = dev._feature_request
+    reporting_reads = 0
+    def request(feature, function, *args):
+        nonlocal reporting_reads
+        if feature == FEATURE and function == 0x20:
+            reporting_reads += 1
+            if reporting_reads == swap_on_reporting_read:
+                # Another mouse now answers the same receiver slot with flags
+                # that coincidentally match the original mouse's baseline.
+                dev.id = dev.unitId = 'd1e2f3a4'
+        return original(feature, function, *args)
+    dev.feature_request.side_effect = request
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+        before = owner.path.read_bytes()
+        with pytest.raises(RuntimeError, match='identity|restore'):
+            worker.recover_reporting(dev, api, owner)
+        assert owner.path.read_bytes() == before
+    assert dev.writes == []
+
+
+def test_even_empty_recovery_requires_fresh_matching_unit_identity():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, _commands, _events = setup_session()
+    dev.id = dev.unitId = 'd1e2f3a4'
+    with Ownership('unit:a1b2c3d4') as owner:
+        with pytest.raises(RuntimeError, match='identity'):
+            worker.recover_reporting(dev, api, owner)
+        assert owner.read() is None
+    assert dev.writes == []
+
+
+def test_recovery_persistence_failure_is_fatal_even_if_later_flags_would_match():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, _commands, _events = setup_session()
+    dev.reporting[416] = (0x115, 416)
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+        before = owner.path.read_bytes()
+        def failed_touch(*_args):
+            dev.reporting[416] = (0x104, 416)
+            raise OSError('Journal fsync failed')
+        owner.touch = failed_touch
+        with pytest.raises(OSError, match='fsync'):
+            worker.recover_reporting(dev, api, owner)
+        assert owner.path.read_bytes() == before
+    assert not dev.writes
+
+
+def test_manual_idle_session_has_no_reporting_writes_but_keeps_ownership():
+    dev, api, commands, events = setup_session()
+    assert run(dev, api, commands, events, controls=[], ring_button=None, raw_xy=False)
+    assert dev.writes == []
+    assert events == [{'type': 'ready', 'controls': [], 'ring_button': None, 'raw_xy': False},
+                      {'type': 'stopped', 'restored': True}]
+
+
+def test_trigger_transitions_to_ordinary_idle_and_new_trigger_restore_exactly():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    phases = []
+    changes = [([416], None, False), ([], None, False), ([83], 83, True), ([416], 416, True)]
+    def read(*_):
+        phases.append(dict(dev.reporting))
+        if len(phases) <= len(changes):
+            controls, trigger, raw = changes[len(phases) - 1]
+            commands.put({'op': 'configure', 'config_id': len(phases), 'controls': controls,
+                          'ring_button': trigger, 'raw_xy': raw})
+        else:
+            commands.put({'op': 'stop'})
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events)
+    assert phases[1][416][0] & 1 and not phases[1][416][0] & 16
+    assert phases[2] == before
+    assert phases[3][83][0] & 17 == 17 and phases[3][416] == before[416]
+    assert dev.reporting == before
+    assert [e['config_id'] for e in events if e['type'] == 'configured'] == [1, 2, 3, 4]
+
+
+def test_null_trigger_cannot_request_raw_motion():
+    dev, api, commands, events = setup_session()
+    assert not run(dev, api, commands, events, controls=[416], ring_button=None, raw_xy=True)
+    assert dev.writes == [] and not api.base.open_path.called
+
+
+def test_idle_manual_session_recovers_orphan_and_refuses_owned_lock():
+    from mx4_linux.reporting_state import Ownership
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4') as owner:
+        owner.touch(416, 0x104, 416, 17)
+    dev.reporting[416] = (0x115, 416)
+    assert run(dev, api, commands, events, controls=[], ring_button=None, raw_xy=False)
+    assert dev.reporting[416] == (0x104, 416)
+    assert len(dev.writes) == 2  # Recovery only; idle acquisition makes no setters.
+    assert Ownership('unit:a1b2c3d4').read() is None
+    dev, api, commands, events = setup_session()
+    with Ownership('unit:a1b2c3d4'):
+        assert not run(dev, api, commands, events, controls=[], ring_button=None, raw_xy=False)
+    assert dev.writes == [] and events[-1]['restored'] is None
+
+
+def test_trigger_to_manual_ordinary_waits_for_held_release_before_ack():
+    dev, api, commands, events = setup_session()
+    before = dict(dev.reporting)
+    phases = 0
+    def read(*_):
+        nonlocal phases
+        phases += 1
+        if phases == 1:
+            dev.handle.notifications_hook(notification(data=struct.pack('!4H', 416, 0, 0, 0)))
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [416], 'ring_button': None, 'raw_xy': False})
+        elif phases == 2:
+            assert not any(e['type'] == 'configured' for e in events)
+            assert dev.reporting[416][0] & 17 == 17
+            dev.handle.notifications_hook(notification(data=b'\0' * 8))
+        else:
+            assert dev.reporting[416][0] & 1 and not dev.reporting[416][0] & 16
+            commands.put({'op': 'stop'})
+    api.base.read.side_effect = read
+    assert run(dev, api, commands, events)
+    types = [e['type'] for e in events]
+    release = next(i for i,e in enumerate(events) if e['type'] == 'button' and not e['pressed'])
+    assert release < types.index('configured')
+    assert dev.reporting == before
+
+
+def test_new_trigger_lost_ack_restores_old_and_new_originals():
+    dev, api, commands, events = setup_session()
+    add_control(dev, 83)
+    before = dict(dev.reporting)
+    def read(*_):
+        dev.fail_after_write = len(dev.writes) + 1
+        commands.put({'op': 'configure', 'config_id': 1, 'controls': [83], 'ring_button': 83, 'raw_xy': True})
+    api.base.read.side_effect = read
+    assert not run(dev, api, commands, events)
+    assert dev.reporting == before and events[-1]['restored'] is True
+    assert not any(e['type'] == 'configured' for e in events)

@@ -1,0 +1,73 @@
+{
+  "observed_at": "2026-10-18T18:19:08.201806+00:00",
+  "reviewed_core_commit": "49dc6f418b35a146eface4d2f5033f14e14b4f27",
+  "method": "Production Backend.write and device_worker with fresh expected unit identity, remember=False, normal configuration lock; each alternative freshly confirmed and restored before next case",
+  "stage": "complete",
+  "passed": true,
+  "restored": true,
+  "results": [
+    {
+      "setting": "dpi",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "haptic-level",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "force-sensing",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "hires-smooth-invert",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "hires-smooth-resolution",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "thumb-scroll-invert",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "smart-shift",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "scroll-ratchet",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "scroll-ratchet-torque",
+      "status": "passed",
+      "failure": null
+    },
+    {
+      "setting": "reprogrammable-keys",
+      "status": "passed",
+      "failure": null
+    }
+  ],
+  "configuration_unchanged": true,
+  "desired_unchanged": true,
+  "all_six_reporting_and_mappings_restored": true,
+  "raw_wheel_mode_threshold_torque_restored": true,
+  "haptic_pulses": 0,
+  "host_switches": 0,
+  "private_recovery_values_retained_outside_repository": true,
+  "limits": [
+    "Individual production setting writes were tested; this is not a live GUI profile-application or reconnect test.",
+    "Readback establishes stored values, not subjective wheel direction, pointer distance or pressure calibration.",
+    "No original settings, unit identity/digest, host names, private paths or raw scan retained in this public evidence."
+  ],
+  "harness_sha256": "2283708da199bd8e081b310134a0a69ec854b70ea4455d5668bf6b50e9043ae9"
+}

@@ -3,5 +3,9 @@ recursive-include bin *.js
 recursive-include scripts *.sh *.py *.js
 recursive-include data *.rules
 recursive-include docs *.md *.png
+recursive-include docs/assets *.json
 recursive-include tests *.py *.js
 recursive-include .github *.yml *.md
+
+recursive-include src/mx4_linux/assets *.css *.png *.json *.glb
+recursive-include src/mx4_linux/assets/fonts *.ttf *.txt

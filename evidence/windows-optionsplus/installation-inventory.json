@@ -1,0 +1,951 @@
+{
+  "root": "C:\\Program Files\\LogiOptionsPlus",
+  "files": [
+    {
+      "path": "app_permissions.json",
+      "Length": 403
+    },
+    {
+      "path": "d3dcompiler_47.dll",
+      "Length": 4741272
+    },
+    {
+      "path": "ffmpeg.dll",
+      "Length": 3068568
+    },
+    {
+      "path": "icudtl.dat",
+      "Length": 10467680
+    },
+    {
+      "path": "libEGL.dll",
+      "Length": 514712
+    },
+    {
+      "path": "libGLESv2.dll",
+      "Length": 8409240
+    },
+    {
+      "path": "logioptionsplus.exe",
+      "Length": 210949784
+    },
+    {
+      "path": "logioptionsplus_agent.exe",
+      "Length": 68391064
+    },
+    {
+      "path": "logioptionsplus_appbroker.exe",
+      "Length": 7157912
+    },
+    {
+      "path": "logioptionsplus_updater.exe",
+      "Length": 23079576
+    },
+    {
+      "path": "logi_crashpad_handler.exe",
+      "Length": 797848
+    },
+    {
+      "path": "msvcp140.dll",
+      "Length": 562840
+    },
+    {
+      "path": "msvcp140_atomic_wait.dll",
+      "Length": 40088
+    },
+    {
+      "path": "PlugInInstallerUtility.exe",
+      "Length": 11443352
+    },
+    {
+      "path": "PlugInInstallerUtility2.exe",
+      "Length": 11443352
+    },
+    {
+      "path": "Qt5Concurrent.dll",
+      "Length": 37016
+    },
+    {
+      "path": "Qt5Core.dll",
+      "Length": 6128792
+    },
+    {
+      "path": "Qt5Gui.dll",
+      "Length": 6800024
+    },
+    {
+      "path": "Qt5Widgets.dll",
+      "Length": 5553816
+    },
+    {
+      "path": "resources.pak",
+      "Length": 6301392
+    },
+    {
+      "path": "ucrtbase.dll",
+      "Length": 977560
+    },
+    {
+      "path": "v8_context_snapshot.bin",
+      "Length": 776865
+    },
+    {
+      "path": "vcruntime140.dll",
+      "Length": 109208
+    },
+    {
+      "path": "data\\applications.json",
+      "Length": 422602
+    },
+    {
+      "path": "data\\DeviceCompatibility.json",
+      "Length": 2430
+    },
+    {
+      "path": "data\\devices.json",
+      "Length": 3680
+    },
+    {
+      "path": "data\\device_analytics_config.json",
+      "Length": 6616
+    },
+    {
+      "path": "data\\firmware.pem",
+      "Length": 814
+    },
+    {
+      "path": "data\\guru_devices.json",
+      "Length": 1072
+    },
+    {
+      "path": "data\\logitech-lap-public.pem",
+      "Length": 812
+    },
+    {
+      "path": "data\\options_devices.json",
+      "Length": 2988
+    },
+    {
+      "path": "data\\card_presets\\card_presets_001.json",
+      "Length": 642
+    },
+    {
+      "path": "data\\card_presets\\card_presets_virtual_device.json",
+      "Length": 2163
+    },
+    {
+      "path": "data\\card_presets\\card_presets_win.json",
+      "Length": 278426
+    },
+    {
+      "path": "data\\defaults\\defaults_control_osx.json",
+      "Length": 60344
+    },
+    {
+      "path": "data\\defaults\\defaults_control_win.json",
+      "Length": 58270
+    },
+    {
+      "path": "data\\defaults\\defaults_slot_osx.json",
+      "Length": 41246
+    },
+    {
+      "path": "data\\defaults\\defaults_slot_win.json",
+      "Length": 36350
+    },
+    {
+      "path": "data\\devices\\devices_0000001.json",
+      "Length": 3288
+    },
+    {
+      "path": "data\\devices\\devices_0000002.json",
+      "Length": 4688
+    },
+    {
+      "path": "data\\devices\\devices_0000003.json",
+      "Length": 5182
+    },
+    {
+      "path": "data\\devices\\devices_0000004.json",
+      "Length": 10775
+    },
+    {
+      "path": "data\\devices\\devices_0000005.json",
+      "Length": 10670
+    },
+    {
+      "path": "data\\devices\\devices_0000006.json",
+      "Length": 4658
+    },
+    {
+      "path": "data\\devices\\devices_0000007.json",
+      "Length": 9911
+    },
+    {
+      "path": "data\\devices\\devices_0000008.json",
+      "Length": 2675
+    },
+    {
+      "path": "data\\devices\\devices_0000009.json",
+      "Length": 5803
+    },
+    {
+      "path": "data\\devices\\devices_0000011.json",
+      "Length": 2685
+    },
+    {
+      "path": "data\\devices\\devices_0000012.json",
+      "Length": 1375
+    },
+    {
+      "path": "data\\devices\\devices_0000013.json",
+      "Length": 4661
+    },
+    {
+      "path": "data\\devices\\devices_0000014.json",
+      "Length": 2523
+    },
+    {
+      "path": "data\\devices\\devices_0000015.json",
+      "Length": 2298
+    },
+    {
+      "path": "data\\devices\\devices_0000016.json",
+      "Length": 1291
+    },
+    {
+      "path": "data\\devices\\devices_0000017.json",
+      "Length": 44635
+    },
+    {
+      "path": "data\\devices\\devices_0000018.json",
+      "Length": 31724
+    },
+    {
+      "path": "data\\devices\\devices_0000019.json",
+      "Length": 3474
+    },
+    {
+      "path": "data\\devices\\devices_0000020.json",
+      "Length": 3730
+    },
+    {
+      "path": "data\\devices\\devices_0000021.json",
+      "Length": 7301
+    },
+    {
+      "path": "data\\devices\\devices_0000022.json",
+      "Length": 2831
+    },
+    {
+      "path": "data\\devices\\devices_0000023.json",
+      "Length": 5357
+    },
+    {
+      "path": "data\\devices\\devices_0000024.json",
+      "Length": 5497
+    },
+    {
+      "path": "data\\devices\\devices_0000025.json",
+      "Length": 3688
+    },
+    {
+      "path": "data\\devices\\devices_0000026.json",
+      "Length": 1970
+    },
+    {
+      "path": "data\\devices\\devices_0000027.json",
+      "Length": 8068
+    },
+    {
+      "path": "data\\devices\\devices_0000028.json",
+      "Length": 6690
+    },
+    {
+      "path": "data\\devices\\devices_0000029.json",
+      "Length": 17420
+    },
+    {
+      "path": "data\\devices\\devices_0000030.json",
+      "Length": 3467
+    },
+    {
+      "path": "data\\devices\\devices_0000031.json",
+      "Length": 3175
+    },
+    {
+      "path": "data\\devices\\devices_0000032.json",
+      "Length": 3711
+    },
+    {
+      "path": "data\\devices\\devices_0000033.json",
+      "Length": 7463
+    },
+    {
+      "path": "data\\devices\\devices_0000034.json",
+      "Length": 6409
+    },
+    {
+      "path": "data\\devices\\devices_0000035.json",
+      "Length": 8263
+    },
+    {
+      "path": "data\\devices\\devices_0000037.json",
+      "Length": 2357
+    },
+    {
+      "path": "data\\devices\\devices_0000038.json",
+      "Length": 3809
+    },
+    {
+      "path": "data\\devices\\devices_0000039.json",
+      "Length": 2124
+    },
+    {
+      "path": "data\\devices\\devices_0000040.json",
+      "Length": 15410
+    },
+    {
+      "path": "data\\devices\\devices_0000041.json",
+      "Length": 7523
+    },
+    {
+      "path": "data\\devices\\devices_0000044.json",
+      "Length": 1462
+    },
+    {
+      "path": "data\\devices\\devices_0000046.json",
+      "Length": 3743
+    },
+    {
+      "path": "data\\devices\\devices_0000047.json",
+      "Length": 21662
+    },
+    {
+      "path": "data\\devices\\devices_0000048.json",
+      "Length": 21688
+    },
+    {
+      "path": "data\\devices\\devices_0000049.json",
+      "Length": 21458
+    },
+    {
+      "path": "data\\devices\\devices_0000050.json",
+      "Length": 21432
+    },
+    {
+      "path": "data\\devices\\devices_0000051.json",
+      "Length": 2292
+    },
+    {
+      "path": "data\\devices\\devices_0000052.json",
+      "Length": 5023
+    },
+    {
+      "path": "data\\devices\\devices_0000053.json",
+      "Length": 8420
+    },
+    {
+      "path": "data\\devices\\devices_0000054.json",
+      "Length": 17554
+    },
+    {
+      "path": "data\\devices\\devices_0000058.json",
+      "Length": 3237
+    },
+    {
+      "path": "data\\devices\\devices_0000065.json",
+      "Length": 48750
+    },
+    {
+      "path": "data\\devices\\devices_initial.json",
+      "Length": 535726
+    },
+    {
+      "path": "data\\devices\\device_0000010.json",
+      "Length": 8844
+    },
+    {
+      "path": "data\\macros\\common_application_cards_osx.json",
+      "Length": 2601
+    },
+    {
+      "path": "data\\macros\\common_application_cards_win.json",
+      "Length": 2517
+    },
+    {
+      "path": "data\\macros\\devices_predefined_map_osx.json",
+      "Length": 17572
+    },
+    {
+      "path": "data\\macros\\devices_predefined_map_win.json",
+      "Length": 17572
+    },
+    {
+      "path": "data\\macros\\extended_application_cards_map_osx.json",
+      "Length": 467
+    },
+    {
+      "path": "data\\macros\\extended_application_cards_map_win.json",
+      "Length": 323
+    },
+    {
+      "path": "data\\macros\\predefined_osx.json",
+      "Length": 227503
+    },
+    {
+      "path": "data\\macros\\predefined_win.json",
+      "Length": 230436
+    },
+    {
+      "path": "data\\migration\\application_settings_osx.json",
+      "Length": 148
+    },
+    {
+      "path": "data\\migration\\application_settings_win.json",
+      "Length": 287
+    },
+    {
+      "path": "data\\migration\\device_app_table_osx.json",
+      "Length": 23467
+    },
+    {
+      "path": "data\\migration\\device_app_table_win.json",
+      "Length": 23708
+    },
+    {
+      "path": "data\\migration\\task_id_card_map_osx.json",
+      "Length": 40917
+    },
+    {
+      "path": "data\\migration\\task_id_card_map_win.json",
+      "Length": 43053
+    },
+    {
+      "path": "data\\migration\\icons\\adobe_photoshop.webp",
+      "Length": 8562
+    },
+    {
+      "path": "data\\migration\\icons\\adobe_premier_pro.webp",
+      "Length": 3066
+    },
+    {
+      "path": "data\\migration\\icons\\ms_excel.webp",
+      "Length": 2586
+    },
+    {
+      "path": "data\\migration\\icons\\ms_powerpoint.webp",
+      "Length": 4308
+    },
+    {
+      "path": "data\\migration\\icons\\ms_word.webp",
+      "Length": 3350
+    },
+    {
+      "path": "data\\overlay\\notification_resources.json",
+      "Length": 108
+    },
+    {
+      "path": "data\\overlay\\osd_resources.json",
+      "Length": 5122
+    },
+    {
+      "path": "data\\overlay\\icons\\backlighting_1.png",
+      "Length": 397
+    },
+    {
+      "path": "data\\overlay\\icons\\backlighting_2.png",
+      "Length": 396
+    },
+    {
+      "path": "data\\overlay\\icons\\backlighting_3.png",
+      "Length": 395
+    },
+    {
+      "path": "data\\overlay\\icons\\backlighting_4.png",
+      "Length": 395
+    },
+    {
+      "path": "data\\overlay\\icons\\backlighting_5.png",
+      "Length": 396
+    },
+    {
+      "path": "data\\overlay\\icons\\backlighting_6.png",
+      "Length": 397
+    },
+    {
+      "path": "data\\overlay\\icons\\backlighting_7.png",
+      "Length": 381
+    },
+    {
+      "path": "data\\overlay\\icons\\backlighting_off.png",
+      "Length": 516
+    },
+    {
+      "path": "data\\overlay\\icons\\backlight_effect.png",
+      "Length": 909
+    },
+    {
+      "path": "data\\overlay\\icons\\battery.png",
+      "Length": 276
+    },
+    {
+      "path": "data\\overlay\\icons\\caps_lock_off.png",
+      "Length": 1045
+    },
+    {
+      "path": "data\\overlay\\icons\\caps_lock_on.png",
+      "Length": 904
+    },
+    {
+      "path": "data\\overlay\\icons\\fn_inversion_off.png",
+      "Length": 925
+    },
+    {
+      "path": "data\\overlay\\icons\\fn_inversion_on.png",
+      "Length": 844
+    },
+    {
+      "path": "data\\overlay\\icons\\fn_lock_off.png",
+      "Length": 844
+    },
+    {
+      "path": "data\\overlay\\icons\\fn_lock_on.png",
+      "Length": 925
+    },
+    {
+      "path": "data\\overlay\\icons\\mute.png",
+      "Length": 588
+    },
+    {
+      "path": "data\\overlay\\icons\\num_lock_off.png",
+      "Length": 684
+    },
+    {
+      "path": "data\\overlay\\icons\\num_lock_on.png",
+      "Length": 767
+    },
+    {
+      "path": "data\\overlay\\icons\\scroll_lock_off.png",
+      "Length": 1047
+    },
+    {
+      "path": "data\\overlay\\icons\\scroll_lock_on.png",
+      "Length": 1128
+    },
+    {
+      "path": "data\\overlay\\icons\\show_mode.png",
+      "Length": 1264
+    },
+    {
+      "path": "data\\rap\\available_card_tags_control.json",
+      "Length": 160428
+    },
+    {
+      "path": "data\\rap\\available_card_tags_slot.json",
+      "Length": 361451
+    },
+    {
+      "path": "data\\rap\\recommendations_control_osx.json",
+      "Length": 98056
+    },
+    {
+      "path": "data\\rap\\recommendations_control_win.json",
+      "Length": 95749
+    },
+    {
+      "path": "data\\rap\\recommendations_slot_osx.json",
+      "Length": 421554
+    },
+    {
+      "path": "data\\rap\\recommendations_slot_win.json",
+      "Length": 406551
+    },
+    {
+      "path": "data\\strings\\da-DK.yaml",
+      "Length": 317004
+    },
+    {
+      "path": "data\\strings\\de-DE.yaml",
+      "Length": 339015
+    },
+    {
+      "path": "data\\strings\\el-GR.yaml",
+      "Length": 497768
+    },
+    {
+      "path": "data\\strings\\en-US.yaml",
+      "Length": 300687
+    },
+    {
+      "path": "data\\strings\\es-ES.yaml",
+      "Length": 334620
+    },
+    {
+      "path": "data\\strings\\fi-FI.yaml",
+      "Length": 323195
+    },
+    {
+      "path": "data\\strings\\fr-FR.yaml",
+      "Length": 348027
+    },
+    {
+      "path": "data\\strings\\it-IT.yaml",
+      "Length": 334565
+    },
+    {
+      "path": "data\\strings\\ja-JP.yaml",
+      "Length": 371261
+    },
+    {
+      "path": "data\\strings\\ko-KR.yaml",
+      "Length": 332695
+    },
+    {
+      "path": "data\\strings\\nb-NO.yaml",
+      "Length": 311512
+    },
+    {
+      "path": "data\\strings\\nl-NL.yaml",
+      "Length": 323256
+    },
+    {
+      "path": "data\\strings\\pl-PL.yaml",
+      "Length": 340293
+    },
+    {
+      "path": "data\\strings\\pt-BR.yaml",
+      "Length": 328787
+    },
+    {
+      "path": "data\\strings\\pt-PT.yaml",
+      "Length": 333550
+    },
+    {
+      "path": "data\\strings\\ru-RU.yaml",
+      "Length": 479972
+    },
+    {
+      "path": "data\\strings\\sv-SE.yaml",
+      "Length": 319571
+    },
+    {
+      "path": "data\\strings\\zh-CN.yaml",
+      "Length": 286771
+    },
+    {
+      "path": "data\\strings\\zh-TW.yaml",
+      "Length": 292926
+    },
+    {
+      "path": "data\\tray\\icons\\mute_icon.png",
+      "Length": 3544
+    },
+    {
+      "path": "integrations\\plugin_excel\\config.json",
+      "Length": 2641
+    },
+    {
+      "path": "integrations\\plugin_illustrator\\config.json",
+      "Length": 2184
+    },
+    {
+      "path": "integrations\\plugin_indesign\\config.json",
+      "Length": 2054
+    },
+    {
+      "path": "integrations\\plugin_lightroom_classic\\config.json",
+      "Length": 1930
+    },
+    {
+      "path": "integrations\\plugin_photoshop\\config.json",
+      "Length": 2174
+    },
+    {
+      "path": "integrations\\plugin_powerpoint\\config.json",
+      "Length": 2666
+    },
+    {
+      "path": "integrations\\plugin_premiere_pro\\config.json",
+      "Length": 2018
+    },
+    {
+      "path": "integrations\\plugin_word\\config.json",
+      "Length": 2636
+    },
+    {
+      "path": "locales\\af.pak",
+      "Length": 581534
+    },
+    {
+      "path": "locales\\am.pak",
+      "Length": 943307
+    },
+    {
+      "path": "locales\\ar.pak",
+      "Length": 1041316
+    },
+    {
+      "path": "locales\\bg.pak",
+      "Length": 1075975
+    },
+    {
+      "path": "locales\\bn.pak",
+      "Length": 1388355
+    },
+    {
+      "path": "locales\\ca.pak",
+      "Length": 655692
+    },
+    {
+      "path": "locales\\cs.pak",
+      "Length": 679723
+    },
+    {
+      "path": "locales\\da.pak",
+      "Length": 612369
+    },
+    {
+      "path": "locales\\de.pak",
+      "Length": 656301
+    },
+    {
+      "path": "locales\\el.pak",
+      "Length": 1183364
+    },
+    {
+      "path": "locales\\en-GB.pak",
+      "Length": 530750
+    },
+    {
+      "path": "locales\\en-US.pak",
+      "Length": 536882
+    },
+    {
+      "path": "locales\\es-419.pak",
+      "Length": 646031
+    },
+    {
+      "path": "locales\\es.pak",
+      "Length": 643726
+    },
+    {
+      "path": "locales\\et.pak",
+      "Length": 587335
+    },
+    {
+      "path": "locales\\fa.pak",
+      "Length": 969366
+    },
+    {
+      "path": "locales\\fi.pak",
+      "Length": 598161
+    },
+    {
+      "path": "locales\\fil.pak",
+      "Length": 678536
+    },
+    {
+      "path": "locales\\fr.pak",
+      "Length": 698527
+    },
+    {
+      "path": "locales\\gu.pak",
+      "Length": 1370444
+    },
+    {
+      "path": "locales\\he.pak",
+      "Length": 849337
+    },
+    {
+      "path": "locales\\hi.pak",
+      "Length": 1449142
+    },
+    {
+      "path": "locales\\hr.pak",
+      "Length": 654647
+    },
+    {
+      "path": "locales\\hu.pak",
+      "Length": 701008
+    },
+    {
+      "path": "locales\\id.pak",
+      "Length": 579244
+    },
+    {
+      "path": "locales\\it.pak",
+      "Length": 634667
+    },
+    {
+      "path": "locales\\ja.pak",
+      "Length": 772142
+    },
+    {
+      "path": "locales\\kn.pak",
+      "Length": 1569071
+    },
+    {
+      "path": "locales\\ko.pak",
+      "Length": 655419
+    },
+    {
+      "path": "locales\\lt.pak",
+      "Length": 710962
+    },
+    {
+      "path": "locales\\lv.pak",
+      "Length": 708649
+    },
+    {
+      "path": "locales\\ml.pak",
+      "Length": 1620801
+    },
+    {
+      "path": "locales\\mr.pak",
+      "Length": 1340931
+    },
+    {
+      "path": "locales\\ms.pak",
+      "Length": 609524
+    },
+    {
+      "path": "locales\\nb.pak",
+      "Length": 585924
+    },
+    {
+      "path": "locales\\nl.pak",
+      "Length": 609093
+    },
+    {
+      "path": "locales\\pl.pak",
+      "Length": 679405
+    },
+    {
+      "path": "locales\\pt-BR.pak",
+      "Length": 636956
+    },
+    {
+      "path": "locales\\pt-PT.pak",
+      "Length": 640618
+    },
+    {
+      "path": "locales\\ro.pak",
+      "Length": 664052
+    },
+    {
+      "path": "locales\\ru.pak",
+      "Length": 1099404
+    },
+    {
+      "path": "locales\\sk.pak",
+      "Length": 691098
+    },
+    {
+      "path": "locales\\sl.pak",
+      "Length": 661889
+    },
+    {
+      "path": "locales\\sr.pak",
+      "Length": 1017109
+    },
+    {
+      "path": "locales\\sv.pak",
+      "Length": 591743
+    },
+    {
+      "path": "locales\\sw.pak",
+      "Length": 625300
+    },
+    {
+      "path": "locales\\ta.pak",
+      "Length": 1611678
+    },
+    {
+      "path": "locales\\te.pak",
+      "Length": 1491377
+    },
+    {
+      "path": "locales\\th.pak",
+      "Length": 1251875
+    },
+    {
+      "path": "locales\\tr.pak",
+      "Length": 636575
+    },
+    {
+      "path": "locales\\uk.pak",
+      "Length": 1105818
+    },
+    {
+      "path": "locales\\ur.pak",
+      "Length": 956097
+    },
+    {
+      "path": "locales\\vi.pak",
+      "Length": 755306
+    },
+    {
+      "path": "locales\\zh-CN.pak",
+      "Length": 541986
+    },
+    {
+      "path": "locales\\zh-TW.pak",
+      "Length": 535956
+    },
+    {
+      "path": "platforms\\qwindows.dll",
+      "Length": 1497240
+    },
+    {
+      "path": "resources\\app.asar",
+      "Length": 61845517
+    },
+    {
+      "path": "resources\\icon_kiros.png",
+      "Length": 70448
+    },
+    {
+      "path": "SharedSupportWin\\CrossSupportedDevices.json",
+      "Length": 4
+    },
+    {
+      "path": "SharedSupportWin\\Excluded_Devices.json",
+      "Length": 729
+    },
+    {
+      "path": "SharedSupportWin\\Excluded_Devices.sig",
+      "Length": 344
+    }
+  ],
+  "versions": [
+    {
+      "Name": "logioptionsplus.exe",
+      "version": "2.9.4631.0"
+    },
+    {
+      "Name": "logioptionsplus_agent.exe",
+      "version": "2.9.994631"
+    },
+    {
+      "Name": "logioptionsplus_appbroker.exe",
+      "version": "2.9.994631"
+    },
+    {
+      "Name": "logioptionsplus_updater.exe",
+      "version": "2.9.994631"
+    },
+    {
+      "Name": "logi_crashpad_handler.exe",
+      "version": "0.1.9+893940, Sentry v0.9.1"
+    },
+    {
+      "Name": "PlugInInstallerUtility.exe",
+      "version": "2.1.846799"
+    },
+    {
+      "Name": "PlugInInstallerUtility2.exe",
+      "version": "2.1.846799"
+    }
+  ]
+}

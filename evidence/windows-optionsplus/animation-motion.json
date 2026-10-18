@@ -1,0 +1,182 @@
+[
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 316384,
+    "archive_byte_offset": 9921834,
+    "selector": ".devicedetails-container .app-specific-header-container",
+    "declaration": "height:124px;line-height:124px;position:relative;transition:all .13s;width:inherit",
+    "interpretation": "130ms transition on header size/layout"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 316523,
+    "archive_byte_offset": 9921973,
+    "selector": ".devicedetails-container .app-specific-header-container.isConfigurationEnabled",
+    "declaration": "animation:slide-right-left .18s;left:-72%;position:absolute",
+    "interpretation": "180ms slide-right-left declaration; panel-enabled header"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 330348,
+    "archive_byte_offset": 9935798,
+    "selector": ".isConfigurationEnabled .brightness-feature-content-container,.isConfigurationEnabled .buttons-feature-content-container,.isConfigurationEnabled .dnd-feature-content-container,.isConfigurationEnabled .flow-feature-content-container,.isConfigurationEnabled .haptic-feature-content-container,.isConfigurationEnabled .point-and-scroll-feature-content-container,.isConfigurationEnabled .point-and-scroll-press-feature-content-container,.isConfigurationEnabled .presenter-feature-content-container",
+    "declaration": "transform:translateX(-130px);transition:all .2s",
+    "interpretation": "200ms; enabled configuration state uses translateX(-130px)"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 331885,
+    "archive_byte_offset": 9937335,
+    "selector": ".backlight-effect-feature-content-container,.buttons-feature-content-container,.crown-feature-content-container,.dial-and-roller-feature-content-container,.dnd-feature-content-container,.easy-switch-feature-content-container,.flow-feature-content-container,.haptic-feature-content-container,.keys-feature-content-container,.multi-roller-content-container,.point-and-scroll-feature-content-container,.point-and-scroll-press-feature-content-container,.presenter-feature-content-container",
+    "declaration": "height:100%;transform:translateX(-30px);transition:all .2s",
+    "interpretation": "200ms; default content uses translateX(-30px); relative travel100px"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 698151,
+    "archive_byte_offset": 10303601,
+    "selector": ".device-configuration-panel",
+    "declaration": "animation:floatText .2s;background:var(--primary-background-1);box-shadow:5px 5px 48px var(--overlay-light);height:100vh;padding:0;position:fixed;right:0;top:0;z-index:2",
+    "interpretation": "200ms floatText; right-side drawer"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 706666,
+    "archive_byte_offset": 10312116,
+    "selector": ".app-profile-configuration-panel",
+    "declaration": "animation:floatText .2s;background:var(--primary-background-1);box-shadow:5px 5px 48px var(--overlay-light);height:100vh;padding:0;position:fixed;right:0;top:0;z-index:1",
+    "interpretation": "200ms floatText; right-side app-profile drawer"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 504191,
+    "archive_byte_offset": 10109641,
+    "selector": ".collapse-body",
+    "declaration": "overflow:hidden;transition:height .25s ease",
+    "interpretation": "250ms ease height; disclosure body"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 2236,
+    "archive_byte_offset": 9607686,
+    "selector": ".tooltip.animationTop",
+    "declaration": "animation:slide-up .2s ease-out forwards",
+    "interpretation": "200ms ease-out fade/translateY12px\u21920"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 2299,
+    "archive_byte_offset": 9607749,
+    "selector": ".tooltip.animationRight",
+    "declaration": "animation:slide-right-animation .2s ease-out forwards",
+    "interpretation": "200ms ease-out; right tooltip"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 2488,
+    "archive_byte_offset": 9607938,
+    "selector": ".tooltip.animationLeft",
+    "declaration": "animation:slide-left .2s ease-out forwards",
+    "interpretation": "200ms ease-out; left tooltip"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 2792,
+    "archive_byte_offset": 9608242,
+    "selector": ".tooltipWithDelay.animationTop",
+    "declaration": "animation:slide-up .2s ease-out .5s forwards",
+    "interpretation": "200ms ease-out after500ms delay"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 392427,
+    "archive_byte_offset": 9997877,
+    "selector": ".concentric-circle .circle-layout",
+    "declaration": "border:2px solid;border-radius:50%;opacity:0;position:absolute;transform:translate(-50%,-50%);transition:all .1s ease-in-out",
+    "interpretation": "100ms ease-in-out visual state transition"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 392655,
+    "archive_byte_offset": 9998105,
+    "selector": ".concentric-circle .circle-layout.haptic-feedback-circle",
+    "declaration": "animation:showForDuration 2s ease-in-out forwards",
+    "interpretation": "2000ms showForDuration; opacity holds through80%, then fades"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 670153,
+    "archive_byte_offset": 10275603,
+    "selector": ".haptic-feedback-configuration-scroll-container",
+    "declaration": "height:calc(100vh - 60px);overflow-y:scroll;position:relative;transition:all .2s ease",
+    "interpretation": "200ms transition; haptic drawer scroll content"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 831436,
+    "archive_byte_offset": 10436886,
+    "selector": ".action-ring-onboarding .ring-position:after",
+    "declaration": "animation:ripple 3.2s linear 1;animation-fill-mode:forwards;bottom:0;left:0;opacity:0;right:0;top:0",
+    "interpretation": "3200ms one-shot ripple highlight; onboarding only"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 834467,
+    "archive_byte_offset": 10439917,
+    "selector": ".action-ring-onboarding.plugins-panel .action-ring-plugin-container .thumbnails-container .thumbnail.active .progress-bar",
+    "declaration": "animation:progress .25s ease-out forwards;border-color:var(--primary)",
+    "interpretation": "250ms ease-out progress indication; onboarding plugin thumbnail"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 136179,
+    "archive_byte_offset": 9741629,
+    "selector": ".device-list-item-new-element-container .device-list-item-image-container .device-list-item-image-camera:hover,.device-list-item-new-element-container .device-list-item-image-container .device-list-item-image:hover",
+    "declaration": "transform:translateY(-12px);transition:all .2s ease-in-out;transition-delay:50ms",
+    "interpretation": "200ms ease-in-out,50ms delay,translateY(-12px); home device image hover"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 264898,
+    "archive_byte_offset": 9870348,
+    "selector": ".input-range__slider-container",
+    "declaration": "transition:none",
+    "interpretation": "none; application stylesheet disables slider-container motion"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 264945,
+    "archive_byte_offset": 9870395,
+    "selector": ".input-range__slider",
+    "declaration": "background:var(--primary-background-1);border:5px solid var(--primary);border-radius:8px;box-sizing:content-box;height:6px;transition:none;width:6px",
+    "interpretation": "none; application stylesheet disables slider-thumb motion"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 706869,
+    "archive_byte_offset": 10312319,
+    "selector": "@-webkit-keyframes floatText",
+    "interpretation": "drawer moves right:-20%\u21920"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 390320,
+    "archive_byte_offset": 9995770,
+    "selector": "@keyframes haptic_ripple_scale_7",
+    "interpretation": "scale0\u21927,opacity1\u21920,border1.5px\u2192.2142857143px"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 390464,
+    "archive_byte_offset": 9995914,
+    "selector": "@keyframes haptic_ripple_scale_6",
+    "interpretation": "scale0\u21926,opacity1\u21920,border1.5px\u2192.25px"
+  },
+  {
+    "member": "app.min.css",
+    "member_byte_offset": 393205,
+    "archive_byte_offset": 9998655,
+    "selector": "@keyframes showForDuration",
+    "interpretation": "0\u201380%opacity1,thenopacity0"
+  }
+]

@@ -4,14 +4,14 @@ MX4 Linux supports source installation and a self-contained npm package that lau
 
 ## System dependencies
 
-The GUI requires Python 3.11+, Python GObject, GTK 4.12+ and Libadwaita 1.4+. Install these through your distribution so the GObject typelib and shared libraries match. Typical base packages are:
+The GUI requires Python 3.11+, Python GObject, GTK 4.12+, Libadwaita 1.4+, Fontconfig and JetBrains Mono. Install native libraries through your distribution so the GObject typelib and shared libraries match. Setup installs the bundled fonts automatically when needed. Typical base packages are:
 
 ```bash
 # Arch Linux
-sudo pacman -S python python-gobject gtk4 libadwaita python-pip
+sudo pacman -S python python-gobject gtk4 libadwaita python-pip fontconfig
 
 # Debian / Ubuntu; check that your release meets the GTK and Libadwaita minimums
-sudo apt install python3-venv python3-pip python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1
+sudo apt install python3-venv python3-pip python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 fontconfig
 ```
 
 For the Actions Ring overlay, install the system `gtk4-layer-shell` library and its `Gtk4LayerShell-1.0` typelib. Package names vary by distribution. If the library or compositor support is unavailable, the ring can fall back to a normal window.
@@ -21,6 +21,21 @@ Desktop integration targets Niri on Wayland. Native shortcuts and Unicode text u
 The local helper build needs `curl`, `sha256sum`, `tar`, Meson, Ninja, `pkg-config`, a C compiler, `wayland-scanner`, and the Wayland client/cursor and xkbcommon development files. Missing helper build tools do not prevent the Python application from installing; setup prints a diagnostic. No sudo is used for this build.
 
 Without wtype, shortcuts can use python-evdev and `/dev/uinput`. Text actions instead call `wl-copy` from `wl-clipboard` and paste with Ctrl+V, replacing the clipboard contents. Niri actions still require Niri.
+
+## Interface font
+
+The interface uses [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), a free alternative to Berkeley Mono. Regular and bold font files and the SIL Open Font License 1.1 are bundled in `src/mx4_linux/assets/fonts/`; no paid font, account, external font download or license purchase is required.
+
+Both setup paths check that Fontconfig exposes the actual JetBrains Mono family in upright regular and bold weights. If either is missing, they verify and install the bundled fonts and their license into `$XDG_DATA_HOME/fonts/mx4-linux-jetbrains-mono/` (default `~/.local/share/fonts/mx4-linux-jetbrains-mono/`) and refresh the user fonts cache, including discovery of the new subdirectory. Setup uses no sudo and leaves other font files untouched. A failed prerequisite check does not disable a previously working installation.
+
+To check or install the font independently:
+
+```bash
+./scripts/setup-font.sh --check  # Read-only; reports missing fonts
+./scripts/setup-font.sh          # Install bundled fonts only if needed
+```
+
+Restart an already open application after installing the fonts. An existing launch remains available with a fallback font while the prerequisite is being resolved.
 
 ## Source setup
 
@@ -32,7 +47,7 @@ cd mx4-linux
 .venv/bin/mx4-linux doctor --json
 ```
 
-`setup.sh` creates `.venv` with `--system-site-packages` so the application can use the distribution's GObject bindings. It installs the editable application, test/lint/build tools and Solaar 1.1.20. If `uv` is installed, setup uses it; otherwise it uses the environment's pip. To select a different compatible interpreter, run `PYTHON=python3.11 ./scripts/setup.sh` with that interpreter's matching system bindings installed.
+`setup.sh` verifies or installs JetBrains Mono, then creates `.venv` with `--system-site-packages` so the application can use the distribution's GObject bindings. It installs the editable application, test/lint/build tools and Solaar 1.1.20. If `uv` is installed, setup uses it; otherwise it uses the environment's pip. To select a different compatible interpreter, run `PYTHON=python3.11 ./scripts/setup.sh` with that interpreter's matching system bindings installed.
 
 The optional `scripts/setup-wtype.sh` downloads commit `d71be3a7b3f93b534a2823fd68cabd7ac2a02359` from wtype 0.4, verifies its source checksum and installs the built executable, MIT license and man page inside `.venv`. Download/source/build files stay under `.tools`. An existing local helper is reused only when its stored executable checksum matches.
 
@@ -65,7 +80,7 @@ npm install --global --prefix "$HOME/.local" ./mx4-linux-0.2.0.tgz
 
 The archive includes the Python application, icon, access-rule installers and documentation. npm installation runs no scripts and installs no Node dependencies. Add `~/.local/bin` to your `PATH` if you want to invoke `mx4-linux` without its full path.
 
-`mx4-linux setup` checks Python 3.11+, GTK 4.12+, Libadwaita 1.4+ and Python GObject, creates a virtual environment with system site packages, and installs the application and Solaar using pip. It writes to `$XDG_DATA_HOME/mx4-linux/runtime/0.2.0/` (default `~/.local/share/mx4-linux/runtime/0.2.0/`); it does not need sudo or change device permissions. `PYTHON=/usr/bin/python3 mx4-linux setup` selects the system interpreter whose GObject bindings match the installed libraries. Install system `wtype` separately for keyboard/text actions; npm setup does not build it automatically.
+`mx4-linux setup` verifies or installs JetBrains Mono, checks Python 3.11+, GTK 4.12+, Libadwaita 1.4+ and Python GObject, creates a virtual environment with system site packages, and installs the application and Solaar using pip. The Python runtime is written to `$XDG_DATA_HOME/mx4-linux/runtime/0.2.0/` (default `~/.local/share/mx4-linux/runtime/0.2.0/`); setup does not need sudo or change device permissions. `PYTHON=/usr/bin/python3 mx4-linux setup` selects the system interpreter whose GObject bindings match the installed libraries. Install system `wtype` separately for keyboard/text actions; npm setup does not build it automatically.
 
 The launcher first honors `MX4_LINUX_PYTHON=/path/to/environment/bin/python`, then a completed per-user runtime, then a checkout's `.venv`. It always loads the source shipped with the selected npm package. Arguments after `npm start --` reach the native CLI unchanged; for example, `npm start -- doctor --json`. Only `setup` is handled by the launcher.
 
@@ -116,7 +131,7 @@ This writes `$XDG_DATA_HOME/applications/io.github.mx4linux.Control.desktop`, de
 
 ## Updating
 
-Close MX4 Linux before updating:
+Choose **Quit MX4 Linux** from the application menu before updating:
 
 ```bash
 git pull --ff-only
@@ -134,7 +149,7 @@ Profiles and desktop configuration are stored separately and survive environment
 
 ## Uninstalling
 
-Close the application first so an active listener can restore the mouse's previous reporting state. From the project directory, remove generated environments and the optional launcher:
+Choose **Quit MX4 Linux** from the application menu first so an active listener can restore the mouse's previous reporting state. From the project directory, remove generated environments and the optional launcher:
 
 ```bash
 rm -rf -- .venv .tools
@@ -162,6 +177,7 @@ These removal steps do not undo hardware settings already written to the mouse o
 ## Troubleshooting
 
 - **Missing GTK / Adwaita imports:** install the system packages and recreate `.venv` with that system Python. A pip-only PyGObject installation is not the documented setup path.
+- **Missing interface font:** install the `fontconfig` package and run `scripts/setup-font.sh`; use `--check` to verify the family without changing files. For a global npm install, rerun `mx4-linux setup`.
 - **Mouse absent:** wake it, inspect `doctor --json`, verify access, and refresh. A receiver's presence alone does not establish an online MX Master 4.
 - **Intermittent discovery or writes:** close other mouse configuration tools, including Solaar's UI, to avoid competing settings. Device operations can wait up to 90 seconds before reporting a timeout.
 - **Helper build failure:** install system wtype, or install the missing build tools printed by `setup-wtype.sh` and rerun it.

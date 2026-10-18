@@ -1,0 +1,51 @@
+{
+  "observed_at": "2026-10-18T18:01:20.034408+00:00",
+  "commit": "49dc6f418b35a146eface4d2f5033f14e14b4f27",
+  "mode": "physical panel / production DesktopController+EventSession+event_worker",
+  "device": "MX Master 4",
+  "controlled_action_argv": [
+    "/usr/bin/true"
+  ],
+  "ring_cid": 416,
+  "other_button_bindings": 0,
+  "isolated_xdg_config_and_state": true,
+  "baseline_controls": [
+    82,
+    83,
+    86,
+    195,
+    196,
+    416
+  ],
+  "result": {
+    "action_successes": 1,
+    "button_presses": 2,
+    "button_releases": 1,
+    "failure_type": null,
+    "haptics_played": 0,
+    "mapped_seen": true,
+    "motion_packets": 13,
+    "ok": true,
+    "physical_gesture_observed": true,
+    "preserved_state_directory": null,
+    "reporting_equal_after_stop": true,
+    "reporting_journal_clean": true,
+    "reporting_snapshot_count": 6,
+    "ring_open_count": 2,
+    "selected_indices": [
+      7
+    ],
+    "stage": "stop-reporting",
+    "unexpected_controls": 0,
+    "worker_errors": 0,
+    "worker_restored": true,
+    "worker_stopped": true,
+    "worker_warnings": 0
+  },
+  "limits": [
+    "No DPI/force/wheel/haptic-strength changes, no host switching, no haptic playback.",
+    "One user selection completed. A second press occurred before stop; cleanup did not commit a second action.",
+    "Exact six-control reporting/mapping equality was confirmed after actual worker exit; temporary state removed only after confirmed restoration.",
+    "No unit IDs, host names, private window titles or raw worker diagnostics retained."
+  ]
+}

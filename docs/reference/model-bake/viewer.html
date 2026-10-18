@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><script type="importmap">{"imports":{"three":"/three/package/build/three.module.js","three/addons/":"/three/package/examples/jsm/"}}</script><style>html,body{margin:0;background:transparent}canvas{display:block}</style></head><body><script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+const size=Number(new URLSearchParams(location.search).get('size'))||768;
+renderer.setPixelRatio(1);renderer.setSize(size,size);renderer.setClearColor(0,0);
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+document.body.append(renderer.domElement);
+const scene=new THREE.Scene();const pmrem=new THREE.PMREMGenerator(renderer);const room=new RoomEnvironment();scene.environment=pmrem.fromScene(room,.04).texture;room.dispose();
+const gltf=await new GLTFLoader().loadAsync('/mouse.glb');scene.add(gltf.scene);gltf.scene.updateMatrixWorld(true);
+let wheel=null;
+if(new URLSearchParams(location.search).get('wheel')==='1'){
+ const island=await(await fetch('/wheel-island.json')).json();let source;gltf.scene.traverse(o=>{if(o.isMesh&&gltf.parser.associations.get(o)?.meshes===0)source=o});
+ const geometry=source.geometry.clone();geometry.setIndex(island.wheel_indices);const pivot=new THREE.Vector3(...island.pivot_source_mm);geometry.translate(-pivot.x,-pivot.y,-pivot.z);
+ const remaining=source.geometry.clone();remaining.setIndex(island.remaining_indices);source.geometry=remaining;
+ wheel=new THREE.Mesh(geometry,source.material);wheel.name='BAKED_MAIN_WHEEL';wheel.position.copy(pivot);source.parent.add(wheel);
+}
+const bounds=new THREE.Box3().setFromObject(gltf.scene);const center=bounds.getCenter(new THREE.Vector3());
+const camera=new THREE.OrthographicCamera(-.095,.095,.095,-.095,.001,10);
+window.modelInfo={bounds:[bounds.min.toArray(),bounds.max.toArray()],center:center.toArray(),renderer:renderer.getContext().getParameter(renderer.getContext().RENDERER)};
+window.bake=(x,y,z,extent=.17,roll=0,exposure=1,wheelAngle=0)=>{if(wheel)wheel.rotation.x=wheelAngle;camera.position.copy(center).add(new THREE.Vector3(x,y,z));camera.up.set(0,1,0);camera.lookAt(center);camera.rotateZ(roll);camera.left=-extent/2;camera.right=extent/2;camera.top=extent/2;camera.bottom=-extent/2;camera.updateProjectionMatrix();renderer.toneMappingExposure=exposure;renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png')};
+window.projectSource=(points)=>Object.fromEntries(Object.entries(points).map(([name,p])=>{const w=new THREE.Vector3(...p).applyMatrix4(gltf.scene.getObjectByName('METAL_EXTRA_PARTS').matrixWorld);const n=w.clone().project(camera);return[name,{source_mm:p,world_m:w.toArray(),normalized:[(n.x+1)/2,(1-n.y)/2]}]}));
+window.pick=(points)=>{const ray=new THREE.Raycaster();const inv=gltf.scene.getObjectByName('METAL_EXTRA_PARTS').matrixWorld.clone().invert();return Object.fromEntries(Object.entries(points).map(([name,p])=>{ray.setFromCamera(new THREE.Vector2(p[0]*2-1,1-p[1]*2),camera);const hit=ray.intersectObject(gltf.scene,true)[0];return [name,hit?{normalized:p,source_mm:hit.point.clone().applyMatrix4(inv).toArray(),mesh:hit.object.name}:null]}))};
+window.ready=true;
+</script></body></html>

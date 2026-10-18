@@ -1,6 +1,8 @@
 """Hardware-free tests of discovery, write validation, and worker isolation."""
 
+import enum
 import errno
+import math
 import io
 import json
 import os
@@ -11,6 +13,8 @@ import sys
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
+
+import pytest
 
 from mx4_linux import device_worker as worker
 
@@ -74,6 +78,7 @@ class KeyList(list):
 class FakeDevice:
     def __init__(self, name="MX Master 4", number=255):
         self.name, self.number, self.online = name, number, True
+        self.id = self.unitId = "a1b2c3d4"
         self.close = Mock()
         self.ping = Mock(return_value=True)
         self.battery = Mock(return_value=SimpleNamespace(to_str=lambda: "Battery: 82% (discharging)"))
@@ -82,6 +87,8 @@ class FakeDevice:
         self.feature_request = Mock(side_effect=self._feature_request)
 
     def _feature_request(self, _feature, function, *data):
+        if _feature == 3 and function == 0:
+            return b'\0' + bytes.fromhex(self.id) + b'\0' * 8
         assert function == 0x20, "Tests must not issue a physical write"
         cid = int.from_bytes(bytes(data))
         return struct.pack("!HBH", cid, 0, self.mappings[cid])
@@ -477,7 +484,7 @@ class WorkerTests(unittest.TestCase):
         hardware = {"value": 45}
 
         class Button:
-            changeable, min_value, max_value = True, 15, 90
+            changeable, min_value, default, max_value = True, 15, 45, 90
 
             def get_current(self):
                 return hardware["value"]
@@ -503,6 +510,7 @@ class WorkerTests(unittest.TestCase):
         scan = worker.handle_request({"op": "scan"}, api)
         descriptor = scan["devices"][0]["settings"][0]
         self.assertEqual((descriptor["kind"], descriptor["value"], descriptor["minimum"], descriptor["maximum"]), ("range", 45, 15, 90))
+        self.assertEqual(descriptor["default"], 45)
         self.assertEqual(self.request_write(api, "force-sensing", 70), {"ok": True, "value": 70})
         self.assertFalse(self.request_write(api, "force-sensing", 100)["ok"])
 
@@ -579,3 +587,168 @@ class WorkerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_scan_metadata_exact_battery_and_stable_unit():
+    dev = FakeDevice()
+    dev.id = dev.unitId = 'A1B2C3D4'
+    dev.battery.return_value = SimpleNamespace(level=82, to_str=lambda: '82%')
+    result = worker.handle_request({'op': 'scan'}, fake_api(devices=[dev])[0])['devices'][0]
+    assert result['stable_id'] == 'unit:a1b2c3d4'
+    assert result['battery_percent'] == 82
+    assert result['battery_observed_at'] > 0
+
+
+def test_expected_identity_changed_rejects_setting_before_write():
+    setting = FakeSetting()
+    dev = FakeDevice()
+    dev.id = dev.unitId = 'a1b2c3d4'
+    result = worker.handle_request({'op': 'write', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                    'expected_stable_id': 'unit:d1e2f3a4',
+                                    'setting': 'smart-shift', 'value': 20}, fake_api([setting], [dev])[0])
+    assert not result['ok']
+    assert not setting.writes
+
+
+def test_easy_switch_gets_join_utf8_chunks_without_any_hostname_write():
+    dev = FakeDevice()
+    dev.features = {0x1814: 10, 0x1815: 11}
+    name = ('a' * 13 + 'é').encode()
+    calls = []
+    def request(feature, function, *args, **kwargs):
+        calls.append((feature, function, args, kwargs))
+        if feature == 0x1814:
+            assert function == 0
+            return bytes([3, 0])
+        assert feature == 0x1815 and function in (0, 0x10, 0x30)
+        if function == 0:
+            return bytes([1, 8, 3, 0])
+        if function == 0x10:
+            return bytes([args[0], int(args[0] < 2), 0, 0, len(name), 24])
+        return bytes(args) + name[args[1]:args[1] + 14]
+    dev.feature_request.side_effect = request
+    result = worker._easy_switch(dev)
+    assert result['count'] == 3 and result['current'] == 0
+    assert result['hosts'][0]['name'] == name.decode()
+    assert [h['paired'] for h in result['hosts']] == [True, True, False]
+    assert all(fn not in (0x40,) for _, fn, _, _ in calls)
+
+
+@pytest.mark.parametrize('value,known', [(0, True), (10, True), (11, True), (100, True),
+                                       (True, False), (-1, False), (101, False),
+                                       (math.nan, False), (math.inf, False), (None, False)])
+def test_battery_percentage_is_exact_and_bounded(value, known):
+    dev = FakeDevice()
+    dev.battery.return_value = SimpleNamespace(level=value, to_str=lambda: 'battery')
+    result = worker._battery(dev)
+    assert (result['battery_percent'] is not None) == known
+    assert (result['battery_observed_at'] is not None) == known
+
+
+def test_approximate_battery_enum_is_not_a_percentage():
+    class Approx(enum.IntEnum):
+        LOW = 10
+    dev = FakeDevice()
+    dev.battery.return_value = SimpleNamespace(level=Approx.LOW, to_str=lambda: 'low')
+    assert worker._battery(dev)['battery_percent'] is None
+
+
+@pytest.fixture
+def hosts_device(tmp_path, monkeypatch):
+    monkeypatch.setenv('XDG_STATE_HOME', str(tmp_path))
+    dev = FakeDevice()
+    dev.features = {0x1814: 10, 0x1815: 11}
+    calls = []
+    def request(feature, function, *args, **kwargs):
+        calls.append((feature, function, args, kwargs))
+        if feature == 3:
+            return b'\0' + bytes.fromhex(dev.id) + b'\0' * 8
+        if feature == 0x1814:
+            if function == 0:
+                return bytes([3, 0])
+            assert function == 0x10 and kwargs == {'no_reply': True}
+            return None
+        assert feature == 0x1815
+        if function == 0:
+            return bytes([1, 8, 3, 0])
+        if function == 0x10:
+            return bytes([args[0], int(args[0] < 2), 0, 0, 0, 24])
+        raise AssertionError('No hostname writes')
+    dev.feature_request.side_effect = request
+    return dev, fake_api(devices=[dev])[0], calls
+
+
+def test_valid_host_switch_is_one_unconfirmed_request_without_readback(hosts_device):
+    dev, api, calls = hosts_device
+    result = worker.handle_request({'op': 'switch_host', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                   'index': 1, 'expected_stable_id': 'unit:a1b2c3d4'}, api)
+    assert result == {'ok': True, 'requested': True, 'message': 'Switch requested; mouse may disconnect.'}
+    assert calls[-1] == (0x1814, 0x10, (1,), {'no_reply': True})
+    assert sum(feature == 0x1814 and fn == 0x10 for feature, fn, _, _ in calls) == 1
+
+
+@pytest.mark.parametrize('index', [True, -1, 2, 3, None, '1'])
+def test_invalid_or_unpaired_host_never_writes(hosts_device, index):
+    _dev, api, calls = hosts_device
+    assert not worker.handle_request({'op': 'switch_host', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                     'index': index, 'expected_stable_id': 'unit:a1b2c3d4'}, api)['ok']
+    assert not any(feature == 0x1814 and fn == 0x10 for feature, fn, _, _ in calls)
+
+
+def test_scan_never_calls_host_setters(hosts_device):
+    _dev, api, calls = hosts_device
+    assert worker.handle_request({'op': 'scan'}, api)['ok']
+    assert all((feature, function) not in {(0x1814, 0x10), (0x1815, 0x40)} for feature, function, _, _ in calls)
+
+
+def test_host_switch_refuses_dirty_ownership_and_other_listener(hosts_device):
+    from mx4_linux.reporting_state import Ownership
+    _dev, api, calls = hosts_device
+    request = {'op': 'switch_host', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+               'index': 1, 'expected_stable_id': 'unit:a1b2c3d4'}
+    with Ownership('unit:a1b2c3d4') as owner:
+        assert not worker.handle_request(request, api)['ok']
+        owner.touch(416, 0x104, 416, 17)
+    assert not worker.handle_request(request, api)['ok']
+    assert not any(feature == 0x1814 and fn == 0x10 for feature, fn, _, _ in calls)
+
+
+def test_host_switch_same_channel_is_noop_and_changed_identity_is_rejected(hosts_device):
+    _dev, api, calls = hosts_device
+    request = {'op': 'switch_host', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+               'index': 0, 'expected_stable_id': 'unit:a1b2c3d4'}
+    assert worker.handle_request(request, api)['requested'] is False
+    request.update(index=1, expected_stable_id='unit:d1e2f3a4')
+    assert not worker.handle_request(request, api)['ok']
+    assert not any(feature == 0x1814 and fn == 0x10 for feature, fn, _, _ in calls)
+
+
+def test_legacy_write_without_expected_identity_still_binds_and_rechecks_unit():
+    setting = FakeSetting('dpi', 2, 1000, [Named(1000, '1000'), Named(1600, '1600')])
+    api, dev, _ = fake_api([setting])
+    original = dev._feature_request
+    identity_reads = []
+    def request(feature, function, *args):
+        if feature == 3:
+            identity_reads.append(True)
+        return original(feature, function, *args)
+    dev.feature_request.side_effect = request
+    result = worker.handle_request({'op': 'write', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                    'setting': 'dpi', 'value': 1600}, api)
+    assert result['ok']
+    assert len(identity_reads) >= 2
+    setting.writes.clear()
+    dev.feature_request.side_effect = lambda *_args, **_kwargs: None
+    result = worker.handle_request({'op': 'write', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                    'setting': 'dpi', 'value': 1000}, api)
+    assert not result['ok']
+    assert setting.writes == []
+
+
+def test_explicit_unknown_expected_identity_cannot_mutate_a_fresh_device():
+    setting = FakeSetting('dpi', 2, 1000, [Named(1000, '1000'), Named(1600, '1600')])
+    api, _dev, _ = fake_api([setting])
+    result = worker.handle_request({'op': 'write', 'device_id': worker._device_id('/dev/hidraw-test', 255),
+                                    'setting': 'dpi', 'value': 1600, 'expected_stable_id': None}, api)
+    assert not result['ok']
+    assert setting.writes == []

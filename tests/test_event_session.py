@@ -154,7 +154,7 @@ def test_stopped_is_delivered_once_only_after_process_exit_and_cleanup(processes
     assert not session.running and not session.stopping and not session.ready
     assert process.stdin.closed and process.stdout.closed and process.stderr.closed
     assert [e["type"] for e in events] == ["ready", "stopped"]
-    assert events[-1] == {"type": "stopped", "exit_code": 0, "session_id": 1}
+    assert events[-1] == {"type": "stopped", "restored": None, "exit_code": 0, "session_id": 1}
     assert process.stderr.close_count == 1
     assert process.stderr.close_thread == "mx4-event-stderr"
 
@@ -329,3 +329,56 @@ print(json.dumps({'type': 'stopped'}), flush=True)
     finally:
         session.stop()
         process.wait(timeout=3)
+
+
+def test_configure_sends_only_validated_current_controls_and_stops_on_broken_pipe(processes):
+    session = EventSession(lambda _: None)
+    assert session.configure(default_config()) is None
+    session.start('fake', default_config())
+    process = processes[0]
+    process.stdout.put({'type': 'ready'})
+    wait_for(lambda: session.ready)
+    config = default_config()
+    config['button_bindings'] = {'82': 'copy'}
+    assert session.configure(config) == 1
+    assert json.loads(process.stdin.lines[-1]) == {'op': 'configure', 'config_id': 1,
+        'controls': [82, 416], 'ring_button': 416, 'raw_xy': True}
+    config['button_bindings'] = {'80': 'copy'}
+    with pytest.raises(ValueError):
+        session.configure(config)
+    process.stdin.failure = BrokenPipeError()
+    config['button_bindings'] = {}
+    assert session.configure(config) is None
+    assert session.stopping
+    assert session.configure(config) is None
+
+
+@pytest.mark.parametrize('reported,exit_code,expected', [(True, 0, True), (False, 0, False), (None, 0, None), (True, 1, None)])
+def test_restoration_outcome_is_current_session_only_after_child_exit(processes, reported, exit_code, expected):
+    events = []
+    session = EventSession(events.append)
+    session.start('mouse', default_config())
+    process = processes[0]
+    process.stdout.put({'type': 'stopped', 'restored': reported})
+    time.sleep(.01)
+    assert session.restored is None
+    process.exit(exit_code)
+    wait_for(lambda: any(event['type'] == 'stopped' for event in events))
+    assert session.restored is expected
+    assert events[-1]['restored'] is expected
+
+
+@pytest.mark.parametrize('bindings,expected', [({}, []), ({'416': 'copy', '82': 'paste'}, [82, 416])])
+def test_manual_only_session_requests_only_real_bindings_and_no_raw(processes, bindings, expected):
+    session = EventSession(lambda _: None)
+    config = default_config() | {'ring_button': None, 'button_bindings': bindings}
+    session.start('fake', config)
+    process = processes[0]
+    assert json.loads(process.stdin.lines[0]) == {'device_id': 'fake', 'controls': expected,
+                                                 'ring_button': None, 'raw_xy': False}
+    process.stdout.put({'type': 'ready'})
+    wait_for(lambda: session.ready)
+    assert session.configure(config) == 1
+    assert json.loads(process.stdin.lines[-1]) == {'op': 'configure', 'config_id': 1,
+        'controls': expected, 'ring_button': None, 'raw_xy': False}
+    session.stop()

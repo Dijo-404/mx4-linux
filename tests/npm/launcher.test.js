@@ -14,6 +14,8 @@ function fixture(t) {
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const packageRoot = join(directory, 'package');
   mkdirSync(join(packageRoot, 'bin'), { recursive: true });
+  mkdirSync(join(packageRoot, 'scripts'), { recursive: true });
+  writeFileSync(join(packageRoot, 'scripts', 'setup-font.sh'), '#!/bin/sh\nexit "${TEST_FONT_EXIT:-0}"\n');
   for (const path of ['bin/mx4-linux.js', 'package.json', 'pyproject.toml', 'README.md', 'LICENSE']) copyFileSync(join(root, path), join(packageRoot, path));
   mkdirSync(join(packageRoot, 'src', 'mx4_linux'), { recursive: true });
   copyFileSync(join(root, 'src', 'mx4_linux', '__init__.py'), join(packageRoot, 'src', 'mx4_linux', '__init__.py'));
@@ -92,6 +94,17 @@ test('setup rejects unsupported arguments and reports a missing Python executabl
   const result = f.run(['doctor'], { MX4_LINUX_PYTHON: join(f.directory, 'absent') });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Cannot start Python/);
+});
+
+test('setup checks the font prerequisite before modifying an existing runtime', t => {
+  const f = fixture(t);
+  assert.equal(f.run(['setup'], { PYTHON: f.python }).status, 0);
+  const previousCalls = f.logs().length;
+  const failed = f.run(['setup'], { PYTHON: f.python, TEST_FONT_EXIT: '3' });
+  assert.equal(failed.status, 1);
+  assert.ok(existsSync(f.ready), 'font verification must not invalidate a working installation');
+  assert.equal(f.logs().length, previousCalls, 'no Python or pip operation may run after the prerequisite failed');
+  assert.equal(f.run(['doctor']).status, 0, 'existing application launch remains available');
 });
 
 test('termination reaches Python so the listener can clean up', { timeout: 5000 }, async t => {

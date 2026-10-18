@@ -35,3 +35,8 @@ def test_group_icon_distinguishes_an_action_collection_from_its_parent_routine()
 
 def test_incomplete_editor_drafts_have_a_neutral_icon():
     assert action_icon({"label": "New action", "steps": []}) == "system-run-symbolic"
+
+def test_explicit_leaf_icon_does_not_hide_group_affordance():
+    action = {'icon': 'audio-volume-high-symbolic', 'steps': []}
+    assert action_icon(action) == 'audio-volume-high-symbolic'
+    assert action_icon(action, grouped=True) == 'view-app-grid-symbolic'

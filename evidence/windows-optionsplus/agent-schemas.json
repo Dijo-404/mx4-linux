@@ -1,0 +1,3089 @@
+{
+  "artifact": {
+    "file_name": "logioptionsplus_agent.exe",
+    "size": 68391064,
+    "sha256": "0d7149a8ded851cb492f75e3b78306cc68b60dc623b2341267db17bb15b1f03c",
+    "format": "PE32+",
+    "machine": "0x8664",
+    "coff_timestamp": 1791739724,
+    "image_base": "0x140000000",
+    "entry_rva": "0x234e278",
+    "sections": [
+      {
+        "name": ".text",
+        "rva": "0x1000",
+        "virtual_size": 49368260,
+        "file_offset": "0x400",
+        "file_size": 49368576
+      },
+      {
+        "name": ".rdata",
+        "rva": "0x2f16000",
+        "virtual_size": 9083508,
+        "file_offset": "0x2f15200",
+        "file_size": 9083904
+      },
+      {
+        "name": ".data",
+        "rva": "0x37c0000",
+        "virtual_size": 6315840,
+        "file_offset": "0x37bee00",
+        "file_size": 6008832
+      },
+      {
+        "name": ".pdata",
+        "rva": "0x3dc6000",
+        "virtual_size": 3273108,
+        "file_offset": "0x3d79e00",
+        "file_size": 3273216
+      },
+      {
+        "name": "CPADinfo",
+        "rva": "0x40e6000",
+        "virtual_size": 56,
+        "file_offset": "0x4099000",
+        "file_size": 512
+      },
+      {
+        "name": ".rsrc",
+        "rva": "0x40e7000",
+        "virtual_size": 151720,
+        "file_offset": "0x4099200",
+        "file_size": 152064
+      },
+      {
+        "name": ".reloc",
+        "rva": "0x410d000",
+        "virtual_size": 492064,
+        "file_offset": "0x40be400",
+        "file_size": 492544
+      }
+    ]
+  },
+  "method": "static bounded protobuf descriptor decoding",
+  "bounds": {
+    "max_descriptor_bytes": 524288,
+    "max_fields_per_message": 20000,
+    "max_nesting": 24,
+    "offset_convention": "original file offsets; end is exclusive"
+  },
+  "limitations": [
+    "Schema presence does not establish runtime registration, invocation or MX4 support.",
+    "No executable code, native handler body or HID++ wire encoding is recovered.",
+    "Search covers matching logi protocol/common_protocol proto3 descriptors only.",
+    "Unmatched, packed, encrypted, proto2 or differently named records may exist.",
+    "Service/extension definitions and most descriptor options are omitted.",
+    "Selected schema references may point to messages omitted from this report.",
+    "Enums are decoded as signed int32; offsets and digests identify whole descriptors."
+  ],
+  "recovered_descriptor_count": 74,
+  "descriptors": [
+    {
+      "name": "logi/protocol/lps.proto",
+      "package": "logi.protocol.lps",
+      "file_offset": "0x3197210",
+      "end_offset_exclusive": "0x319be1f",
+      "byte_length": 19471,
+      "sha256": "0e15d1bf1711d477c9d818ac98bce33af77b9061fe607bebb045d47d8012f38a",
+      "dependencies": [
+        "google/protobuf/struct.proto",
+        "google/protobuf/wrappers.proto"
+      ],
+      "messages": [
+        {
+          "name": "HandshakeRequest",
+          "fields": [
+            {
+              "number": 1,
+              "name": "minimum_protocol_version",
+              "type": "int32"
+            },
+            {
+              "number": 2,
+              "name": "maximum_protocol_version",
+              "type": "int32"
+            }
+          ]
+        },
+        {
+          "name": "HandshakeResponse",
+          "fields": [
+            {
+              "number": 1,
+              "name": "negotiated_protocol_version",
+              "type": "int32"
+            }
+          ]
+        },
+        {
+          "name": "StartDeviceRequest",
+          "fields": [
+            {
+              "number": 1,
+              "name": "icon_size",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "device_type",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "StartDeviceResponse",
+          "fields": [
+            {
+              "number": 1,
+              "name": "screens",
+              "type": ".logi.protocol.lps.ScreenInfo",
+              "kind": "message",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "ExecuteAction",
+          "fields": [
+            {
+              "number": 1,
+              "name": "action_name",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "number_of_ticks",
+              "type": "int32"
+            },
+            {
+              "number": 3,
+              "name": "action_parameters",
+              "type": ".google.protobuf.Struct",
+              "kind": "message"
+            }
+          ]
+        },
+        {
+          "name": "ExecuteRegisteredAction",
+          "fields": [
+            {
+              "number": 1,
+              "name": "registered_action_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "number_of_ticks",
+              "type": "int32"
+            }
+          ]
+        },
+        {
+          "name": "RegisterActionRequest",
+          "fields": [
+            {
+              "number": 1,
+              "name": "action_name",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "number_of_ticks",
+              "type": "int32"
+            },
+            {
+              "number": 3,
+              "name": "action_parameters",
+              "type": ".logi.protocol.lps.RegisterActionRequest.ActionParametersEntry",
+              "kind": "message",
+              "repeated": true
+            }
+          ],
+          "nested": [
+            {
+              "name": "ActionParametersEntry",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "key",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "value",
+                  "type": "string"
+                }
+              ],
+              "map_entry": true
+            }
+          ]
+        },
+        {
+          "name": "RegisterActionResponse",
+          "fields": [
+            {
+              "number": 1,
+              "name": "action_name",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "Action",
+          "fields": [
+            {
+              "number": 1,
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "display_name",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "description",
+              "type": "string"
+            },
+            {
+              "number": 4,
+              "name": "group_name",
+              "type": "string"
+            },
+            {
+              "number": 5,
+              "name": "is_command",
+              "type": "bool"
+            },
+            {
+              "number": 6,
+              "name": "super_group_name",
+              "type": "string"
+            },
+            {
+              "number": 7,
+              "name": "icon",
+              "type": "string"
+            },
+            {
+              "number": 8,
+              "name": "mode_names",
+              "type": "string",
+              "repeated": true
+            },
+            {
+              "number": 9,
+              "name": "order_id",
+              "type": "int32"
+            },
+            {
+              "number": 10,
+              "name": "is_reset_command",
+              "type": "bool"
+            },
+            {
+              "number": 11,
+              "name": "reset_command_name",
+              "type": "string"
+            },
+            {
+              "number": 12,
+              "name": "is_widget",
+              "type": "bool"
+            },
+            {
+              "number": 13,
+              "name": "action_parameter",
+              "type": "string"
+            },
+            {
+              "number": 14,
+              "name": "is_multi_state",
+              "type": "bool"
+            },
+            {
+              "number": 15,
+              "name": "is_profile_action_template",
+              "type": "bool"
+            },
+            {
+              "number": 16,
+              "name": "profile_action_type",
+              "type": "string"
+            },
+            {
+              "number": 17,
+              "name": "template_id",
+              "type": "string"
+            },
+            {
+              "number": 18,
+              "name": "show_as_single_action",
+              "type": "bool"
+            },
+            {
+              "number": 19,
+              "name": "is_hidden",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "LpsAssignment",
+          "fields": [
+            {
+              "number": 1,
+              "name": "action_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "slot_id",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "display_name",
+              "type": "string"
+            },
+            {
+              "number": 4,
+              "name": "profile_id",
+              "type": "string"
+            },
+            {
+              "number": 5,
+              "name": "category",
+              "type": "string"
+            },
+            {
+              "number": 6,
+              "name": "description",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ShowOverlayEventData",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "primary_text",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "primary_icon",
+              "type": ".google.protobuf.StringValue",
+              "kind": "message"
+            },
+            {
+              "number": 4,
+              "name": "secondary_text",
+              "type": ".google.protobuf.StringValue",
+              "kind": "message"
+            },
+            {
+              "number": 5,
+              "name": "secondary_icon",
+              "type": "string"
+            },
+            {
+              "number": 6,
+              "name": "background_color",
+              "type": "uint32"
+            },
+            {
+              "number": 7,
+              "name": "foreground_color",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "HideOverlayEventData",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "AdjustmentValueData",
+          "fields": [
+            {
+              "number": 1,
+              "name": "value_string",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "format_string",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "value",
+              "type": "float"
+            },
+            {
+              "number": 4,
+              "name": "min_value",
+              "type": "float"
+            },
+            {
+              "number": 5,
+              "name": "max_value",
+              "type": "float"
+            },
+            {
+              "number": 6,
+              "name": "default_value",
+              "type": "float"
+            }
+          ]
+        },
+        {
+          "name": "NestedControlAssignments",
+          "fields": [
+            {
+              "number": 1,
+              "name": "control_assignments",
+              "type": ".logi.protocol.lps.ControlAssignment",
+              "kind": "message",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "ControlAssignment",
+          "fields": [
+            {
+              "number": 1,
+              "name": "control_id",
+              "type": "uint32"
+            },
+            {
+              "number": 2,
+              "name": "press_action_assignment",
+              "type": ".logi.protocol.lps.ControlAssignment.ActionAssignment",
+              "kind": "message"
+            },
+            {
+              "number": 3,
+              "name": "rotate_action_assignment",
+              "type": ".logi.protocol.lps.ControlAssignment.ActionAssignment",
+              "kind": "message"
+            },
+            {
+              "number": 4,
+              "name": "nested_control_assignments",
+              "type": ".logi.protocol.lps.ControlAssignment",
+              "kind": "message",
+              "repeated": true
+            }
+          ],
+          "nested": [
+            {
+              "name": "ActionAssignment",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "action_name",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "display_name",
+                  "type": "string"
+                },
+                {
+                  "number": 3,
+                  "name": "image",
+                  "type": "string"
+                },
+                {
+                  "number": 4,
+                  "name": "active_image",
+                  "type": "string"
+                },
+                {
+                  "number": 5,
+                  "name": "plugin_background_color",
+                  "type": "uint32"
+                },
+                {
+                  "number": 6,
+                  "name": "plugin_foreground_color",
+                  "type": "uint32"
+                },
+                {
+                  "number": 7,
+                  "name": "background_color",
+                  "type": "uint32"
+                },
+                {
+                  "number": 8,
+                  "name": "foreground_color",
+                  "type": "uint32"
+                },
+                {
+                  "number": 9,
+                  "name": "adjustment_value",
+                  "type": ".google.protobuf.StringValue",
+                  "kind": "message"
+                },
+                {
+                  "number": 10,
+                  "name": "adjustment_value_data",
+                  "type": ".logi.protocol.lps.AdjustmentValueData",
+                  "kind": "message"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "AssignmentsChangedData",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "control_assignments",
+              "type": ".logi.protocol.lps.ControlAssignment",
+              "kind": "message",
+              "repeated": true
+            },
+            {
+              "number": 3,
+              "name": "scale_factor",
+              "type": "int32"
+            }
+          ]
+        },
+        {
+          "name": "AssignmentChangedData",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "control_assignment",
+              "type": ".logi.protocol.lps.ControlAssignment",
+              "kind": "message"
+            }
+          ]
+        },
+        {
+          "name": "AdjustmentValueChangedData",
+          "fields": [
+            {
+              "number": 1,
+              "name": "control_id",
+              "type": "int32"
+            },
+            {
+              "number": 2,
+              "name": "action_name",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "adjustment_value",
+              "type": ".google.protobuf.StringValue",
+              "kind": "message"
+            },
+            {
+              "number": 4,
+              "name": "adjustment_value_data",
+              "type": ".logi.protocol.lps.AdjustmentValueData",
+              "kind": "message"
+            },
+            {
+              "number": 5,
+              "name": "adjustment_clicks",
+              "type": "int32"
+            }
+          ]
+        },
+        {
+          "name": "StartRadialMenuDeviceRequestParameters",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "device_model",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "firmware_version",
+              "type": "string"
+            },
+            {
+              "number": 4,
+              "name": "serial_number",
+              "type": "string"
+            },
+            {
+              "number": 5,
+              "name": "image_width",
+              "type": "int32",
+              "oneof_index": 0,
+              "proto3_optional": 1
+            },
+            {
+              "number": 6,
+              "name": "image_height",
+              "type": "int32",
+              "oneof_index": 1,
+              "proto3_optional": 1
+            }
+          ]
+        },
+        {
+          "name": "SetActionsRingScaleFactor",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "scale_factor",
+              "type": "int32"
+            }
+          ]
+        }
+      ],
+      "enums": [
+        {
+          "name": "ErrorCode",
+          "values": {
+            "Success": 0,
+            "InvalidFunction": 1,
+            "NotFound": 2,
+            "AccessDenied": 5,
+            "BadFormat": 11,
+            "InvalidData": 13,
+            "NotImplemented": 120,
+            "BadArguments": 160,
+            "Busy": 170,
+            "AlreadyExists": 183,
+            "GenericError": -1
+          }
+        },
+        {
+          "name": "MessageType",
+          "values": {
+            "None": 0,
+            "Request": 1,
+            "Event": 2,
+            "Response": 3
+          }
+        }
+      ],
+      "message_selection": "selected top-level messages",
+      "total_top_level_messages": 126
+    },
+    {
+      "name": "logi/protocol/application.proto",
+      "package": "logi.protocol.application",
+      "file_offset": "0x32bf400",
+      "end_offset_exclusive": "0x32bfc24",
+      "byte_length": 2084,
+      "sha256": "7b0c144572a9de7acba214d32393409de3de169903f07ece354006ba95b7d1a3",
+      "dependencies": [
+        "logi/common_protocol/settings.proto",
+        "logi/protocol/util.proto"
+      ],
+      "messages": [
+        {
+          "name": "Configuration",
+          "fields": [
+            {
+              "number": 1,
+              "name": "autolaunch",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 2,
+              "name": "language",
+              "type": ".logi.protocol.util.String",
+              "kind": "message"
+            },
+            {
+              "number": 3,
+              "name": "onboarding_shown",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 4,
+              "name": "migration_shown",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 5,
+              "name": "seen_coach_marks",
+              "type": "string",
+              "repeated": true
+            },
+            {
+              "number": 7,
+              "name": "brand",
+              "type": ".logi.protocol.util.String",
+              "kind": "message"
+            },
+            {
+              "number": 8,
+              "name": "notifications_enabled",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 9,
+              "name": "settings_loaded_from_backup",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 10,
+              "name": "key_value",
+              "type": ".logi.protocol.settings.KeyValue",
+              "kind": "message",
+              "repeated": true
+            },
+            {
+              "number": 11,
+              "name": "low_battery_notifications_enabled",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 12,
+              "name": "lock_notifications_enabled",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 13,
+              "name": "use_system_language",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 14,
+              "name": "theme",
+              "type": ".logi.protocol.util.String",
+              "kind": "message"
+            },
+            {
+              "number": 15,
+              "name": "use_system_theme",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 16,
+              "name": "mic_mute_overlay_enabled",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 17,
+              "name": "automatic_backup_enabled",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 18,
+              "name": "user_voice",
+              "type": ".logi.protocol.util.AttributeValue",
+              "kind": "message",
+              "repeated": true
+            },
+            {
+              "number": 19,
+              "name": "macros_onboarding_shown",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 20,
+              "name": "macros_user_voice",
+              "type": ".logi.protocol.util.AttributeValue",
+              "kind": "message",
+              "repeated": true
+            },
+            {
+              "number": 21,
+              "name": "macros_template_tab_banner_shown",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 22,
+              "name": "macros_manage_tab_banner_shown",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 23,
+              "name": "macros_feature_enabled",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 24,
+              "name": "macros_restore_backup_shown",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 25,
+              "name": "system_notification_click_view",
+              "type": ".logi.protocol.util.String",
+              "kind": "message"
+            },
+            {
+              "number": 26,
+              "name": "macros_execution_stop_hint_shown",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 27,
+              "name": "star_rating_notification_enabled",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 28,
+              "name": "macros_cards_context_menu_shown",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 29,
+              "name": "macros_add_triggers_allowed",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            },
+            {
+              "number": 30,
+              "name": "copied_settings_device_unit_ids",
+              "type": "string",
+              "repeated": true
+            },
+            {
+              "number": 31,
+              "name": "show_mode_notification_enabled",
+              "type": ".logi.protocol.util.BoolValue",
+              "kind": "message"
+            }
+          ]
+        }
+      ],
+      "enums": [],
+      "message_selection": "selected top-level messages",
+      "total_top_level_messages": 2
+    },
+    {
+      "name": "logi/protocol/force_sensing.proto",
+      "package": "logi.protocol.force_sensing",
+      "file_offset": "0x32c6580",
+      "end_offset_exclusive": "0x32c68c4",
+      "byte_length": 836,
+      "sha256": "3c3a0eec166b222a12df269521b28f440de477625c7ee43241d7e5cb2c82908d",
+      "dependencies": [],
+      "messages": [
+        {
+          "name": "ButtonForceSensingCapability",
+          "fields": [
+            {
+              "number": 1,
+              "name": "button_index",
+              "type": "uint32"
+            },
+            {
+              "number": 2,
+              "name": "min_force",
+              "type": "uint32"
+            },
+            {
+              "number": 3,
+              "name": "default_force",
+              "type": "uint32"
+            },
+            {
+              "number": 4,
+              "name": "max_force",
+              "type": "uint32"
+            },
+            {
+              "number": 5,
+              "name": "high_force",
+              "type": "uint32"
+            },
+            {
+              "number": 6,
+              "name": "force_change_capability",
+              "type": "bool"
+            },
+            {
+              "number": 7,
+              "name": "layer_config_capability",
+              "type": "bool"
+            },
+            {
+              "number": 8,
+              "name": "num_thresholds",
+              "type": "uint32"
+            },
+            {
+              "number": 9,
+              "name": "default_l2_force",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "ButtonForceSensing",
+          "fields": [
+            {
+              "number": 1,
+              "name": "button_index",
+              "type": "uint32"
+            },
+            {
+              "number": 2,
+              "name": "current_force",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "ButtonLayerConfig",
+          "fields": [
+            {
+              "number": 1,
+              "name": "button_index",
+              "type": "uint32"
+            },
+            {
+              "number": 2,
+              "name": "layer1_enabled",
+              "type": "bool"
+            },
+            {
+              "number": 3,
+              "name": "layer2_enabled",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "ForceSensingCapabilities",
+          "fields": [
+            {
+              "number": 1,
+              "name": "button_force_sensing_capabilities",
+              "type": ".logi.protocol.force_sensing.ButtonForceSensingCapability",
+              "kind": "message",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "ForceSensingSettings",
+          "fields": [
+            {
+              "number": 1,
+              "name": "buttons_force_sensing_settings",
+              "type": ".logi.protocol.force_sensing.ButtonForceSensing",
+              "kind": "message",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "LayerConfigSettings",
+          "fields": [
+            {
+              "number": 1,
+              "name": "buttons_layer_config_settings",
+              "type": ".logi.protocol.force_sensing.ButtonLayerConfig",
+              "kind": "message",
+              "repeated": true
+            }
+          ]
+        }
+      ],
+      "enums": [],
+      "message_selection": "all",
+      "total_top_level_messages": 6
+    },
+    {
+      "name": "logi/protocol/haptics.proto",
+      "package": "logi.protocol.haptics",
+      "file_offset": "0x32c8190",
+      "end_offset_exclusive": "0x32c9487",
+      "byte_length": 4855,
+      "sha256": "a93e4c9d3d980577daf6c6ca0ca49c7193da4377846535332b6f203b0c923241",
+      "dependencies": [],
+      "messages": [
+        {
+          "name": "HapticEvent",
+          "fields": [
+            {
+              "number": 1,
+              "name": "event_source_name",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "event_name",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "HapticEventSourceSetting",
+          "fields": [
+            {
+              "number": 1,
+              "name": "is_haptics_enabled",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "HapticFeedbackLevel",
+          "fields": [
+            {
+              "number": 1,
+              "name": "level_name",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "value",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "HapticWaveForm",
+          "fields": [
+            {
+              "number": 1,
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "id",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "BreathingExercises",
+          "fields": [
+            {
+              "number": 1,
+              "name": "exercise_id",
+              "type": "uint32"
+            },
+            {
+              "number": 2,
+              "name": "waveform_id",
+              "type": "uint32"
+            },
+            {
+              "number": 3,
+              "name": "no_of_cycles",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "HapticSettings",
+          "fields": [
+            {
+              "number": 1,
+              "name": "is_global_haptics_enabled",
+              "type": "bool"
+            },
+            {
+              "number": 2,
+              "name": "event_source_settings",
+              "type": ".logi.protocol.haptics.HapticSettings.EventSourceSettingsEntry",
+              "kind": "message",
+              "repeated": true
+            },
+            {
+              "number": 3,
+              "name": "haptic_feedback_level",
+              "type": "uint32"
+            },
+            {
+              "number": 4,
+              "name": "is_power_save_enabled",
+              "type": "bool"
+            }
+          ],
+          "nested": [
+            {
+              "name": "EventSourceSettingsEntry",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "key",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "value",
+                  "type": ".logi.protocol.haptics.HapticEventSourceSetting",
+                  "kind": "message"
+                }
+              ],
+              "map_entry": true
+            }
+          ]
+        },
+        {
+          "name": "HapticCapabilities",
+          "fields": [
+            {
+              "number": 1,
+              "name": "power_save_capability",
+              "type": "bool"
+            },
+            {
+              "number": 2,
+              "name": "default_haptic_feedback_level",
+              "type": "uint32"
+            },
+            {
+              "number": 3,
+              "name": "haptic_levels_format",
+              "type": ".logi.protocol.haptics.HapticFeedbackLevelFormat",
+              "kind": "enum"
+            },
+            {
+              "number": 4,
+              "name": "supported_levels",
+              "type": ".logi.protocol.haptics.HapticFeedbackLevel",
+              "kind": "message",
+              "repeated": true
+            },
+            {
+              "number": 5,
+              "name": "supported_waveforms",
+              "type": ".logi.protocol.haptics.HapticCapabilities.SupportedWaveformsEntry",
+              "kind": "message",
+              "repeated": true
+            },
+            {
+              "number": 6,
+              "name": "stop_waveform_capability",
+              "type": "bool"
+            },
+            {
+              "number": 7,
+              "name": "get_playing_waveform_capability",
+              "type": "bool"
+            },
+            {
+              "number": 8,
+              "name": "waveform_info_capability",
+              "type": "bool"
+            },
+            {
+              "number": 9,
+              "name": "breathing_exercises",
+              "type": ".logi.protocol.haptics.BreathingExercises",
+              "kind": "message",
+              "repeated": true
+            }
+          ],
+          "nested": [
+            {
+              "name": "SupportedWaveformsEntry",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "key",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "value",
+                  "type": ".logi.protocol.haptics.HapticWaveForm",
+                  "kind": "message"
+                }
+              ],
+              "map_entry": true
+            }
+          ]
+        },
+        {
+          "name": "Haptics",
+          "fields": [],
+          "nested": [
+            {
+              "name": "HapticConfig",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "is_haptics_enabled",
+                  "type": "bool"
+                },
+                {
+                  "number": 2,
+                  "name": "is_power_save_enabled",
+                  "type": "bool"
+                },
+                {
+                  "number": 3,
+                  "name": "current_haptic_level",
+                  "type": "uint32"
+                }
+              ]
+            },
+            {
+              "name": "HapticProperties",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "is_timer_enabled",
+                  "type": "bool"
+                }
+              ]
+            },
+            {
+              "name": "HapticPropertiesBroadcast",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "properties",
+                  "type": ".logi.protocol.haptics.Haptics.HapticProperties",
+                  "kind": "message"
+                },
+                {
+                  "number": 2,
+                  "name": "slot_prefix",
+                  "type": "string"
+                }
+              ]
+            },
+            {
+              "name": "HapticStatusResponse",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "haptic_status",
+                  "type": ".logi.protocol.haptics.Haptics.HapticStatus",
+                  "kind": "enum"
+                }
+              ]
+            },
+            {
+              "name": "PlayWaveFormRequest",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "waveform_id",
+                  "type": "uint32"
+                },
+                {
+                  "number": 2,
+                  "name": "enable_waveform_info_event",
+                  "type": "bool"
+                }
+              ]
+            },
+            {
+              "name": "PlayWaveFormResponse",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "waveform_id",
+                  "type": "uint32"
+                },
+                {
+                  "number": 2,
+                  "name": "status",
+                  "type": ".logi.protocol.haptics.Haptics.PlayWaveFormStatus",
+                  "kind": "enum"
+                }
+              ]
+            },
+            {
+              "name": "StopWaveformResponse",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "waveform_running_status",
+                  "type": ".logi.protocol.haptics.Haptics.WaveformRunningStatus",
+                  "kind": "enum"
+                }
+              ]
+            },
+            {
+              "name": "GetPlayingWaveformResponse",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "waveform_id",
+                  "type": ".logi.protocol.haptics.Haptics.WaveformId",
+                  "kind": "enum"
+                },
+                {
+                  "number": 2,
+                  "name": "waveform_running_status",
+                  "type": ".logi.protocol.haptics.Haptics.WaveformRunningStatus",
+                  "kind": "enum"
+                }
+              ]
+            },
+            {
+              "name": "WaveformInfoEventResponse",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "waveform_id",
+                  "type": ".logi.protocol.haptics.Haptics.WaveformId",
+                  "kind": "enum"
+                },
+                {
+                  "number": 2,
+                  "name": "waveform_running_status",
+                  "type": ".logi.protocol.haptics.Haptics.WaveformRunningStatus",
+                  "kind": "enum"
+                }
+              ]
+            },
+            {
+              "name": "PlayBreathingExercise",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "exercise_id",
+                  "type": "int32"
+                },
+                {
+                  "number": 2,
+                  "name": "trigger",
+                  "type": ".logi.protocol.haptics.Haptics.BreathingExerciseTrigger",
+                  "kind": "enum"
+                }
+              ]
+            },
+            {
+              "name": "HapticEventSource",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "event_source_name",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "event_source_display_name",
+                  "type": "string"
+                },
+                {
+                  "number": 3,
+                  "name": "event_source_description",
+                  "type": "string"
+                },
+                {
+                  "number": 4,
+                  "name": "icon",
+                  "type": "string"
+                },
+                {
+                  "number": 5,
+                  "name": "icon_type",
+                  "type": "string"
+                },
+                {
+                  "number": 6,
+                  "name": "internal",
+                  "type": "bool"
+                },
+                {
+                  "number": 7,
+                  "name": "disabled_by_default",
+                  "type": "bool"
+                }
+              ]
+            },
+            {
+              "name": "HapticEventSources",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "haptic_event_sources",
+                  "type": ".logi.protocol.haptics.Haptics.HapticEventSources.HapticEventSourcesEntry",
+                  "kind": "message",
+                  "repeated": true
+                }
+              ],
+              "nested": [
+                {
+                  "name": "HapticEventSourcesEntry",
+                  "fields": [
+                    {
+                      "number": 1,
+                      "name": "key",
+                      "type": "string"
+                    },
+                    {
+                      "number": 2,
+                      "name": "value",
+                      "type": ".logi.protocol.haptics.Haptics.HapticEventSource",
+                      "kind": "message"
+                    }
+                  ],
+                  "map_entry": true
+                }
+              ]
+            }
+          ],
+          "enums": [
+            {
+              "name": "HapticStatus",
+              "values": {
+                "HAPTIC_ENABLED": 0,
+                "HAPTIC_DISABLED": 1
+              }
+            },
+            {
+              "name": "PlayWaveFormStatus",
+              "values": {
+                "RECEIVED_AND_STARTED_PLAYING": 0,
+                "RECEIVED_AND_IGNORED": 1
+              }
+            },
+            {
+              "name": "WaveformId",
+              "values": {
+                "SHARP_STATE_CHANGE": 0,
+                "DAMP_STATE_CHANGE": 1,
+                "SHARP_COLLISION": 2,
+                "DAMP_COLLISION": 3,
+                "SUBTLE_COLLISION": 4,
+                "HAPPY_ALERT": 5,
+                "ANGRY_ALERT": 6,
+                "COMPLETED": 7,
+                "SQUARE": 8,
+                "WAVE": 9,
+                "FIREWORK": 10,
+                "MAD": 11,
+                "KNOCK": 12,
+                "JINGLE": 13,
+                "RINGING": 14,
+                "SIMPLE_BREATHING": 15,
+                "BOX_BREATHING": 16,
+                "BELLY_BREATHING": 17,
+                "TIMER": 18,
+                "START_END_BREATHING_SIGNAL": 19,
+                "NONE": 255
+              }
+            },
+            {
+              "name": "BreathingExerciseTrigger",
+              "values": {
+                "DEVICE": 0,
+                "UI": 1
+              }
+            },
+            {
+              "name": "WaveformRunningStatus",
+              "values": {
+                "NO_WAVEFORM_PLAYING": 0,
+                "SOFTWARE_WAVEFORM_PLAYING": 1,
+                "DEVICE_WAVEFORM_PLAYING": 2,
+                "UNKNOWN_ERROR_OR_STATUS": 255
+              }
+            }
+          ]
+        },
+        {
+          "name": "Config",
+          "fields": [],
+          "nested": [
+            {
+              "name": "HapticEvent",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "unsupported",
+                  "type": "bool"
+                },
+                {
+                  "number": 2,
+                  "name": "waveform_id",
+                  "type": "uint32"
+                }
+              ]
+            },
+            {
+              "name": "HapticEventSource",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "disabled_by_default",
+                  "type": "bool"
+                },
+                {
+                  "number": 2,
+                  "name": "unsupported_on_win",
+                  "type": "bool"
+                },
+                {
+                  "number": 3,
+                  "name": "unsupported_on_mac",
+                  "type": "bool"
+                },
+                {
+                  "number": 4,
+                  "name": "supported_events",
+                  "type": ".logi.protocol.haptics.Config.HapticEventSource.SupportedEventsEntry",
+                  "kind": "message",
+                  "repeated": true
+                }
+              ],
+              "nested": [
+                {
+                  "name": "SupportedEventsEntry",
+                  "fields": [
+                    {
+                      "number": 1,
+                      "name": "key",
+                      "type": "string"
+                    },
+                    {
+                      "number": 2,
+                      "name": "value",
+                      "type": ".logi.protocol.haptics.Config.HapticEvent",
+                      "kind": "message"
+                    }
+                  ],
+                  "map_entry": true
+                }
+              ]
+            },
+            {
+              "name": "BlacklistedEvent",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "event_source_name",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "event_name",
+                  "type": "string"
+                }
+              ]
+            },
+            {
+              "name": "HapticDeviceConfig",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "supported_event_sources",
+                  "type": ".logi.protocol.haptics.Config.HapticDeviceConfig.SupportedEventSourcesEntry",
+                  "kind": "message",
+                  "repeated": true
+                },
+                {
+                  "number": 2,
+                  "name": "haptic_waveforms",
+                  "type": ".logi.protocol.haptics.Config.HapticDeviceConfig.HapticWaveformsEntry",
+                  "kind": "message",
+                  "repeated": true
+                },
+                {
+                  "number": 3,
+                  "name": "blacklisted_events",
+                  "type": ".logi.protocol.haptics.Config.BlacklistedEvent",
+                  "kind": "message",
+                  "repeated": true
+                },
+                {
+                  "number": 4,
+                  "name": "blacklisted_event_source_names",
+                  "type": "string",
+                  "repeated": true
+                },
+                {
+                  "number": 5,
+                  "name": "blacklisted_event_names",
+                  "type": "string",
+                  "repeated": true
+                },
+                {
+                  "number": 6,
+                  "name": "is_plugin_event_sources_supported",
+                  "type": "bool"
+                }
+              ],
+              "nested": [
+                {
+                  "name": "SupportedEventSourcesEntry",
+                  "fields": [
+                    {
+                      "number": 1,
+                      "name": "key",
+                      "type": "string"
+                    },
+                    {
+                      "number": 2,
+                      "name": "value",
+                      "type": ".logi.protocol.haptics.Config.HapticEventSource",
+                      "kind": "message"
+                    }
+                  ],
+                  "map_entry": true
+                },
+                {
+                  "name": "HapticWaveformsEntry",
+                  "fields": [
+                    {
+                      "number": 1,
+                      "name": "key",
+                      "type": "string"
+                    },
+                    {
+                      "number": 2,
+                      "name": "value",
+                      "type": "uint32"
+                    }
+                  ],
+                  "map_entry": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "TriggerWaveformExecute",
+          "fields": [
+            {
+              "number": 1,
+              "name": "wave_form",
+              "type": ".logi.protocol.haptics.HapticWaveForm",
+              "kind": "message"
+            },
+            {
+              "number": 2,
+              "name": "execute",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "TriggerWaveformInfo",
+          "fields": [
+            {
+              "number": 1,
+              "name": "start_waveform",
+              "type": "bool"
+            },
+            {
+              "number": 2,
+              "name": "device_id",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "enums": [
+        {
+          "name": "HapticFeedbackLevelFormat",
+          "values": {
+            "AllLevels": 0,
+            "SpecificLevels": 1
+          }
+        }
+      ],
+      "message_selection": "all",
+      "total_top_level_messages": 11
+    },
+    {
+      "name": "logi/protocol/devices.proto",
+      "package": "logi.protocol.devices",
+      "file_offset": "0x32d9c60",
+      "end_offset_exclusive": "0x32e47e7",
+      "byte_length": 43911,
+      "sha256": "ebbea46284aace3d1adb0c4862c9002dfa7c6d5a892db5d8baf01a3c368f96ad",
+      "dependencies": [
+        "google/protobuf/wrappers.proto",
+        "google/protobuf/timestamp.proto",
+        "logi/protocol/audio.proto",
+        "logi/protocol/firmware_lighting.proto",
+        "logi/protocol/force_sensing.proto",
+        "logi/protocol/haptics.proto",
+        "logi/protocol/lighting_support.proto",
+        "logi/protocol/microphone.proto",
+        "logi/protocol/mouse.proto",
+        "logi/protocol/keyboard.proto",
+        "logi/protocol/util.proto",
+        "logi/protocol/backlight.proto",
+        "logi/protocol/disable_keys.proto",
+        "logi/protocol/illumination_light.proto",
+        "logi/protocol/touchpad.proto",
+        "logi/protocol/dfu.proto",
+        "logi/protocol/presenter.proto",
+        "logi/protocol/presentation_timers.proto",
+        "logi/protocol/crown.proto",
+        "logi/protocol/multiroller.proto",
+        "logi/protocol/unified_profiles.proto",
+        "logi/protocol/common.proto"
+      ],
+      "messages": [
+        {
+          "name": "ResourceList",
+          "fields": [
+            {
+              "number": 1,
+              "name": "keys",
+              "type": "string",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "Resource",
+          "fields": [
+            {
+              "number": 1,
+              "name": "key",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "content_type",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "as_data_uri",
+              "type": "bool"
+            },
+            {
+              "number": 4,
+              "name": "url",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ResourcesList",
+          "fields": [
+            {
+              "number": 1,
+              "name": "resources",
+              "type": ".logi.protocol.devices.Resource",
+              "kind": "message",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "Resources",
+          "fields": [
+            {
+              "number": 1,
+              "name": "resources",
+              "type": ".logi.protocol.devices.Resource",
+              "kind": "message",
+              "repeated": true
+            }
+          ]
+        },
+        {
+          "name": "_Resources",
+          "fields": [
+            {
+              "number": 1,
+              "name": "resource_info",
+              "type": ".logi.protocol.devices._Resources.ResourceInfo",
+              "kind": "message",
+              "repeated": true
+            }
+          ],
+          "nested": [
+            {
+              "name": "ResourceInfo",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "key",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "content_type",
+                  "type": "string"
+                },
+                {
+                  "number": 3,
+                  "name": "local_path",
+                  "type": "string"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "TriggerEvent",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "device_type",
+              "type": ".logi.protocol.devices.Device.Type",
+              "kind": "enum"
+            },
+            {
+              "number": 3,
+              "name": "slot_id",
+              "type": "string"
+            },
+            {
+              "number": 4,
+              "name": "state",
+              "type": ".logi.protocol.devices.TriggerEvent.State",
+              "kind": "enum"
+            },
+            {
+              "number": 5,
+              "name": "nested_card",
+              "type": "string"
+            },
+            {
+              "number": 6,
+              "name": "adjustable_card_settings",
+              "type": ".logi.protocol.devices.AdjustableCardSettings",
+              "kind": "message",
+              "oneof_index": 0,
+              "proto3_optional": 1
+            },
+            {
+              "number": 7,
+              "name": "assignment_mode",
+              "type": ".logi.protocol.devices.AssignmentMode",
+              "kind": "enum",
+              "oneof_index": 1,
+              "proto3_optional": 1
+            },
+            {
+              "number": 8,
+              "name": "layer",
+              "type": ".logi.protocol.common.KeyLayer",
+              "kind": "enum"
+            },
+            {
+              "number": 9,
+              "name": "from_lp_supported_device",
+              "type": "bool"
+            }
+          ],
+          "enums": [
+            {
+              "name": "State",
+              "values": {
+                "INACTIVE": 0,
+                "START": 1,
+                "END": 2,
+                "ONE_SHOT": 3
+              }
+            }
+          ]
+        },
+        {
+          "name": "DevioDeviceInfo",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "model_id",
+              "type": "uint32"
+            },
+            {
+              "number": 3,
+              "name": "unit_id",
+              "type": "uint32"
+            },
+            {
+              "number": 4,
+              "name": "bus_type",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "OptionsDeviceInfo",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "model_id",
+              "type": "uint32"
+            },
+            {
+              "number": 3,
+              "name": "unit_id",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "DeviceIDAndModel",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "model_id",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "DeviceIDModelAndLayer",
+          "fields": [
+            {
+              "number": 1,
+              "name": "device_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "model_id",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "layer",
+              "type": ".logi.protocol.common.KeyLayer",
+              "kind": "enum"
+            }
+          ]
+        },
+        {
+          "name": "DeviceDepotAndModel",
+          "fields": [
+            {
+              "number": 1,
+              "name": "depot_name",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "model_id",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "DeviceDepotModelAndLayer",
+          "fields": [
+            {
+              "number": 1,
+              "name": "depot_name",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "model_id",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "layer",
+              "type": ".logi.protocol.common.KeyLayer",
+              "kind": "enum"
+            }
+          ]
+        },
+        {
+          "name": "DivertStateRequest",
+          "fields": [
+            {
+              "number": 1,
+              "name": "control_id",
+              "type": "uint32"
+            },
+            {
+              "number": 2,
+              "name": "divert",
+              "type": "bool"
+            },
+            {
+              "number": 3,
+              "name": "raw_xy",
+              "type": "bool"
+            },
+            {
+              "number": 4,
+              "name": "raw_wheel",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "SpecialKeysDivertRequest",
+          "fields": [
+            {
+              "number": 1,
+              "name": "control_ids_list",
+              "type": ".logi.protocol.devices.DivertStateRequest",
+              "kind": "message",
+              "repeated": true
+            }
+          ]
+        }
+      ],
+      "enums": [
+        {
+          "name": "AssignmentMode",
+          "values": {
+            "DEFAULT": 0,
+            "DEVICE_CONNECT": 1,
+            "APP_SWITCH": 2,
+            "DEVICE_RESET": 3,
+            "DEVICE_CONNECT_RESET": 4
+          }
+        }
+      ],
+      "message_selection": "selected top-level messages",
+      "total_top_level_messages": 82
+    },
+    {
+      "name": "logi/protocol/profiles_v2.proto",
+      "package": "logi.protocol.profiles_v2",
+      "file_offset": "0x32f8d60",
+      "end_offset_exclusive": "0x32fd08a",
+      "byte_length": 17194,
+      "sha256": "cc8c0479b38e62df654dfe5cb871b1dd8847d0d436ed7194accf8953298adef6",
+      "dependencies": [
+        "logi/protocol/applications.proto",
+        "logi/protocol/backlight.proto",
+        "logi/protocol/common.proto",
+        "logi/protocol/devices.proto",
+        "logi/protocol/devices_support.proto",
+        "logi/protocol/disable_keys.proto",
+        "logi/protocol/force_sensing.proto",
+        "logi/protocol/haptics.proto",
+        "logi/protocol/highlights.proto",
+        "logi/protocol/illumination_light.proto",
+        "logi/protocol/keyboard.proto",
+        "logi/protocol/macros_categories.proto",
+        "logi/protocol/macros.proto",
+        "logi/protocol/media.proto",
+        "logi/protocol/mouse.proto",
+        "logi/protocol/multiroller.proto",
+        "logi/protocol/presentation.proto",
+        "logi/protocol/presentation_timers.proto",
+        "logi/protocol/presenter.proto",
+        "logi/protocol/radial_menu.proto",
+        "logi/protocol/touchpad.proto",
+        "logi/protocol/util.proto",
+        "logi/protocol/crown.proto"
+      ],
+      "messages": [
+        {
+          "name": "Card",
+          "fields": [
+            {
+              "number": 1,
+              "name": "id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "attribute",
+              "type": ".logi.protocol.profiles_v2.Card.Attribute",
+              "kind": "enum"
+            },
+            {
+              "number": 6,
+              "name": "read_only",
+              "type": "bool"
+            },
+            {
+              "number": 7,
+              "name": "execute_on_profile_change",
+              "type": "bool"
+            },
+            {
+              "number": 8,
+              "name": "macro",
+              "type": ".logi.protocol.macros.Macro",
+              "kind": "message"
+            },
+            {
+              "number": 11,
+              "name": "mouse_settings",
+              "type": ".logi.protocol.mouse.Settings",
+              "kind": "message"
+            },
+            {
+              "number": 12,
+              "name": "selected_nested_card",
+              "type": "string"
+            },
+            {
+              "number": 13,
+              "name": "nested_cards",
+              "type": ".logi.protocol.profiles_v2.Card.NestedCardsEntry",
+              "kind": "message",
+              "repeated": true
+            },
+            {
+              "number": 14,
+              "name": "nested_cards_order",
+              "type": "string",
+              "repeated": true
+            },
+            {
+              "number": 25,
+              "name": "mouse_thumb_wheel_settings",
+              "type": ".logi.protocol.mouse.ThumbWheelSettings",
+              "kind": "message"
+            },
+            {
+              "number": 26,
+              "name": "mouse_scroll_wheel_settings",
+              "type": ".logi.protocol.mouse.ScrollWheelSettings",
+              "kind": "message"
+            },
+            {
+              "number": 30,
+              "name": "keyboard_settings",
+              "type": ".logi.protocol.keyboard.KeyboardSettings",
+              "kind": "message"
+            },
+            {
+              "number": 34,
+              "name": "backlighting_settings",
+              "type": ".logi.protocol.backlight.Settings",
+              "kind": "message"
+            },
+            {
+              "number": 35,
+              "name": "fn_inversion_settings",
+              "type": ".logi.protocol.devices.FnInversionSettings",
+              "kind": "message"
+            },
+            {
+              "number": 36,
+              "name": "change_pointer_speed",
+              "type": ".logi.protocol.profiles_v2.Card.ChangePointerSpeed",
+              "kind": "message"
+            },
+            {
+              "number": 37,
+              "name": "precision_mode",
+              "type": ".logi.protocol.mouse.PrecisionMode",
+              "kind": "message"
+            },
+            {
+              "number": 38,
+              "name": "disable_keys_settings",
+              "type": ".logi.protocol.disable_keys.DisableKeysSettings",
+              "kind": "message"
+            },
+            {
+              "number": 39,
+              "name": "disable_keys_capabilities",
+              "type": ".logi.protocol.disable_keys.DisableKeysCapabilities",
+              "kind": "message"
+            },
+            {
+              "number": 40,
+              "name": "illumination_light_settings",
+              "type": ".logi.protocol.illumination_light.LightSettings",
+              "kind": "message"
+            },
+            {
+              "number": 41,
+              "name": "camera_preview_settings",
+              "type": ".logi.protocol.illumination_light.CameraPreview",
+              "kind": "message"
+            },
+            {
+              "number": 42,
+              "name": "state",
+              "type": ".logi.protocol.profiles_v2.Card.State",
+              "kind": "enum"
+            },
+            {
+              "number": 43,
+              "name": "touchpad_settings",
+              "type": ".logi.protocol.touchpad.Settings",
+              "kind": "message"
+            },
+            {
+              "number": 44,
+              "name": "touchpad_action_gesture_map",
+              "type": ".logi.protocol.touchpad.ActionGestureMapping",
+              "kind": "message"
+            },
+            {
+              "number": 45,
+              "name": "brightness_settings",
+              "type": ".logi.protocol.devices.DeviceBrightness",
+              "kind": "message"
+            },
+            {
+              "number": 46,
+              "name": "icons",
+              "type": ".logi.protocol.profiles_v2.Card.Icons",
+              "kind": "message"
+            },
+            {
+              "number": 47,
+              "name": "ui_settings",
+              "type": ".logi.protocol.profiles_v2.Card.UserIntefaceSettings",
+              "kind": "message"
+            },
+            {
+              "number": 48,
+              "name": "require_focus",
+              "type": "bool"
+            },
+            {
+              "number": 49,
+              "name": "camera_settings_group",
+              "type": ".logi.protocol.devices.Webcam.CameraSettingsGroup",
+              "kind": "message"
+            },
+            {
+              "number": 50,
+              "name": "video_settings_group",
+              "type": ".logi.protocol.devices.Webcam.VideoSettingsGroup",
+              "kind": "message"
+            },
+            {
+              "number": 51,
+              "name": "webcam_global_settings",
+              "type": ".logi.protocol.devices.Webcam.GlobalSettings",
+              "kind": "message"
+            },
+            {
+              "number": 52,
+              "name": "presentation",
+              "type": ".logi.protocol.presentation.Presentation",
+              "kind": "message"
+            },
+            {
+              "number": 53,
+              "name": "presenter_settings",
+              "type": ".logi.protocol.presenter.Settings",
+              "kind": "message"
+            },
+            {
+              "number": 54,
+              "name": "crop_settings_group",
+              "type": ".logi.protocol.devices.Webcam.CropSettingsGroup",
+              "kind": "message"
+            },
+            {
+              "number": 55,
+              "name": "focus_settings_group",
+              "type": ".logi.protocol.devices.Webcam.FocusSettingsGroup",
+              "kind": "message"
+            },
+            {
+              "number": 56,
+              "name": "focus_screen",
+              "type": ".logi.protocol.highlights.FocusScreen",
+              "kind": "message"
+            },
+            {
+              "number": 57,
+              "name": "change_highlight",
+              "type": ".logi.protocol.highlights.ChangeHighlight",
+              "kind": "message"
+            },
+            {
+              "number": 58,
+              "name": "highlights_settings",
+              "type": ".logi.protocol.highlights.HighlightsSettings",
+              "kind": "message"
+            },
+            {
+              "number": 59,
+              "name": "timer_settings",
+              "type": ".logi.protocol.presentation_timers.TimerSettings",
+              "kind": "message"
+            },
+            {
+              "number": 60,
+              "name": "microphone_settings_group",
+              "type": ".logi.protocol.devices.Webcam.MicrophoneSettingsGroup",
+              "kind": "message"
+            },
+            {
+              "number": 61,
+              "name": "haptic_settings",
+              "type": ".logi.protocol.haptics.HapticSettings",
+              "kind": "message"
+            },
+            {
+              "number": 62,
+              "name": "force_sensing_settings",
+              "type": ".logi.protocol.force_sensing.ForceSensingSettings",
+              "kind": "message"
+            },
+            {
+              "number": 63,
+              "name": "crown_mode_settings",
+              "type": ".logi.protocol.crown.Settings",
+              "kind": "message"
+            },
+            {
+              "number": 64,
+              "name": "waveform_info",
+              "type": ".logi.protocol.haptics.TriggerWaveformExecute",
+              "kind": "message"
+            },
+            {
+              "number": 65,
+              "name": "haptic_properties",
+              "type": ".logi.protocol.haptics.Haptics.HapticProperties",
+              "kind": "message"
+            },
+            {
+              "number": 66,
+              "name": "special_keys_divert_state",
+              "type": ".logi.protocol.devices.SpecialKeysDivertState",
+              "kind": "message"
+            },
+            {
+              "number": 71,
+              "name": "webcam_button_action",
+              "type": ".logi.protocol.profiles_v2.WebcamButtonAction",
+              "kind": "message"
+            },
+            {
+              "number": 72,
+              "name": "camera_all_settings_group",
+              "type": ".logi.protocol.devices.Webcam.CameraAllSettingsGroup",
+              "kind": "message"
+            },
+            {
+              "number": 27,
+              "name": "tags",
+              "type": "string",
+              "repeated": true
+            },
+            {
+              "number": 28,
+              "name": "task_id",
+              "type": "uint32"
+            },
+            {
+              "number": 29,
+              "name": "application_id",
+              "type": "string"
+            },
+            {
+              "number": 31,
+              "name": "gesture",
+              "type": ".logi.protocol.macros.Gesture",
+              "kind": "message"
+            },
+            {
+              "number": 32,
+              "name": "gesture_info",
+              "type": ".logi.protocol.profiles_v2.GestureInfo",
+              "kind": "message"
+            },
+            {
+              "number": 33,
+              "name": "continuous",
+              "type": "bool"
+            },
+            {
+              "number": 67,
+              "name": "category",
+              "type": "string"
+            },
+            {
+              "number": 68,
+              "name": "isCommand",
+              "type": "bool"
+            },
+            {
+              "number": 69,
+              "name": "duplicate_card_ids",
+              "type": "string",
+              "repeated": true
+            },
+            {
+              "number": 70,
+              "name": "multi_roller_settings",
+              "type": ".logi.protocol.multiroller.MultiRollerSettings",
+              "kind": "message"
+            }
+          ],
+          "nested": [
+            {
+              "name": "ChangePointerSpeed",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "active",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "pointer_speeds",
+                  "type": ".logi.protocol.profiles_v2.Card.ChangePointerSpeed.PointerSpeedsEntry",
+                  "kind": "message",
+                  "repeated": true
+                },
+                {
+                  "number": 3,
+                  "name": "high_resolution_sensor_active",
+                  "type": "bool"
+                }
+              ],
+              "nested": [
+                {
+                  "name": "PointerSpeedsEntry",
+                  "fields": [
+                    {
+                      "number": 1,
+                      "name": "key",
+                      "type": "string"
+                    },
+                    {
+                      "number": 2,
+                      "name": "value",
+                      "type": "float"
+                    }
+                  ],
+                  "map_entry": true
+                }
+              ]
+            },
+            {
+              "name": "Icons",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "uri",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "icons",
+                  "type": "string",
+                  "repeated": true
+                }
+              ]
+            },
+            {
+              "name": "UserIntefaceSettings",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "value_format",
+                  "type": "string",
+                  "oneof_index": 0,
+                  "proto3_optional": 1
+                },
+                {
+                  "number": 2,
+                  "name": "color_scheme",
+                  "type": "string",
+                  "oneof_index": 1,
+                  "proto3_optional": 1
+                }
+              ]
+            },
+            {
+              "name": "NestedCardsEntry",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "key",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "value",
+                  "type": ".logi.protocol.profiles_v2.Card",
+                  "kind": "message"
+                }
+              ],
+              "map_entry": true
+            }
+          ],
+          "enums": [
+            {
+              "name": "Attribute",
+              "values": {
+                "INVALID": 0,
+                "MACRO_PLAYBACK": 1,
+                "MOUSE_SETTINGS": 4,
+                "MOUSE_THUMB_WHEEL_SETTINGS": 16,
+                "MOUSE_SCROLL_WHEEL_SETTINGS": 17,
+                "ADAPTER_2WAYS": 18,
+                "ADAPTER_4WAYS": 19,
+                "KEYBOARD_SETTINGS": 20,
+                "GESTURE": 21,
+                "BACKLIGHTING_SETTINGS": 22,
+                "FN_INVERSION_SETTINGS": 23,
+                "ONE_OF": 24,
+                "MACRO_REF": 25,
+                "ADAPTER_CROWN": 26,
+                "VIRTUAL_PRECISION_MODE": 27,
+                "DISABLE_KEYS_SETTINGS": 28,
+                "DISABLE_KEYS_CAPABILITIES": 29,
+                "ILLUMINATION_LIGHT_SETTINGS": 30,
+                "CAMERA_PREVIEW_SETTINGS": 31,
+                "TOUCHPAD_SETTINGS": 32,
+                "TOUCHPAD_ACTION_GESTURE_MAP": 33,
+                "FOLDER": 34,
+                "BRIGHTNESS_SETTINGS": 35,
+                "WEBCAM_CAMERA_SETTINGS": 36,
+                "WEBCAM_VIDEO_SETTINGS": 37,
+                "WEBCAM_GLOBAL_SETTINGS": 38,
+                "CONTEXTUAL_ACTION": 39,
+                "START_PRESENTATION": 40,
+                "FOCUS_SCREEN": 41,
+                "PRESENTER_SETTINGS": 42,
+                "WEBCAM_CROP_SETTINGS": 43,
+                "WEBCAM_FOCUS_SETTINGS": 44,
+                "SOFTWARE_EVENT_SHORTCUT": 45,
+                "CHANGE_HIGHLIGHT": 46,
+                "PRESENTATION_TIMER_SETTINGS": 47,
+                "SOFTWARE_EVENT_TRY_MACRO": 48,
+                "SOFTWARE_EVENT_LPS": 49,
+                "SOFTWARE_EVENT_APPLICATION": 50,
+                "WHEEL_MODE_SHIFT": 51,
+                "WEBCAM_MICROPHONE_SETTINGS": 52,
+                "HAPTIC_SETTINGS": 53,
+                "FORCE_SENSING_SETTINGS": 54,
+                "CROWN_MODE_SETTINGS": 55,
+                "ADAPTER_CROWN_TURN": 56,
+                "ADAPTER_CROWN_PRESS_TURN": 57,
+                "ADAPTER_CROWN_PRESS": 58,
+                "TRIGGER_WAVEFORM": 59,
+                "HAPTIC_PROPERTIES": 60,
+                "SPECIAL_KEYS_DIVERT_STATE": 61,
+                "PLAY_BREATHING_EXERCISE": 62,
+                "LAYER_PERSONALIZATION": 63,
+                "MULTI_ROLLER_SETTINGS": 64,
+                "ADAPTER_ROTARY": 65,
+                "WEBCAM_BUTTON_ACTION": 66,
+                "WEBCAM_ALL_CAMERA_SETTINGS": 67
+              }
+            },
+            {
+              "name": "State",
+              "values": {
+                "READY": 0,
+                "APPLICATION_PATH_REQUIRED": 1,
+                "PLUGIN_INSTALLATION_REQUIRED": 2,
+                "DEVICE_NOT_CONNECTED": 4,
+                "HAPTIC_ENABLING_REQUIRED": 5
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assignment",
+          "fields": [
+            {
+              "number": 1,
+              "name": "slot_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "card_id",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "card",
+              "type": ".logi.protocol.profiles_v2.Card",
+              "kind": "message"
+            },
+            {
+              "number": 4,
+              "name": "is_disabled",
+              "type": "bool"
+            },
+            {
+              "number": 5,
+              "name": "tags",
+              "type": "string",
+              "repeated": true
+            },
+            {
+              "number": 6,
+              "name": "assignment_info",
+              "type": ".logi.protocol.profiles_v2.AssignmentInfo",
+              "kind": "message"
+            }
+          ]
+        },
+        {
+          "name": "Slot",
+          "fields": [
+            {
+              "number": 1,
+              "name": "id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "attribute",
+              "type": ".logi.protocol.profiles_v2.Card.Attribute",
+              "kind": "enum"
+            }
+          ]
+        },
+        {
+          "name": "AssignmentQueryInfo",
+          "fields": [
+            {
+              "number": 1,
+              "name": "profile_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "slot_id",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "DeviceSharedContext",
+          "fields": [
+            {
+              "number": 1,
+              "name": "active_card_id",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "enums": [
+        {
+          "name": "SyncAssignmentError",
+          "values": {
+            "FAILED_SYNC": 0,
+            "SYNC_NOT_AVAILABLE": 1
+          }
+        },
+        {
+          "name": "MacroState",
+          "values": {
+            "ACTIVE": 0,
+            "INACTIVE_DRAFT": 1,
+            "INACTIVE_MANUALLY": 2
+          }
+        }
+      ],
+      "message_selection": "selected top-level messages",
+      "total_top_level_messages": 59
+    },
+    {
+      "name": "logi/protocol/card_register.proto",
+      "package": "logi.protocol.card_register",
+      "file_offset": "0x32ffdb0",
+      "end_offset_exclusive": "0x32fff5e",
+      "byte_length": 430,
+      "sha256": "827b3b21624b4ffd0f085017b01bfd11da60c3d13107c0a45c46c18675c0eb93",
+      "dependencies": [
+        "google/protobuf/any.proto",
+        "logi/protocol/devices.proto"
+      ],
+      "messages": [
+        {
+          "name": "CardRouteRegister",
+          "fields": [
+            {
+              "number": 1,
+              "name": "attribute",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "route",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "inner_card_path",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "TaskExecute",
+          "fields": [
+            {
+              "number": 1,
+              "name": "trigger",
+              "type": ".logi.protocol.devices.TriggerEvent",
+              "kind": "message"
+            },
+            {
+              "number": 2,
+              "name": "inner_cards",
+              "type": ".logi.protocol.card_register.TaskExecute.InnerCardsEntry",
+              "kind": "message",
+              "repeated": true
+            }
+          ],
+          "nested": [
+            {
+              "name": "InnerCardsEntry",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "key",
+                  "type": "string"
+                },
+                {
+                  "number": 2,
+                  "name": "value",
+                  "type": ".google.protobuf.Any",
+                  "kind": "message"
+                }
+              ],
+              "map_entry": true
+            }
+          ]
+        }
+      ],
+      "enums": [],
+      "message_selection": "all",
+      "total_top_level_messages": 2
+    },
+    {
+      "name": "logi/protocol/radial_menu.proto",
+      "package": "logi.protocol.radial_menu",
+      "file_offset": "0x331ba20",
+      "end_offset_exclusive": "0x331bc36",
+      "byte_length": 534,
+      "sha256": "de24f58ca9a36ee332e6139229373b4dd0215312e9b72fb0a1fa52e69b5876dd",
+      "dependencies": [],
+      "messages": [
+        {
+          "name": "ShowMenu",
+          "fields": [
+            {
+              "number": 1,
+              "name": "state",
+              "type": ".logi.protocol.radial_menu.ShowMenu.ButtonState",
+              "kind": "enum"
+            },
+            {
+              "number": 2,
+              "name": "slot_id",
+              "type": "string"
+            },
+            {
+              "number": 3,
+              "name": "button_name",
+              "type": "string"
+            }
+          ],
+          "enums": [
+            {
+              "name": "ButtonState",
+              "values": {
+                "PRESS": 0,
+                "RELEASE": 1
+              }
+            }
+          ]
+        },
+        {
+          "name": "ResizeRequest",
+          "fields": [
+            {
+              "number": 1,
+              "name": "width",
+              "type": "uint32"
+            },
+            {
+              "number": 2,
+              "name": "height",
+              "type": "uint32"
+            }
+          ]
+        },
+        {
+          "name": "RadialMenuEvent",
+          "fields": [
+            {
+              "number": 1,
+              "name": "event_type",
+              "type": ".logi.protocol.radial_menu.RadialMenuEventType",
+              "kind": "enum"
+            }
+          ]
+        },
+        {
+          "name": "RadialMenuScaleParams",
+          "fields": [
+            {
+              "number": 1,
+              "name": "scale_percents",
+              "type": "int32"
+            }
+          ]
+        }
+      ],
+      "enums": [
+        {
+          "name": "RadialMenuEventType",
+          "values": {
+            "INVALID": 0,
+            "SHOWN": 1,
+            "DISMISSED": 2,
+            "ACTION_EXECUTED": 3,
+            "HOVERED": 4,
+            "ANALOG_VALUE_LIMIT_REACHED": 5
+          }
+        }
+      ],
+      "message_selection": "all",
+      "total_top_level_messages": 4
+    },
+    {
+      "name": "logi/common_protocol/message.proto",
+      "package": "logi.protocol",
+      "file_offset": "0x332da90",
+      "end_offset_exclusive": "0x332dec8",
+      "byte_length": 1080,
+      "sha256": "568683958f961d20797b3a0f574bc887c3c668f52cb34fb5616c974fdc6bbf4f",
+      "dependencies": [
+        "google/protobuf/any.proto"
+      ],
+      "messages": [
+        {
+          "name": "Result",
+          "fields": [
+            {
+              "number": 1,
+              "name": "code",
+              "type": ".logi.protocol.Result.Code",
+              "kind": "enum"
+            },
+            {
+              "number": 2,
+              "name": "what",
+              "type": "string"
+            }
+          ],
+          "enums": [
+            {
+              "name": "Code",
+              "values": {
+                "INVALID": 0,
+                "INVALID_ARG": -1,
+                "INVALID_DEVICE": -2,
+                "NO_SUCH_PATH": -3,
+                "CANCELLED": -4,
+                "NOT_IMPLEMENTED": -5,
+                "INVALID_VERB": -6,
+                "NOT_READY": -7,
+                "FAULTED": -8,
+                "UNREACHABLE": -9,
+                "UNAUTHORIZED": -10,
+                "DUPLICATE_NAME": -11,
+                "NOT_FOUND": -12,
+                "EXCEPTION": -13,
+                "CONFLICT": -14,
+                "LUS_ERROR": -15,
+                "SUCCESS": 1
+              }
+            }
+          ]
+        },
+        {
+          "name": "Message",
+          "fields": [
+            {
+              "number": 1,
+              "name": "msg_id",
+              "type": "string"
+            },
+            {
+              "number": 2,
+              "name": "verb",
+              "type": ".logi.protocol.Message.Verb",
+              "kind": "enum"
+            },
+            {
+              "number": 3,
+              "name": "path",
+              "type": "string"
+            },
+            {
+              "number": 4,
+              "name": "origin",
+              "type": "string"
+            },
+            {
+              "number": 5,
+              "name": "result",
+              "type": ".logi.protocol.Result",
+              "kind": "message"
+            },
+            {
+              "number": 6,
+              "name": "payload",
+              "type": ".google.protobuf.Any",
+              "kind": "message"
+            }
+          ],
+          "enums": [
+            {
+              "name": "Verb",
+              "values": {
+                "INVALID": 0,
+                "GET": 1,
+                "SET": 2,
+                "BROADCAST": 3,
+                "REMOVE": 4,
+                "SUBSCRIBE": 5,
+                "UNSUBSCRIBE": 6,
+                "OPTIONS": 7
+              }
+            }
+          ]
+        },
+        {
+          "name": "Routes",
+          "fields": [
+            {
+              "number": 1,
+              "name": "route",
+              "type": ".logi.protocol.Routes.Route",
+              "kind": "message",
+              "repeated": true
+            }
+          ],
+          "nested": [
+            {
+              "name": "Route",
+              "fields": [
+                {
+                  "number": 1,
+                  "name": "verb",
+                  "type": ".logi.protocol.Message.Verb",
+                  "kind": "enum"
+                },
+                {
+                  "number": 2,
+                  "name": "path",
+                  "type": "string"
+                },
+                {
+                  "number": 3,
+                  "name": "payload",
+                  "type": "string"
+                },
+                {
+                  "number": 4,
+                  "name": "example_json",
+                  "type": "string"
+                },
+                {
+                  "number": 5,
+                  "name": "endpoint",
+                  "type": "string"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "RegistrationTokens",
+          "fields": [
+            {
+              "number": 1,
+              "name": "tokens",
+              "type": "uint32",
+              "repeated": true
+            }
+          ]
+        }
+      ],
+      "enums": [],
+      "message_selection": "all",
+      "total_top_level_messages": 4
+    }
+  ],
+  "missing_selected_protocols": []
+}

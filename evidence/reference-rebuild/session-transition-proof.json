@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "recorded_at": "2026-10-18T19:51:10.627529+00:00",
+  "source_commit": "cf2247e996bf161fdad3211cd253a96cabe5c502",
+  "proof_level": "Physical production EventSession reporting transitions; no DesktopController, UI or action executor",
+  "passed": true,
+  "restored": true,
+  "transition_get_software_id": 12,
+  "worker_software_id": 13,
+  "transitions": [
+    {
+      "index": 0,
+      "request": {
+        "controls": [],
+        "ring_button": null,
+        "raw_xy": false
+      },
+      "ack_type": "ready",
+      "config_id": null,
+      "matching_ack": true,
+      "all_six_live_flags_and_mappings_confirmed": true
+    },
+    {
+      "index": 1,
+      "request": {
+        "controls": [
+          416
+        ],
+        "ring_button": 416,
+        "raw_xy": true
+      },
+      "ack_type": "configured",
+      "config_id": 1,
+      "matching_ack": true,
+      "all_six_live_flags_and_mappings_confirmed": true
+    },
+    {
+      "index": 2,
+      "request": {
+        "controls": [
+          83
+        ],
+        "ring_button": 83,
+        "raw_xy": true
+      },
+      "ack_type": "configured",
+      "config_id": 2,
+      "matching_ack": true,
+      "all_six_live_flags_and_mappings_confirmed": true
+    },
+    {
+      "index": 3,
+      "request": {
+        "controls": [
+          416
+        ],
+        "ring_button": null,
+        "raw_xy": false
+      },
+      "ack_type": "configured",
+      "config_id": 3,
+      "matching_ack": true,
+      "all_six_live_flags_and_mappings_confirmed": true
+    },
+    {
+      "index": 4,
+      "request": {
+        "controls": [],
+        "ring_button": null,
+        "raw_xy": false
+      },
+      "ack_type": "configured",
+      "config_id": 4,
+      "matching_ack": true,
+      "all_six_live_flags_and_mappings_confirmed": true
+    }
+  ],
+  "protocol_counts": {
+    "ready": 1,
+    "configured": 4,
+    "stopped": 1,
+    "button": 0,
+    "motion": 0,
+    "error": 0,
+    "warning": 0,
+    "other": 0
+  },
+  "worker_exited": true,
+  "stopped_restored": true,
+  "all_six_flags_and_mappings_restored": true,
+  "journal_clean": true,
+  "config_and_desired_unchanged": true,
+  "cleanup_deadline_exceeded": false,
+  "actions_executed": 0,
+  "input_synthesis": 0,
+  "haptic_requests": 0,
+  "host_requests": 0,
+  "harness_sha256": "1017909edfc7ab185398d0c08306c4edaac60d2df7fcaf88b3c9465dbde5e60c",
+  "privacy": "Stable identity, unit digest, original settings/mappings, paths and configuration digest omitted. Private recovery remains outside repository.",
+  "limits": [
+    "No physical button/motion input occurred during this sequence.",
+    "No controller focus/GUI profile workflow, native drag delivery, thumb-wheel diversion, reconnect, Bluetooth or host switch is established by this proof.",
+    "Mappings are semantic reporting API values, not raw HID reply byte equality."
+  ]
+}

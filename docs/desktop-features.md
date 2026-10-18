@@ -5,11 +5,13 @@ These features are Linux implementations using the MX4's HID++ event stream and 
 ## Use the ring
 
 1. Open MX4 Linux and wait for your mouse settings to load.
-2. Open the **Actions** tab and click **Enable**.
+2. Open **Actions Ring** and click **Enable** beside **Mouse integration**.
 3. Hold the haptic panel, move the mouse towards a position and release. A short panel click instead leaves the ring open so you can point and click.
-4. Use **Edit actions** to change positions, create routines or assign additional mouse buttons. Configuration changes stop mouse integration; enable it again after saving.
+4. Change ring positions or open **Smart Actions** to create routines. Opening the editor keeps mouse integration enabled, and **Save changes** updates the active assignments.
 
-The eight circular icon buttons run clockwise from the top. Labels appear beside the hovered or keyboard-selected button; the small center **×** closes the ring. Pointer clicks target the visible circles, so the gaps do not execute actions. Keys **1–8** select them; arrow keys move the selection, Enter confirms, and Escape returns from a group or closes the ring. Moving within the center dead zone does not select an action. A second panel click cancels an open ring. **Try the ring** uses the same interface but prints the chosen steps without executing them or playing feedback. Motion follows the desktop animation preference and stops when the ring settles or closes.
+To assign an installed app directly, choose **Add application** in **Actions Ring**, choose the position under **Replace the action at**, search for and select the app, then **Save changes**. The app opens only when you run that ring action. **Open application** is also available as a Smart Actions template and step.
+
+The eight circular icon buttons run clockwise from the top. Labels appear beside the hovered or keyboard-selected button; the small center **×** closes the ring. Pointer clicks target the visible circles, so the gaps do not execute actions. Keys **1–8** select them; arrow keys move the selection, Enter confirms, and Escape returns from a group or closes the ring. Moving within the center dead zone does not select an action. A second panel click cancels an open ring. **Try the ring** uses the same interface but prints the chosen steps without executing them or playing feedback. The orbit traces into view, a selection marker travels between actions, and held movement shows its direction. Press feedback changes the icon and color while the circular hit area stays fixed. Motion follows the desktop animation preference and stops when the ring settles or closes; selecting an action never waits for an exit animation.
 
 In **Edit actions → Actions Ring**, the live diagram shows the assignments with their labels. Click a diagram button to focus its assignment. Expand **Action groups (optional)** to choose up to six different existing routines for a position. Hovering or choosing that position opens a side menu; it does not run the parent routine. Select a child with the pointer, arrows and Enter, or keys **1–6**. When holding the panel, release over a grouped position to leave its submenu open for selection. The center **×** always cancels. Old configurations remain valid, and groups are optional.
 
@@ -17,13 +19,15 @@ In **Edit actions → Actions Ring**, the live diagram shows the assignments wit
 
 The ring is a centered layer-shell overlay, not a cursor-position popup. It captures the original application before opening and restores that focus before executing an action. A vanished target stops the action. Shortcuts and text triggered while an MX4 configuration window is focused are refused; use the panel from the application you want to control.
 
-The application must remain running. Disable or close it to restore the selected controls' previous diversion/raw-motion flags. It never diverts primary left/right click or scrolling. On unplug or cancellation, synthetic release events cancel the ring instead of committing its selection. The listener's haptic commands and event reads share one retained handle; separate HID++ software IDs prevent replies being confused with one-shot setting requests or Solaar.
+Closing the settings window keeps enabled mouse integration running in the background by default. Reopening MX4 Linux presents the same window and controller. Application Settings lets you disable this behavior. **Disable** stops integration; **Quit** (Ctrl+Q) exits the application and restores the selected controls' previous diversion/raw-motion flags. Closing a window with integration disabled still exits normally. Background operation does not enable integration or add login autostart.
+
+Integration never diverts primary left/right click or scrolling. On unplug or cancellation, synthetic release events cancel the ring instead of committing its selection. The listener's haptic commands and event reads share one retained handle; separate HID++ software IDs prevent replies being confused with one-shot setting requests or Solaar.
 
 Default assignments are Overview, Screenshot, Terminal, Next workspace, Paste, Copy, Undo and Previous workspace. Niri commands use its public IPC. Other compositor support requires adapters; on unsupported layer-shell desktops the ring can appear as a normal window, and Niri actions will report an error.
 
 ## Create a Smart Action
 
-Open **Actions → Edit actions → Smart Actions**. Choose an existing routine or create one from a shortcut, launch, text or multiple-step template. Give it a name, expand a step to edit its fields, and use **Add step** plus the move/remove controls to build the sequence. **Edit steps as JSON** exposes the same data for advanced editing; **Advanced routine settings** contains the action ID. An optional application condition requires an exact match with the focused Niri `app_id`. Use `niri msg --json focused-window` to inspect that ID. Editing and saving do not execute the routine.
+Open **Smart Actions**. Choose an existing routine or create one from a shortcut, launch, text or multiple-step template. Give it a name, expand a step to edit its fields, and use **Add step** plus the move/remove controls to build the sequence. **Edit steps as JSON** exposes the same data for advanced editing; **Advanced routine settings** contains the action ID. An optional application condition requires an exact match with the focused Niri `app_id`. Use `niri msg --json focused-window` to inspect that ID. Editing and saving do not execute the routine.
 
 ![Live Actions Ring assignment preview in the native editor](assets/action-editor-ring.png)
 

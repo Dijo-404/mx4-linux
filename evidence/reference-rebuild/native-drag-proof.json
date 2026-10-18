@@ -1,0 +1,1782 @@
+{
+  "version": 1,
+  "recorded_at": "2026-10-18T20:33:39.369925+00:00",
+  "proof_level": "Real Wayland input delivered to production GTK gestures; callbacks observed without an executing runner or controller",
+  "ring_source_commit": "b97eff81aba6f8470b09610f67005ab719d58799",
+  "ring_source_sha256": "f576cbf5dec56d9101ac4f39d458648785d2c05ea543e689588d72379d48fa73",
+  "ring_model_sha256": "b89e880a8dc24b6eb7bf4d1cfc5034a8b6ec980f2d38f85d83c2caea3d011b26",
+  "gtk_backend": "wayland",
+  "layer_shell": true,
+  "shield_layer": "TOP",
+  "ring_layer": "OVERLAY",
+  "passed": true,
+  "total_cases": 72,
+  "runs": [
+    {
+      "mode": "normal",
+      "passed": true,
+      "gtk_enable_animations": true,
+      "cases": [
+        {
+          "name": "plain",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "vertical",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "right",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "left",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reverse",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 8,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "decrease",
+            "decrease",
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "pinned-root",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 6,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "child",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reject",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "huge",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 4,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "hide-cancel",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 0,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": true,
+          "captured_pointer_state_cleared": true,
+          "native_release_not_required_after_intentional_unmap": true,
+          "effect_count": 0
+        },
+        {
+          "name": "after-cancel",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "preview",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            true
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "plain",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "vertical",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "right",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "left",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reverse",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 8,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "decrease",
+            "decrease",
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "pinned-root",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 6,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "child",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reject",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "huge",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 4,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "hide-cancel",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 0,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": true,
+          "captured_pointer_state_cleared": true,
+          "native_release_not_required_after_intentional_unmap": true,
+          "effect_count": 0
+        },
+        {
+          "name": "after-cancel",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "preview",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            true
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "plain",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "vertical",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "right",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "left",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reverse",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 8,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "decrease",
+            "decrease",
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "pinned-root",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 6,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "child",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reject",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "huge",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 4,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "hide-cancel",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 0,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": true,
+          "captured_pointer_state_cleared": true,
+          "native_release_not_required_after_intentional_unmap": true,
+          "effect_count": 0
+        },
+        {
+          "name": "after-cancel",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "preview",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            true
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        }
+      ],
+      "natural_after_paint_barriers": 37,
+      "probe_redraws": 0,
+      "owned_shield_corner_native_motion_checks": 4,
+      "native_event_counts": {
+        "press": 36,
+        "motion": 125,
+        "release": 33
+      },
+      "ordinary_callbacks": 12,
+      "adjustment_callbacks": 84,
+      "helper_instances": 37,
+      "all_helper_releases_flushed_synced_and_reaped": true,
+      "prior_exact_focus_restored": true,
+      "native_recorder_errors": [],
+      "unqualified_zero_timestamp_motions_excluded": 734,
+      "programmatic_or_duplicate_release_signals_excluded": 24,
+      "action_effects": 0,
+      "nonfatal_gdk_frame_timing_warnings": 8,
+      "tracebacks": false
+    },
+    {
+      "mode": "reduced",
+      "passed": true,
+      "gtk_enable_animations": false,
+      "cases": [
+        {
+          "name": "plain",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "vertical",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "right",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "left",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reverse",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 8,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "decrease",
+            "decrease",
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "pinned-root",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 6,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "child",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reject",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "huge",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 4,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "hide-cancel",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 0,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": true,
+          "captured_pointer_state_cleared": true,
+          "native_release_not_required_after_intentional_unmap": true,
+          "effect_count": 0
+        },
+        {
+          "name": "after-cancel",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "preview",
+          "scale": 75,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            true
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "plain",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "vertical",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "right",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "left",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reverse",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 8,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "decrease",
+            "decrease",
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "pinned-root",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 6,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "child",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reject",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "huge",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 4,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "hide-cancel",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 0,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": true,
+          "captured_pointer_state_cleared": true,
+          "native_release_not_required_after_intentional_unmap": true,
+          "effect_count": 0
+        },
+        {
+          "name": "after-cancel",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "preview",
+          "scale": 100,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            true
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "plain",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "vertical",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "right",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "left",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reverse",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 8,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "decrease",
+            "decrease",
+            "decrease",
+            "decrease"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "pinned-root",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 4,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 6,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "child",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "reject",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "huge",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 4,
+          "adjustment_directions": [
+            "increase",
+            "increase",
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 0,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "hide-cancel",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 0,
+          "ordinary_callbacks": 0,
+          "adjustment_callbacks": 2,
+          "adjustment_directions": [
+            "increase",
+            "increase"
+          ],
+          "callback_preview_flags": [
+            false,
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": true,
+          "captured_pointer_state_cleared": true,
+          "native_release_not_required_after_intentional_unmap": true,
+          "effect_count": 0
+        },
+        {
+          "name": "after-cancel",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            false
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        },
+        {
+          "name": "preview",
+          "scale": 150,
+          "passed": true,
+          "native_press": 1,
+          "native_motion": 3,
+          "native_release": 1,
+          "ordinary_callbacks": 1,
+          "adjustment_callbacks": 0,
+          "adjustment_directions": [],
+          "callback_preview_flags": [
+            true
+          ],
+          "gtk_gesture_cancel_signals": 2,
+          "intentional_ring_hide_cancellation_setup": false,
+          "captured_pointer_state_cleared": null,
+          "native_release_not_required_after_intentional_unmap": false,
+          "effect_count": 0
+        }
+      ],
+      "natural_after_paint_barriers": 37,
+      "probe_redraws": 0,
+      "owned_shield_corner_native_motion_checks": 4,
+      "native_event_counts": {
+        "press": 36,
+        "motion": 125,
+        "release": 33
+      },
+      "ordinary_callbacks": 12,
+      "adjustment_callbacks": 84,
+      "helper_instances": 37,
+      "all_helper_releases_flushed_synced_and_reaped": true,
+      "prior_exact_focus_restored": true,
+      "native_recorder_errors": [],
+      "unqualified_zero_timestamp_motions_excluded": 35,
+      "programmatic_or_duplicate_release_signals_excluded": 24,
+      "action_effects": 0,
+      "nonfatal_gdk_frame_timing_warnings": 14,
+      "tracebacks": false
+    }
+  ],
+  "harness_sha256": "3fe6f37cd652bb0d6cbab5c503d1365cd4c918a23413b06f84af78be1d4896b9",
+  "executed_client_sha256": "3240d15da361fd44b9daa608203f3a8a9b501684148a896879d72aaf61e76cf1",
+  "protocol_xml_sha256": "3ff6d540be0bc5228195bf072bde42117ea17945a5c2061add5d3cf97d6bb524",
+  "scope_limits": [
+    "No action runner/controller, keyboard or clipboard effects, HID operations or host switching. All executable fixture branches were literal /usr/bin/true and were not executed.",
+    "Native release was intentionally not required after each of six ring-unmap cancellation cases; all helper release/flush/sync/reap checks were still mandatory.",
+    "Zero-timestamp motion and programmatic/duplicate release signals were explicitly excluded from native evidence.",
+    "Internal nonfatal GDK frame-timing warnings were logged; these runs are not warning-free.",
+    "This verifies the identified ring sources, not later surrounding application changes or physical human drag/thumb-wheel feel."
+  ]
+}

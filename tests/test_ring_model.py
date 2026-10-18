@@ -148,3 +148,54 @@ def test_open_resets_previous_selection_motion_and_hold():
     ring.open()
     assert ring.visible and not ring.held
     assert ring.x == ring.y == 0 and ring.selected is None
+
+@pytest.mark.parametrize('scale', [75, 100, 150])
+def test_geometry_scales_faces_and_round_trips_coordinates(scale):
+    from mx4_linux.ring_model import RingGeometry
+    geometry = RingGeometry(scale)
+    assert geometry.size(52) == round(52 * scale / 100)
+    assert geometry.logical(*geometry.point(37, -21)) == pytest.approx((37, -21))
+
+@pytest.mark.parametrize('kwargs', [{'scale': True}, {'scale': 74}, {'motion_gain': float('nan')},
+                                   {'motion_gain': .09}, {'deadzone': float('inf')}, {'deadzone': 81}])
+def test_invalid_model_options_raise_before_use(kwargs):
+    from mx4_linux.ring_model import RingGeometry
+    if 'scale' in kwargs:
+        with pytest.raises(ValueError):
+            RingGeometry(**kwargs)
+    else:
+        with pytest.raises(ValueError):
+            RingState(**kwargs)
+
+def test_configurable_motion_is_logical_and_nonfinite_deltas_do_not_poison_state():
+    state = RingState(motion_gain=1, deadzone=50)
+    state.open(held=True)
+    assert state.motion(0, -30) is None
+    assert state.motion(float('nan'), 1) is None
+    assert state.motion(1, float('inf')) is None
+    assert (state.x, state.y) == (0, -30)
+    assert state.motion(0, -21) == 0
+
+def test_finite_huge_raw_motion_cannot_overflow_state():
+    state = RingState(motion_gain=2)
+    state.open(held=True)
+    state.motion(1e308, 1e308)
+    assert math.isfinite(state.x) and math.isfinite(state.y)
+    assert math.hypot(state.x, state.y) == pytest.approx(155)
+    assert state.motion(0, -10) is not None
+
+
+def test_horizontal_drag_threshold_remainder_reversal_and_bounded_huge_delta():
+    from mx4_linux.ring_model import HorizontalDrag
+    drag = HorizontalDrag(100, 100)
+    assert drag.move(109, 101) == 0 and not drag.recognized
+    assert drag.move(110, 101) == 1 and drag.recognized
+    assert drag.move(121, 102) == 0
+    assert drag.move(122, 102) == 1
+    assert drag.move(110, 102) == -1
+    assert drag.move(100, 102) == -1 and drag.recognized
+    assert drag.move(-1e308, 100) == -4
+    assert drag.move(1e308, 100) == 4
+    assert drag.move(float('nan'), 100) == 0
+    vertical = HorizontalDrag(0, 0)
+    assert vertical.move(11, 100) == 0 and not vertical.recognized

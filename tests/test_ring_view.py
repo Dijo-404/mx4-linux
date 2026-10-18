@@ -2,6 +2,7 @@
 
 from time import monotonic
 from types import SimpleNamespace
+import math
 
 import pytest
 
@@ -33,9 +34,11 @@ def preview(monkeypatch):
     settings.set_property("gtk-enable-animations", True)
     window.show_ring(default_config(), preview=True)
     window.allocate(ring.WIDTH, ring.HEIGHT, -1, None)
+    window.mapped()  # Simulate map without presenting a desktop overlay.
     yield SimpleNamespace(window=window, selected=selected, dismissed=dismissed, settings=settings)
     settings.set_property("gtk-enable-animations", original_motion)
     window.hide_ring()
+    window.unmapped()
     window.destroy()
 
 
@@ -50,7 +53,7 @@ def main_position(window, index):
 
 
 def settle(window):
-    for transition in (window.reveal, window.group_reveal, window.label_reveal):
+    for transition in window.transitions():
         transition.move(transition.target, animate=False)
     window.apply_frame(monotonic())
 
@@ -255,7 +258,7 @@ def test_reduced_motion_snaps_all_transitions_and_reopen_leaves_no_tick(preview)
     assert window.tick_id == 0
     assert window.surface.get_opacity() == 1
     assert window.spread == 1
-    for transition in (window.reveal, window.group_reveal, window.label_reveal):
+    for transition in window.transitions():
         assert not transition.active()
         assert transition.value() == transition.target
     assert all(window.child_buttons[index].get_opacity() == 1 for index in range(2))
@@ -264,6 +267,24 @@ def test_reduced_motion_snaps_all_transitions_and_reopen_leaves_no_tick(preview)
     assert window.surface.get_opacity() == 1
     assert window.group_slot is None
     assert not window.child_positions
+
+
+def test_unshown_popup_has_no_global_settings_handler_and_unmap_releases_it(preview):
+    window = ring.ActionsRing(None, lambda *_: None, lambda: None)
+    settings = preview.settings
+    try:
+        assert window._settings_handler == 0
+        window.mapped()
+        handler = window._settings_handler
+        assert handler and settings.handler_is_connected(handler)
+        window.mapped()
+        assert window._settings_handler == handler
+        window.unmapped()
+        assert window._settings_handler == 0
+        assert not settings.handler_is_connected(handler)
+    finally:
+        window.unmapped()
+        window.destroy()
 
 
 def test_group_accessibility_does_not_leave_expandable_state_on_regular_actions(preview):
@@ -288,10 +309,345 @@ def test_finite_group_animation_stops_after_all_transitions_finish(preview, monk
     window = show_group(preview)
     window.commit(2)
     assert window.tick_id
-    deadline = max(t.started + t.duration for t in (window.reveal, window.group_reveal, window.label_reveal)) + .01
+    deadline = max(t.started + t.duration for t in window.transitions()) + .01
     monkeypatch.setattr(ring, "monotonic", lambda: deadline)
     window.stop_animation()  # The unmapped fixture has no frame clock to invoke the registered callback.
     assert window.tick(None, None) is False
     assert window.tick_id == 0
     assert window.group_reveal.value(deadline) == 1
     assert window.child_positions[0] != window.child_positions[1]
+
+@pytest.mark.parametrize('scale', [75, 100, 150])
+def test_scaled_faces_hit_geometry_and_motion_share_logical_space(preview, scale):
+    window = preview.window
+    config = default_config() | {'ring_scale': scale, 'ring_motion_gain': 1, 'ring_deadzone': 50}
+    window.show_ring(config, preview=True)
+    settle(window)
+    window.allocate(round(ring.WIDTH * scale / 100), round(ring.HEIGHT * scale / 100), -1, None)
+    for button in window.buttons:
+        assert button.get_allocated_width() == round(52 * scale / 100)
+    x, y = window.geometry.point(ring.CENTER_X, ring.CENTER_Y - 116)
+    window.pointer_motion(None, x, y)
+    assert window.state.selected == 0
+    window.pointer_click(None, 1, x, y)
+    assert preview.selected == [('overview', True)]
+
+
+def adjustment_config():
+    config = default_config()
+    config['actions']['copy']['adjustment'] = {
+        'increase': [{'type': 'text', 'text': '+'}], 'decrease': [{'type': 'text', 'text': '-'}]}
+    config['ring'][0] = 'copy'
+    return config
+
+
+def test_scroll_uses_fresh_circle_hit_and_keeps_ring_open(preview):
+    window = preview.window
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    x, y = main_position(window, 0)
+    assert window.adjust_at(x, y, 0, -1)
+    assert adjusted == [('copy', 'increase', False)]
+    assert window.state.visible and not preview.selected
+    assert not window.adjust_at(x + 26, y + 26, 0, 1)
+    assert not window.adjust_at(0, 0, 0, 1)
+    assert not window.adjust_at(x, y, 0, float('nan'))
+    assert not window.adjust_at(x, y, 0, 0)
+    assert 'Scroll to adjust' in window.buttons[0].get_tooltip_text()
+
+
+def test_scroll_child_requires_revealed_nonoverlap_and_preview_is_inert(preview):
+    window = preview.window
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    config = adjustment_config()
+    config['ring_groups'] = {'2': ['copy', 'paste']}
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(2)
+    window.group_reveal.move(0, animate=False)
+    window.apply_frame(monotonic())
+    assert not window.adjust_at(*window.child_positions[0], 0, -1)
+    window.group_reveal.move(1, animate=False)
+    settle(window)
+    assert window.adjust_at(*window.child_positions[0], 1, 0)
+    assert adjusted == [('copy', 'increase', False)]
+    window.show_ring(config, preview=True)
+    settle(window)
+    assert not window.adjust_at(*main_position(window, 0), 0, -1)
+    assert len(adjusted) == 1
+
+
+def test_adjusted_hold_release_latches_and_next_open_restores_normal_release(preview):
+    window = preview.window
+    window.on_adjusted = lambda *_: True
+    window.show_ring(adjustment_config(), held=True, preview=False)
+    settle(window)
+    window.motion(0, -100)
+    assert window.adjust_at(*main_position(window, 0), 0, -1)
+    window.release_button()
+    assert window.state.visible and not window.state.held
+    assert not preview.selected
+    window.show_ring(adjustment_config(), held=True, preview=False)
+    window.motion(0, -100)
+    window.release_button()
+    assert preview.selected == [('copy', False)]
+
+@pytest.mark.parametrize('scale', [75, 150])
+def test_scaled_group_heading_footer_and_faces_fit_allocation(preview, scale):
+    window = preview.window
+    config = default_config() | {'ring_scale': scale, 'ring_groups': {'2': list(default_config()['actions'])[:6]}}
+    window.show_ring(config, preview=True)
+    settle(window)
+    window.commit(2)
+    settle(window)
+    window.update_labels()
+    width, height = window.geometry.size(ring.WIDTH), window.geometry.size(ring.HEIGHT)
+    window.allocate(width, height, -1, None)
+    for child in [window.callout, window.instructions, window.close_button] + window.child_buttons:
+        allocation = child.get_allocation()
+        assert allocation.x >= 0 and allocation.y >= 0
+        assert allocation.x + allocation.width <= width
+        assert allocation.y + allocation.height <= height
+
+def test_emerging_child_face_cannot_scroll_an_underlying_root(preview):
+    window = preview.window
+    config = adjustment_config()
+    config['ring'][2] = 'copy'
+    config['ring_groups'] = {'0': ['paste']}
+    window.on_adjusted = lambda *_: pytest.fail('Overlapping painted child must remain inert')
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(0)
+    position = main_position(window, 2)
+    window.child_positions = [position]
+    assert window.child_at(*position) is None
+    assert not window.adjust_at(*position, 0, -1)
+
+
+def test_fallback_resume_does_not_request_another_gtk_activation(preview, monkeypatch):
+    from unittest.mock import Mock
+    window = preview.window
+    present = Mock()
+    monkeypatch.setattr(window, 'present', present)
+    window.yield_keyboard()
+    window.resume_keyboard()
+    present.assert_not_called()  # Controller already restored the exact popup through Niri.
+    assert not window._keyboard_yielded
+
+
+@pytest.mark.parametrize('scale', [75, 100, 150])
+def test_primary_horizontal_drag_pins_root_suppresses_release_and_scales(preview, scale):
+    window = preview.window
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    window.show_ring(adjustment_config() | {'ring_scale': scale}, preview=False)
+    settle(window)
+    x, y = window.geometry.point(*main_position(window, 0))
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, 22 * scale / 100, 2 * scale / 100)
+    window.pointer_motion(None, *window.geometry.point(*main_position(window, 2)))
+    window.pointer_drag(None, 10 * scale / 100, 0)
+    window.pointer_click(None, 1, x + 10 * scale / 100, y)
+    assert adjusted == [('copy', 'increase', False), ('copy', 'increase', False), ('copy', 'decrease', False)]
+    assert window.state.visible and not preview.selected
+
+
+def test_below_threshold_primary_motion_retains_one_click(preview):
+    window = preview.window
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    window.on_adjusted = lambda *_: pytest.fail('Below threshold is an ordinary click')
+    x, y = main_position(window, 0)
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, 9, 2)
+    window.pointer_click(None, 1, x + 9, y + 2)
+    window.buttons[0].emit('clicked')
+    assert preview.selected == [('copy', False)]
+
+
+def test_failed_drag_and_reversal_never_run_main_and_reopen_resets(preview):
+    window = preview.window
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    window.on_adjusted = lambda *_: False
+    x, y = main_position(window, 0)
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, 30, 0)
+    window.pointer_drag(None, 0, 0)
+    window.pointer_click(None, 1, x, y)
+    assert not preview.selected and window.state.visible
+    window.hide_ring()
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    window.pointer_click(None, 1, *main_position(window, 0))
+    assert preview.selected == [('copy', False)]
+
+
+def test_child_drag_keeps_group_and_initial_action_across_hover_and_leave(preview):
+    window = preview.window
+    config = adjustment_config() | {'ring_groups': {'2': ['copy', 'paste']}}
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(2)
+    settle(window)
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    x, y = window.child_positions[0]
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, -22, 0)
+    window.pointer_motion(None, *main_position(window, 6))
+    window.pointer_leave(None)
+    assert window.group_slot == 2
+    window.pointer_click(None, 1, x - 22, y)
+    assert adjusted == [('copy', 'decrease', False), ('copy', 'decrease', False)]
+    assert not preview.selected and window.state.visible
+
+
+def test_drag_preview_gap_group_head_emerging_and_nonfinite_are_inert(preview):
+    window = preview.window
+    config = adjustment_config() | {'ring_groups': {'2': ['copy', 'paste']}}
+    window.on_adjusted = lambda *_: pytest.fail('Rejected drag cannot execute')
+    for is_preview, where in [(True, 0), (False, 2), (False, None)]:
+        window.show_ring(config, preview=is_preview)
+        settle(window)
+        x, y = main_position(window, where) if where is not None else (0, 0)
+        window.pointer_press(None, 1, x, y)
+        window.pointer_drag(None, 50, 0)
+        window.cancel_pointer()
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(2)
+    window.group_reveal.move(0, animate=False)
+    window.apply_frame(monotonic())
+    window.pointer_press(None, 1, *window.child_positions[0])
+    window.pointer_drag(None, 50, 0)
+    window.cancel_pointer()
+    window.pointer_press(None, 1, float('nan'), 0)
+    window.pointer_drag(None, float('inf'), 0)
+    assert not preview.selected
+
+
+@pytest.mark.parametrize('start,end', [(None, 0), (1, 0), (0, None)])
+def test_captured_click_needs_the_same_initial_painted_face(preview, start, end):
+    window = preview.window
+    settle(window)
+    a = main_position(window, start) if start is not None else (0, 0)
+    b = main_position(window, end) if end is not None else (0, 0)
+    window.pointer_press(None, 1, *a)
+    window.pointer_click(None, 1, *b)
+    assert not preview.selected and window.state.visible
+
+
+def test_cancelled_drag_and_late_native_release_are_inert(preview):
+    window = preview.window
+    window.on_adjusted = lambda *_: True
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    x, y = main_position(window, 0)
+    window.pointer_press(None, 1, x, y)
+    window.pointer_drag(None, 22, 0)
+    window.cancel_pointer()
+    window.pointer_click(object(), 1, x, y)
+    window.buttons[0].emit('clicked')
+    assert not preview.selected and window.state.visible
+
+
+def test_switching_group_cancels_captured_child_before_more_adjustment(preview):
+    window = preview.window
+    config = adjustment_config() | {'ring_groups': {'2': ['copy'], '3': ['copy']}}
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(2)
+    settle(window)
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    window.pointer_press(None, 1, *window.child_positions[0])
+    window.pointer_drag(None, 10, 0)
+    window.open_group(3)
+    window.pointer_drag(None, 22, 0)
+    assert adjusted == [('copy', 'increase', False)]
+
+
+@pytest.mark.parametrize("elapsed", [0, .03, .10, .22])
+def test_opening_targets_are_visible_and_stay_at_their_final_positions(preview, elapsed):
+    window = preview.window
+    positions = [window.labels.get_child_position(button) for button in window.buttons]
+    window.apply_frame(window.reveal.started + elapsed)
+    assert window.surface.get_opacity() == 1
+    for index, button in enumerate(window.buttons):
+        dx, dy = button_center(index)
+        x, y = ring.CENTER_X + dx, ring.CENTER_Y + dy
+        assert window.pointer_target(x, y) == ("root", index)
+        assert .72 <= button.get_opacity() <= 1
+        assert window.labels.get_child_position(button) == positions[index]
+    window.pointer_click(None, 1, ring.CENTER_X, ring.CENTER_Y - 116)
+    assert preview.selected == [("overview", True)]
+
+
+def test_pointer_and_keyboard_share_the_traveling_orbit_marker(preview):
+    window = preview.window
+    window.pointer_motion(None, *main_position(window, 0))
+    settle(window)
+    assert window.orbit.selected == 0
+    window.key_pressed(None, Gdk.KEY_Left, 0, 0)
+    assert window.orbit.selected == 7
+    assert window.orbit.angle.target == pytest.approx(-math.pi / 4)
+    window.pointer_motion(None, *main_position(window, 6))
+    assert window.orbit.selected == 6
+    assert window.orbit.angle.active()
+
+
+def test_captured_press_feedback_clears_on_cancel_and_never_moves_targets(preview):
+    window = preview.window
+    settle(window)
+    position = main_position(window, 1)
+    before = window.labels.get_child_position(window.buttons[1])
+    window.pointer_press(None, 1, *position)
+    assert window.buttons[1].has_css_class("pressed")
+    window.apply_frame(monotonic())
+    assert window.labels.get_child_position(window.buttons[1]) == before
+    assert window.pointer_target(*position) == ("root", 1)
+    window.cancel_pointer()
+    assert not window.buttons[1].has_css_class("pressed")
+    assert not preview.selected
+
+
+def test_held_motion_tracks_selection_and_hiding_clears_orbit_and_callbacks(preview):
+    window = preview.window
+    window.show_ring(default_config(), held=True, preview=True)
+    window.motion(100, 0)
+    assert window.orbit.selected == window.state.selected == 2
+    assert window.state.x > 0
+    window.hide_ring()
+    assert window.orbit.selected is None
+    assert window.orbit.opacity.value() == 0
+    assert not window.tick_id
+
+
+def test_child_selection_keeps_orbit_pointing_to_its_group_parent(preview):
+    window = show_group(preview)
+    window.commit(2)
+    settle(window)
+    window.focus_child(1)
+    assert window.orbit.selected == 2
+    assert not window.orbit.angle.active()
+    window.key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert window.orbit.selected == 2
+
+
+def test_tick_caps_paint_work_at_sixty_fps_without_extending_duration(preview, monkeypatch):
+    window = preview.window
+    start = window.reveal.started
+    painted = []
+    monkeypatch.setattr(window, "apply_frame", lambda now: painted.append(now))
+    window.stop_animation()
+    for elapsed in (0, .005, .010, .017):
+        monkeypatch.setattr(ring, "monotonic", lambda elapsed=elapsed: start + elapsed)
+        assert window.tick(None, None)
+    assert painted == [start, start + .017]
+    monkeypatch.setattr(ring, "monotonic", lambda: start + 1)
+    assert not window.tick(None, None)
+    assert painted[-1] == start + 1

@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 from types import SimpleNamespace
 
@@ -109,6 +110,52 @@ def test_invalid_config_cannot_overwrite_saved_document(tmp_path):
     with pytest.raises(RuntimeError, match="exactly eight"):
         store.save(invalid)
     assert store.path.read_bytes() == original
+
+
+def test_locked_update_preserves_concurrent_changes_and_returns_committed_document(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    path = tmp_path / 'desktop.json'
+    first, second = DesktopConfigStore(path), DesktopConfigStore(path)
+    first.save(default_config())
+    entered, release = threading.Event(), threading.Event()
+    def preference(document):
+        entered.set()
+        assert release.wait(2)
+        document['appearance'] = 'light'
+    def assignment(document):
+        document['button_bindings']['83'] = 'copy'
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        saved_preference = executor.submit(first.update, preference)
+        assert entered.wait(1)
+        saved_assignment = executor.submit(second.update, assignment)
+        release.set()
+        assert saved_preference.result()['appearance'] == 'light'
+        latest = saved_assignment.result()
+    assert latest['appearance'] == 'light'
+    assert latest['button_bindings']['83'] == 'copy'
+    assert first.read() == latest
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_locked_update_rejects_invalid_mutation_without_replacing_document(tmp_path):
+    store = DesktopConfigStore(tmp_path / 'desktop.json')
+    store.save(default_config())
+    original = store.path.read_bytes()
+    with pytest.raises(RuntimeError, match='exactly eight'):
+        store.update(lambda document: document.update(ring=[]))
+    with pytest.raises(TypeError, match='must be callable'):
+        store.update(None)
+    assert store.path.read_bytes() == original
+
+
+def test_locked_update_does_not_repair_or_replace_corrupt_document(tmp_path):
+    path = tmp_path / 'desktop.json'
+    path.write_text('broken')
+    mutate = lambda document: document.update(appearance='light')
+    with pytest.raises(RuntimeError, match='Cannot read'):
+        DesktopConfigStore(path).update(mutate)
+    assert path.read_text() == 'broken'
 
 
 @pytest.mark.parametrize("contents", ["broken", "[]", '{"version":9}', "{}"])
@@ -291,6 +338,35 @@ def test_command_launch_passes_literal_argv_without_waiting_for_app(monkeypatch)
     assert reaped == [True]
 
 
+def test_installed_application_ring_assignment_persists_and_dispatches_only_on_execution(tmp_path, monkeypatch):
+    launches = []
+    monkeypatch.setattr(actions, "launch_application", launches.append)
+    config = routine([{"type": "application", "desktop_id": "org.example.Editor.desktop"}])
+    config["ring"][0] = "test"
+    store = DesktopConfigStore(tmp_path / "desktop.json")
+    store.save(config)
+    saved = store.read()
+    assert saved == config
+    preview = DesktopActions(saved, dry_run=True).execute(saved["ring"][0])
+    assert preview["steps"] == [{"type": "application", "desktop_id": "org.example.Editor.desktop"}]
+    assert launches == []
+    result = DesktopActions(saved).execute(saved["ring"][0])
+    assert result["ok"] and result["completed"] == 1
+    assert launches == ["org.example.Editor.desktop"]
+    assert result["steps"] == [{"type": "application", "desktop_id": "org.example.Editor.desktop"}]
+
+
+@pytest.mark.parametrize("step", [
+    {"type": "application", "desktop_id": "/tmp/app.desktop"},
+    {"type": "application", "desktop_id": "app"},
+    {"type": "application", "desktop_id": "app.desktop", "argv": ["echo", "not-used"]},
+    {"type": "application"},
+])
+def test_application_steps_reject_paths_and_ambiguous_launch_instructions(step):
+    with pytest.raises(RuntimeError, match="Invalid desktop configuration"):
+        validate_config(routine([step]))
+
+
 def test_macro_cancellation_prevents_subsequent_steps(monkeypatch):
     calls = []
     monkeypatch.setattr(actions, "_run", lambda argv, **_kwargs: calls.append(argv))
@@ -423,3 +499,284 @@ def test_missing_clipboard_tool_prevents_keyboard_injection(monkeypatch):
     monkeypatch.setattr(executor, "_shortcut", lambda *_args: pytest.fail("No clipboard means no paste"))
     with pytest.raises(RuntimeError, match="wl-copy is not installed"):
         executor.execute("test")
+
+
+def profile(config, label="General", app_id="*", **extra):
+    return {"label": label, "app_id": app_id, "ring": list(reversed(config["ring"])),
+            "button_bindings": {"83": "copy"}, **extra}
+
+
+def test_legacy_config_round_trips_without_adding_optional_fields(tmp_path):
+    config = default_config()
+    before = json.loads(json.dumps(config))
+    assert actions.resolve_config(config) == before
+    assert actions.resolve_config(config) is not config
+    DesktopConfigStore(tmp_path / "legacy.json").save(config)
+    assert DesktopConfigStore(tmp_path / "legacy.json").read() == before
+    assert config == before
+
+
+def test_context_resolution_exact_general_and_legacy_are_detached():
+    config = default_config()
+    config["ring_groups"] = {"0": ["copy", "paste"]}
+    config["assignment_profiles"] = {
+        "general": profile(config),
+        "editor": profile(config, "Editor", "editor.app", ring_groups={"1": ["undo"]}),
+        "other-editor": profile(config, "Other editor", "editor.app"),
+    }
+    config["active_profiles"] = {"*": "general", "editor.app": "editor"}
+    before = json.loads(json.dumps(config))
+    exact = actions.resolve_config(config, "editor.app")
+    assert exact["ring"] == config["assignment_profiles"]["editor"]["ring"]
+    assert exact["ring_groups"] == {"1": ["undo"]}
+    general = actions.resolve_config(config, "unknown.app")
+    assert "ring_groups" not in general
+    assert general["button_bindings"] == {"83": "copy"}
+    assert actions.resolve_config(config, None) == general
+    exact["actions"]["copy"]["steps"].clear()
+    exact["assignment_profiles"]["editor"]["ring"].clear()
+    general["ring"].clear()
+    assert config == before
+    del config["active_profiles"]["*"]
+    assert actions.resolve_config(config, "Editor.app")["ring_groups"] == config["ring_groups"]
+    assert actions.resolve_config(config, "editor.app")["ring_groups"] == {"1": ["undo"]}
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda c: c.update(assignment_profiles=[]),
+    lambda c: c["assignment_profiles"].update({"invalid ID": profile(c)}),
+    lambda c: c["assignment_profiles"].update({str(i): profile(c) for i in range(65)}),
+    lambda c: c["assignment_profiles"]["general"].update(label=""),
+    lambda c: c["assignment_profiles"]["general"].update(label="x" * 81),
+    lambda c: c["assignment_profiles"]["general"].update(app_id=""),
+    lambda c: c["assignment_profiles"]["general"].update(app_id="x" * 257),
+    lambda c: c["assignment_profiles"]["general"].update(app_id="bad\napp"),
+    lambda c: c["assignment_profiles"]["general"].update(unknown=1),
+    lambda c: c["assignment_profiles"]["general"].update(ring=["missing"] * 8),
+    lambda c: c["assignment_profiles"]["general"].update(ring=["copy"] * 9),
+    lambda c: c["assignment_profiles"]["general"].update(ring_groups={"0": ["missing"]}),
+    lambda c: c["assignment_profiles"]["general"].update(ring_groups={"0": ["copy", "copy"]}),
+    lambda c: c["assignment_profiles"]["general"].update(ring_groups={"0": c["ring"][:7]}),
+    lambda c: c["assignment_profiles"]["general"].update(button_bindings={"416": "copy"}),
+    lambda c: c["assignment_profiles"]["general"].update(button_bindings={"83": "missing"}),
+    lambda c: c.update(active_profiles=[]),
+    lambda c: c.update(active_profiles={"*": "missing"}),
+    lambda c: c.update(active_profiles={"some.app": "general"}),
+    lambda c: c.update(active_profiles={"*": []}),
+    lambda c: c.update(active_profiles={"": "general"}),
+    lambda c: c.update(active_profiles={1: "general"}),
+])
+def test_invalid_contextual_profiles_are_rejected(mutate):
+    config = default_config()
+    config["assignment_profiles"] = {"general": profile(config)}
+    mutate(config)
+    with pytest.raises(RuntimeError, match="Invalid desktop configuration"):
+        validate_config(config)
+
+
+def test_active_profiles_require_profile_document_and_resolver_validates():
+    config = default_config()
+    config["active_profiles"] = {}
+    with pytest.raises(RuntimeError, match="assignment_profiles"):
+        actions.resolve_config(config)
+
+
+@pytest.mark.parametrize("settings", [
+    {"ring_scale": 75, "ring_motion_gain": 0.1, "ring_deadzone": 8},
+    {"ring_scale": 150, "ring_motion_gain": 2.0, "ring_deadzone": 80.0},
+    {"appearance": "system"}, {"appearance": "light"}, {"appearance": "dark"},
+    {"haptic_events": {key: True for key in ("open", "hover", "select", "complete")}},
+    {"haptic_waveforms": {"open": 0, "hover": 255}},
+    {key: False for key in ("haptic_power_save", "autostart", "background", "resume_integration")},
+])
+def test_optional_settings_round_trip_without_mutation(tmp_path, settings):
+    config = {**default_config(), **settings}
+    DesktopConfigStore(tmp_path / "desktop.json").save(config)
+    assert DesktopConfigStore(tmp_path / "desktop.json").read() == config
+
+
+@pytest.mark.parametrize("setting,value", [
+    ("ring_scale", True), ("ring_scale", 74), ("ring_scale", 151), ("ring_scale", 100.0),
+    ("ring_motion_gain", False), ("ring_motion_gain", 0.09), ("ring_motion_gain", 2.01),
+    ("ring_motion_gain", float("nan")), ("ring_motion_gain", float("inf")),
+    ("ring_deadzone", True), ("ring_deadzone", 7), ("ring_deadzone", 81), ("ring_deadzone", "20"),
+    ("appearance", "auto"), ("appearance", []),
+    ("haptic_power_save", 1), ("autostart", "true"), ("background", None), ("resume_integration", 0),
+    ("haptic_events", []), ("haptic_events", {"unknown": True}), ("haptic_events", {"hover": 1}),
+    ("haptic_waveforms", {"hover": True}), ("haptic_waveforms", {"hover": 256}),
+    ("haptic_waveforms", {"complete": -1}), ("haptic_waveforms", {"unknown": 1}),
+])
+def test_invalid_optional_settings_rejected(setting, value):
+    config = {**default_config(), setting: value}
+    with pytest.raises(RuntimeError, match="Invalid desktop configuration"):
+        validate_config(config)
+
+
+def adjustable(**extra):
+    return routine([{"type": "shortcut", "keys": ["MUTE"]}], icon="audio-volume-high-symbolic",
+                   adjustment={"increase": [{"type": "shortcut", "keys": ["VOLUMEUP"]}],
+                               "decrease": [{"type": "shortcut", "keys": ["VOLUMEDOWN"]}]}, **extra)
+
+
+def test_adjustments_dry_run_are_detached_and_do_not_probe_context_or_input(monkeypatch):
+    import evdev
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("Preview must not execute or query desktop state")
+    monkeypatch.setattr(actions, "focused_context", forbidden)
+    monkeypatch.setattr(actions.subprocess, "run", forbidden)
+    monkeypatch.setattr(actions.subprocess, "Popen", forbidden)
+    monkeypatch.setattr(evdev, "UInput", forbidden)
+    executor = DesktopActions(adjustable(app_id="editor.app"), dry_run=True)
+    result = executor.execute("test", adjustment="increase")
+    assert result["steps"] == [{"type": "shortcut", "keys": ["VOLUMEUP"]}]
+    assert result["adjustment"] == "increase"
+    assert result["condition"] == {"app_id": "editor.app", "evaluated": False}
+    result["steps"][0]["keys"].clear()
+    assert executor.execute("test", adjustment="increase")["steps"][0]["keys"] == ["VOLUMEUP"]
+    assert "adjustment" not in executor.execute("test")
+
+
+@pytest.mark.parametrize("branch", ["up", "", 1, [], True])
+def test_invalid_adjustment_branch_rejected(branch):
+    with pytest.raises(RuntimeError, match="adjustment"):
+        DesktopActions(adjustable(), dry_run=True).execute("test", adjustment=branch)
+
+
+def test_adjustment_requires_adjustable_action():
+    with pytest.raises(RuntimeError, match="adjust"):
+        DesktopActions(default_config(), dry_run=True).execute("copy", adjustment="increase")
+
+
+def test_adjustment_uses_shared_execution_guard_and_cancellation(monkeypatch):
+    config = adjustable(app_id="editor.app")
+    config["actions"]["test"]["adjustment"]["decrease"] *= 2
+    seen = []
+    monkeypatch.setattr(actions, "focused_context", lambda: {"app_id": "wrong", "window_id": 1})
+    executor = DesktopActions(config)
+    monkeypatch.setattr(executor, "_shortcut", lambda keys, *_args: seen.append(keys))
+    assert executor.execute("test", adjustment="decrease")["skipped"]
+    assert seen == []
+    monkeypatch.setattr(actions, "focused_context", lambda: {"app_id": "editor.app", "window_id": 1})
+    with pytest.raises(RuntimeError, match="after 1/2.*cancelled"):
+        executor.execute("test", cancelled=lambda: bool(seen), adjustment="decrease")
+    assert seen == [["VOLUMEDOWN"]]
+    seen.clear()
+    result = executor.execute("test", adjustment="increase")
+    assert result["completed"] == 1 and result["adjustment"] == "increase"
+    assert seen == [["VOLUMEUP"]]
+
+
+@pytest.mark.parametrize("icon", ["", "../copy", "/tmp/icon.svg", "bad\nname", "x" * 129, [], "copy icon"])
+def test_invalid_action_icon_rejected(icon):
+    config = default_config()
+    config["actions"]["copy"]["icon"] = icon
+    with pytest.raises(RuntimeError, match="icon"):
+        validate_config(config)
+
+
+@pytest.mark.parametrize("adjustment", [
+    None, [], {}, {"increase": []},
+    {"increase": [], "decrease": [{"type": "delay", "milliseconds": 0}]},
+    {"increase": [{"type": "delay", "milliseconds": 0}], "decrease": [], "other": []},
+    {"increase": [{"type": "command", "argv": "echo test"}], "decrease": [{"type": "delay", "milliseconds": 0}]},
+    {"increase": [{"type": "delay", "milliseconds": 30000}] * 3, "decrease": [{"type": "delay", "milliseconds": 0}]},
+    {"increase": [{"type": "delay", "milliseconds": 0}] * 65, "decrease": [{"type": "delay", "milliseconds": 0}]},
+])
+def test_invalid_adjustment_steps_use_shared_validator(adjustment):
+    config = default_config()
+    config["actions"]["copy"]["adjustment"] = adjustment
+    with pytest.raises(RuntimeError, match="Invalid desktop configuration"):
+        validate_config(config)
+
+
+def test_profile_boundary_and_empty_optional_maps_are_valid():
+    config = default_config()
+    config.update(assignment_profiles={str(index): profile(config) for index in range(64)},
+                  active_profiles={}, haptic_events={}, haptic_waveforms={})
+    assert validate_config(config) is config
+    assert actions.resolve_config(config)["ring"] == config["ring"]
+
+
+def test_adjustment_delay_limit_is_per_executed_branch():
+    config = adjustable()
+    action = config["actions"]["test"]
+    for branch in action["adjustment"]:
+        action["adjustment"][branch] = [{"type": "delay", "milliseconds": 30000}] * 2
+    assert validate_config(config) is config
+
+
+def test_extended_document_size_limit_is_enforced_before_store_write(tmp_path):
+    config = default_config()
+    config["actions"].update({str(index): {"label": "Large", "steps": [{"type": "text", "text": "✓" * 65536}]}
+                              for index in range(6)})
+    with pytest.raises(RuntimeError, match="exceeds 1 MiB"):
+        DesktopConfigStore(tmp_path / "config.json").save(config)
+    assert not (tmp_path / "config.json").exists()
+
+
+@pytest.mark.parametrize('value', [None, 82, 83, 86, 195, 196, 416])
+def test_trigger_accepts_manual_and_supported_controls(value):
+    config = default_config()
+    config['ring_button'] = value
+    config['button_bindings'] = {str(cid): 'copy' for cid in actions.BUTTON_IDS if cid != value}
+    assert validate_config(config) is config
+
+
+@pytest.mark.parametrize('field,value', [('adapt_to_app', 1), ('adapt_to_app', None), ('adapt_to_app', 'false'),
+                                         ('ring_button', True), ('ring_button', 83.0), ('ring_button', '83')])
+def test_trigger_and_adaptation_have_exact_types(field, value):
+    config = default_config()
+    config[field] = value
+    with pytest.raises(RuntimeError):
+        validate_config(config)
+
+
+def test_profile_trigger_inheritance_and_detached_resolution_remain_valid():
+    config = default_config()
+    config['assignment_profiles'] = {
+        'a': profile(config, 'A', 'app.a', ring_button=83, button_bindings={'416': 'copy'}),
+        'b': profile(config, 'B', 'app.b'),
+        'general': profile(config, ring_button=None, button_bindings={'416': 'undo'}),
+    }
+    config['active_profiles'] = {'app.a': 'a', 'app.b': 'b', '*': 'general'}
+    before = deepcopy(config)
+    exact = actions.resolve_config(config, 'app.a')
+    assert exact['ring_button'] == 83 and exact['button_bindings'] == {'416': 'copy'}
+    assert validate_config(exact)
+    assert exact['assignment_profiles']['b']['ring_button'] == 416
+    assert config == before and 'ring_button' not in config['assignment_profiles']['b']
+    config['adapt_to_app'] = False
+    general = actions.resolve_config(config, 'app.a')
+    assert general['ring_button'] is None and general['button_bindings'] == {'416': 'undo'}
+    assert actions.resolve_config(config, 'app.a', for_editing=True)['ring_button'] == 83
+    del config['active_profiles']['*']
+    assert actions.resolve_config(config, 'app.a')['ring_button'] == 416
+
+
+def test_inactive_profile_trigger_conflict_is_rejected():
+    config = default_config()
+    config['assignment_profiles'] = {'inactive': profile(config, ring_button=83)}
+    with pytest.raises(RuntimeError, match='distinct'):
+        validate_config(config)
+
+
+def test_button_assignment_changes_one_explicit_scope_and_rolls_back_conflicts():
+    config = default_config()
+    config['assignment_profiles'] = {'app': profile(config, 'A', 'app.a')}
+    config['active_profiles'] = {'app.a': 'app'}
+    config['adapt_to_app'] = False
+    actions.set_button_assignment(config, 416, 'undo', 'app.a')
+    assert config['ring_button'] == 416
+    assert config['assignment_profiles']['app']['ring_button'] is None
+    assert config['assignment_profiles']['app']['button_bindings']['416'] == 'undo'
+    actions.set_button_assignment(config, 83, actions.SHOW_RING, 'app.a')
+    assert config['assignment_profiles']['app']['ring_button'] == 83
+    assert '83' not in config['assignment_profiles']['app']['button_bindings']
+    assert config['assignment_profiles']['app']['button_bindings']['416'] == 'undo'
+    # An inherited profile reserving83 as an ordinary binding rejects root83.
+    del config['assignment_profiles']['app']['ring_button']
+    config['assignment_profiles']['app']['button_bindings'] = {'83': 'copy'}
+    before = deepcopy(config)
+    with pytest.raises(RuntimeError):
+        actions.set_button_assignment(config, 83, actions.SHOW_RING)
+    assert config == before

@@ -8,20 +8,33 @@ import sys
 import threading
 import time
 
+from .event_worker import _validate
+
 
 _LOG = logging.getLogger(__name__)
 _MAX_LINE = 65536
+
+
+def _reporting_request(config):
+    ring = config["ring_button"]
+    controls = set(map(int, config["button_bindings"]))
+    if ring is not None:
+        controls.add(ring)
+    return {"controls": sorted(controls), "ring_button": ring, "raw_xy": ring is not None}
 
 
 class EventSession:
     def __init__(self, callback):
         self.callback = callback
         self.process = None
+        self.device_id = None
         self.session_id = 0
         self.ready = False
         self.stopping = False
         self._lock = threading.RLock()
         self._feedback_time = 0
+        self._config_id = 0
+        self.restored = None
 
     @property
     def running(self):
@@ -48,9 +61,11 @@ class EventSession:
                 self._stop_process(process, session_id)
                 return False
 
-    def start(self, device_id, config):
-        controls = sorted({config["ring_button"], *map(int, config["button_bindings"])})
-        request = {"device_id": device_id, "controls": controls, "ring_button": config["ring_button"], "raw_xy": True}
+    def start(self, device_id, config, expected_stable_id=None):
+        request = {"device_id": device_id, **_reporting_request(config)}
+        if expected_stable_id is not None:
+            request["expected_stable_id"] = expected_stable_id
+        _validate(request)
         with self._lock:
             if self.running:
                 raise RuntimeError("Mouse integration is already running.")
@@ -58,10 +73,13 @@ class EventSession:
                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        text=True, encoding="utf-8", bufsize=1)
             self.process = process
+            self.device_id = device_id
             self.session_id += 1
             session_id = self.session_id
             self.ready, self.stopping = False, False
             self._feedback_time = 0
+            self._config_id = 0
+            self.restored = None
         errors = deque(maxlen=8)
         errors_lock = threading.Lock()
 
@@ -140,7 +158,15 @@ class EventSession:
                     with errors_lock:
                         detail = " ".join(errors)
                     self._emit(process, session_id, {"type": "error", "message": "Mouse listener exited unexpectedly. " + detail})
-                self._emit(process, session_id, {**(stopped_event or {"type": "stopped"}), "exit_code": code})
+                restored = stopped_event.get("restored") if stopped_event else None
+                restored = restored if type(restored) is bool else None
+                if code != 0:
+                    restored = None
+                with self._lock:
+                    if self._current(process, session_id):
+                        self.restored = restored
+                self._emit(process, session_id, {**(stopped_event or {"type": "stopped"}),
+                                                "restored": restored, "exit_code": code})
 
         threading.Thread(target=events, daemon=True, name="mx4-event-reader").start()
 
@@ -161,6 +187,20 @@ class EventSession:
             if self.process is None:
                 return False
             return self._send(self.process, self.session_id, request)
+
+    def configure(self, config):
+        """Request an exact control set; the worker acknowledges its safe boundary."""
+        request = _reporting_request(config)
+        _validate({"device_id": "configure", **request})
+        with self._lock:
+            if not self.ready or self.stopping or not self.running:
+                return None
+            self._config_id += 1
+            config_id = self._config_id
+            if self._send(self.process, self.session_id, {"op": "configure", "config_id": config_id, **request}):
+                return config_id
+            self._stop_process(self.process, self.session_id)
+            return None
 
     def feedback(self, waveform=0):
         with self._lock:

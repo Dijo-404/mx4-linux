@@ -2,6 +2,7 @@
 """Exercise native demo widgets; use dbus-run-session and xvfb-run in CI."""
 
 import os
+from importlib.resources import files
 from pathlib import Path
 import tempfile
 from time import monotonic, sleep
@@ -10,8 +11,9 @@ from time import monotonic, sleep
 def main():
     with tempfile.TemporaryDirectory(prefix="mx4-gtk-smoke-") as directory:
         os.environ["XDG_CONFIG_HOME"] = directory
+        os.environ["XDG_STATE_HOME"] = str(Path(directory) / "state")
         from mx4_linux.actions import DesktopConfigStore, default_config
-        from mx4_linux.desktop_editor import DesktopEditor
+        from mx4_linux.desktop_editor import present_desktop_editor
         from mx4_linux.gtk_support import Adw, Gdk, Gio, GLib, Gtk
         from mx4_linux.gui import ControlWindow
         from mx4_linux.ring import ActionsRing, CENTER_X, CENTER_Y
@@ -30,19 +32,49 @@ def main():
 
         app = Adw.Application(application_id="io.github.mx4linux.Smoke", flags=Gio.ApplicationFlags.NON_UNIQUE)
         app.register(None)
+        isolated = default_config()
+        for action in isolated["actions"].values():
+            action["steps"] = [{"type": "command", "argv": ["/usr/bin/true"]}]
+        DesktopConfigStore().save(isolated)
         window = ControlWindow(app, demo=True)
         ring = None
         editor = None
         settings = Gtk.Settings.get_default()
         animations = settings.get_property("gtk-enable-animations")
         try:
+            stylesheet_errors = []
+            provider = Gtk.CssProvider()
+            provider.connect("parsing-error", lambda _p, _section, error: stylesheet_errors.append(str(error)))
+            provider.load_from_path(str(files("mx4_linux") / "assets" / "reference.css"))
+            assert not stylesheet_errors, stylesheet_errors
             window.present()
             wait_until(lambda: window.current is not None and not window.busy)
+            assert window.route == "home"
+            window.navigate("buttons")
+            window.select_target("button:83")
+            assert window.selected_target == "button:83"
+            for appearance in ("light", "dark"):
+                window.save_local_preference("appearance", appearance)
+                wait_until(lambda: not window.busy)
+                assert window.desktop.config["appearance"] == appearance
+                assert window.has_css_class("mx4-light") == (appearance == "light")
+                wait_until(window.shell.inspector.get_mapped)
+            window.go_back()
+            assert window.selected_target is None
+            window.navigate("point")
+            wait_until(window.wheel.get_mapped)
             assert window.wheel.get_visible()
             settings.set_property("gtk-enable-animations", True)
             window.wheel.spin(1)
             assert window.wheel.tick_id
             wait_until(lambda: window.wheel.tick_id == 0)
+            window.navigate("haptics")
+            window.wheel.pulse()
+            assert window.wheel.pulse_source
+            window.navigate("home")
+            wait_until(lambda: window.wheel.pulse_source == 0)
+            window.navigate("point")
+            wait_until(window.wheel.get_mapped)
 
             selected = []
             ring = ActionsRing(app, lambda action, preview: selected.append((action, preview)), lambda: None)
@@ -82,12 +114,12 @@ def main():
             window.wheel.spin(1)
             window.wheel.set_visible(False)
             wait_until(lambda: window.wheel.tick_id == 0)
-            editor = DesktopEditor(window, DesktopConfigStore(Path(directory) / "desktop.json"), lambda: None)
-            editor.present()
+            editor = present_desktop_editor(window, DesktopConfigStore(Path(directory) / "desktop.json"), lambda: None, cid=83)
             wait_until(editor.get_mapped)
             assert len(editor.ring_choices) == 8
             assert not editor.dirty
-            print("GTK smoke passed: demo settings, wheel, ring groups, reduced motion, editor, cleanup.")
+            assert editor.shortcuts_expander.get_expanded()
+            print("GTK smoke passed: stylesheet, light/dark, demo settings, wheel, ring groups, reduced motion, editor, cleanup.")
         finally:
             settings.set_property("gtk-enable-animations", animations)
             if editor is not None:

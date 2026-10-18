@@ -13,13 +13,16 @@ MX4 Linux has three boundaries: the native user interface, isolated HID++ worker
 | `profiles.py` | Manual snapshots, locked atomic saves, profile validation and sequential application. |
 | `desktop.py` | GUI desktop integration, focus capture/restore, routine lifecycle and listener events. |
 | `desktop_editor.py` | Ring assignment and Smart Actions editor. |
-| `ring.py`, `ring_model.py` | GTK icon overlay, circular pointer geometry, held eight-sector interaction and optional side menus. |
-| `ring_icons.py`, `ring_preview.py` | Step-based native icon mapping and the editor’s static assignment diagram. |
+| `ring.py`, `ring_model.py`, `ring_motion.py` | GTK icon overlay, circular pointer geometry, held eight-sector interaction, interruptible selection motion and optional side menus. |
+| `ring_icons.py`, `ring_preview.py` | Step-based native icon mapping and the editor’s keyboard-accessible, animated assignment diagram. |
 | `event_session.py` | Nonblocking subprocess lifecycle and session-tagged event delivery. |
 | `event_worker.py` | Retained HID++ event handle, temporary control reporting and restoration. |
 | `actions.py` | Desktop schema, defaults, persistence, execution and input backends. |
+| `applications.py` | Read-only installed-application discovery and launch through GIO desktop entries. |
 | `gtk_support.py` | GTK/Adwaita imports and optional layer-shell loading. |
-| `motion.py`, `wheel.py` | Frame-time transitions and a finite, illustrative wheel preview without hardware polling. |
+| `gltf_model.py`, `model_renderer.py` | Offline loading of the supplied GLB, native GTK `GLArea` rendering and projection of model-space control landmarks. |
+| `model_motion.py` | Unrestricted quaternion rotation, bounded zoom and finite, interruptible page-pose transitions without GTK or GPU dependencies. |
+| `motion.py`, `mouse_motion.py`, `mouse_view.py` | Native model gestures, frame-time transitions, registered controls, baked-image fallback and finite wheel/haptic previews without hardware polling. |
 | `bin/mx4-linux.js` | Linux npm entry point, explicit per-user runtime setup, argument/signal forwarding. |
 
 ## Hardware requests
@@ -30,11 +33,17 @@ Discovery limits itself to supported MX Master 4 settings. Controls and numeric 
 
 The GUI applies confirmed write values to existing controls instead of running another discovery scan and rebuilding the page. Coupled wheel readbacks update related controls without issuing extra writes. A failed write invalidates uncertain values and refreshes from hardware. Saving a profile uses the existing confirmed snapshot on the background executor and does not rescan the mouse.
 
+Periodic battery reads use the serialized worker without another discovery scan. They update the battery labels and preserve the footer's last operation notice. A failed read clears the previous battery value and observation time; callbacks still require the same device identity and operation epoch.
+
 Profile application validates a full plan before writing. It then makes sequential hardware changes, so it cannot provide a transaction across a disconnect or device failure. Errors state how many changes completed. Profiles never snapshot or replay waveform commands.
 
 ## Event listener lifecycle
 
 Mouse integration starts only when the user enables it. `EventSession` starts the event worker, sends the selected ring/button controls and relays JSON-line events to the GUI. The worker captures the existing control reporting state, temporarily enables diversion and raw XY for selected supported buttons, and retains its HID handle for input and haptic feedback.
+
+Opening the action editor dismisses any current ring selection while retaining enabled integration. Saving reconciles the configuration with the active worker through its existing control-release boundary; editing does not require disabling and re-enabling integration. The editor exposes the same integration status and Enable/Disable control as the main window.
+
+Closing the main window hides it while integration is enabled or starting, unless `background` is explicitly false. The registered GTK window keeps the application and controller alive; launcher activation reuses that window without restarting integration. Explicit Quit uses the editor's existing unsaved-changes guard, cancels pending work, waits asynchronously for the listener's stopped/restoration callback, and then releases UI resources and exits. This does not add login autostart or automatically enable integration.
 
 Only nonprimary controls are allowed. The prior reporting flags and mapping are restored on the worker's cleanup path. Stop requests, EOF and termination use this path; a disconnected mouse or forced process loss can prevent immediate hardware restoration and may require reconnecting.
 
@@ -50,7 +59,17 @@ Held movement keeps the calibrated eight-sector model and center dead zone. Afte
 
 Before opening the ring, desktop integration records Niri's focused application/window. Before executing the chosen action, it restores that focus and verifies the original window still exists. A vanished target stops execution. Ring/button dispatch refuses shortcuts and text when an MX4 configuration window is the target; direct CLI `actions run` does not use this GUI focus guard. A preview follows the selection UI but prints steps without action execution or haptic feedback.
 
-Animations use GTK frame callbacks and elapsed time. Wheel motion settles after an impulse; ring callbacks stop when transitions finish or the ring hides. GTK's `gtk-enable-animations` preference disables decorative motion. Labels and buttons are native widgets reused across frames. Opening spreads the icons outward over 180 ms; side menus reveal over 160 ms and labels fade over 100 ms. Hit testing follows the painted positions. Emerging children cannot receive pointer clicks while they overlap their parent, another main button or each other. Ring selection dispatches immediately after hiding; no exit animation delays the action. The wheel illustration previews scrolling visually and does not read or claim to represent physical wheel rotation.
+Animations use GTK frame callbacks and elapsed time. Wheel motion settles after an impulse; ring callbacks stop when transitions finish or the ring hides. GTK's `gtk-enable-animations` preference disables decorative motion. Labels and buttons are native widgets reused across frames. Opening traces the orbit over 220 ms while root buttons remain immediately visible at their final hit positions. A short inner selection arc follows the shortest route between actions over 180 ms, retargeting from its current painted angle. Held motion draws a direction tether; captured presses tint the circular face and compress only its icon. Side menus reveal over 160 ms and labels fade over 100 ms. Hit testing follows the painted child positions; root hit regions remain fixed. Emerging children cannot receive pointer clicks while they overlap their parent, another main button or each other. Ring selection dispatches immediately after hiding; no exit animation delays the action. The wheel illustration previews scrolling visually and does not read or claim to represent physical wheel rotation.
+
+Mouse artwork renders the supplied GLB in a native GTK `GLArea`. The offline loader reads the embedded mesh attributes, materials and textures; no browser, network fetch or third-party 3D engine runs in the application. `ModelPicture` owns the renderer, input controllers, motion state and baked-image fallback. Surface targets, leaders and host indicators use model-space landmarks projected through the current orientation and zoom, while their native callout labels stay parked. Surface overlays hide during page turns and on faces pointing away from the viewer. Easy-Switch initially shows the model; its Switch computer callout opens the host selector, so compact layouts can show the turn without a covering inspector.
+
+The home model supports drag rotation in every direction, including complete turns and upside-down views. Wheel scrolling and the +/− keys adjust zoom within a bounded range; arrow keys rotate the focused model, and Home or 0 restores its initial pose and magnification. Device pages share a model viewport: Haptic Feedback turns it sideways toward the thumb panel, and Easy-Switch starts a backward flip before settling with the underside upright. `ModelMotion` uses unit quaternions and 650 ms eased interpolation; the underside follows a spherical cubic curve to combine that backward turn with its readable final pose. Navigation interrupts and retargets from the current displayed orientation. The model remains still after settling. Frame callbacks run only during active transitions, capped at 60 fps; unmapping pauses elapsed time, and the toolbar pause control or system reduced-motion setting stops decorative playback. Reduced motion snaps page poses while keeping direct home-model manipulation available.
+
+If graphics initialization fails, the model retains its baked product illustration and registered controls. Existing image assets also provide the finite wheel demonstration: it temporarily holds the 3D viewport, settles the baked camera, plays the wheel frames and restores the model. The decoded-image LRU cache remains bounded at 16 MiB, plus images retained by visible widgets. Neither the model pose nor the authored wheel/haptic previews represent physical motion telemetry.
+
+The native shell uses a single monospaced family, flat warm-neutral surfaces and restrained transitions. Button contents and ring icons scale slightly on hover while their layout allocations and pointer hit regions stay fixed. Below 760 pixels, a device-page chooser replaces the wide sidebar; title truncation and bounded dropdowns preserve window sizing. The editor shares theme and motion preferences, supports Ctrl+S and guarded Escape, and exposes field errors beside the relevant details. Ring preview arrows move between assignments; Enter or Space opens the selected assignment. Global settings subscriptions follow mapping or explicit artwork disposal, and ring CSS providers are shared per display. See [design-system.md](design-system.md) for the visual and motion rules.
+
+Choice rows place their label and help above a full-width control so narrow inspectors do not truncate the selected DPI or assignment. Main-window Back and Escape share route history: close the selected inspector first, then restore the previous page and its selected target. A bubbling key controller leaves native popovers and modal dialogs in control of their dismissal; Escape on Home does not close the application.
 
 Optional `ring_groups` references existing routines by slot. Hovering or choosing a grouped position opens its side menu; a held parent release latches the menu, while an explicit child choice dispatches its routine. This does not change direct CLI execution of the parent action. Version 1 documents without groups remain valid. The editor prevalidates group references, preserves ID renames and removes deleted children before saving.
 
@@ -58,7 +77,9 @@ The existing 80 ms compositor focus handoff before input execution remains. It a
 
 ## Smart Actions
 
-The whole configuration is validated before saving or executing. Routines contain explicit steps: Niri actions, command argument arrays, keyboard chords, text or delays. Command steps start a process without a shell and do not wait for the application to close. Their processes are reaped in the background.
+The whole configuration is validated before saving or executing. Routines contain explicit steps: Niri actions, installed applications, command argument arrays, keyboard chords, text or delays. Command steps start a process without a shell and do not wait for the application to close. Their processes are reaped in the background.
+
+The ring's **Add application** picker searches visible installed desktop entries, then creates a routine and assigns it to the chosen position in the editor draft. An application step stores `{"type":"application","desktop_id":"org.example.App.desktop"}`. Execution resolves that ID through `GioUnix.DesktopAppInfo` (or the legacy `Gio.DesktopAppInfo`) and calls its launch API, preserving desktop-entry semantics without parsing an `Exec` string. A removed launcher produces an actionable error. Discovery, selection, saving and dry runs do not launch applications.
 
 The executor checks cancellation and its two-minute deadline between steps. Delays and native text chunks bound cancellation latency. The GUI permits one active routine and rejects repeated triggers instead of accumulating a queue. Cancellation prevents later steps; completed input and launched applications remain.
 

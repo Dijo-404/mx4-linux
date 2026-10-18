@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +32,18 @@ try {
     'scripts/lib-device-access.sh', 'data/70-mx4-linux.rules', 'docs/install.md']) {
     assert.ok(files.has(path), `Missing package file: ${path}`);
   }
+  // Runtime imports include dynamically selected camera frames. Check the
+  // complete source/asset tree so a working checkout cannot hide a broken pack.
+  function checkRuntime(directory) {
+    for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory() && entry.name !== '__pycache__') checkRuntime(path);
+      else if (entry.isFile() && /\.(py|css|png|json|glb|svg|ttf|txt)$/.test(path)) {
+        assert.ok(files.has(path), `Missing runtime module or asset: ${path}`);
+      }
+    }
+  }
+  checkRuntime('src/mx4_linux');
   for (const path of files) {
     assert.ok(!/(^|\/)(__pycache__|\.venv|\.git|node_modules|evidence)(\/|$)|\.(pyc|zip|tgz)$/.test(path), `Unexpected package file: ${path}`);
   }
