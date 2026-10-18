@@ -73,6 +73,7 @@ def test_adjustable_presets(preset, main, increase, decrease):
 
 
 @pytest.mark.parametrize("preset,value,step", [
+    ("installed-application", "org.example.App.desktop", {"type": "application", "desktop_id": "org.example.App.desktop"}),
     ("application", ["kitty", "--title", "$(literal)"], {"type": "command", "argv": ["kitty", "--title", "$(literal)"]}),
     ("command", ["printf", "a; b"], {"type": "command", "argv": ["printf", "a; b"]}),
     ("file", "/tmp/a file.pdf", {"type": "command", "argv": ["xdg-open", "/tmp/a file.pdf"]}),
@@ -101,6 +102,7 @@ def test_templates_validate_and_detach_inputs(preset, value, step):
 
 
 @pytest.mark.parametrize("preset,value", [
+    ("installed-application", "/tmp/app.desktop"), ("installed-application", "app"),
     ("application", "kitty --title hello"), ("command", []), ("command", ["echo", 1]),
     ("command", ["echo\0bad"]), ("file", ""), ("folder", "\0"), ("folder", []),
     ("url", "file:///tmp/private"), ("url", "javascript:alert(1)"), ("url", "https:///nohost"),
