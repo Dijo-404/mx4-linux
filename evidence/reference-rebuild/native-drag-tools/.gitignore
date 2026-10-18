@@ -1,0 +1,6 @@
+__pycache__/
+virtual-pointer-client
+parser-tests
+virtual-pointer-client.h
+virtual-pointer-protocol.c
+preparation-result.json
