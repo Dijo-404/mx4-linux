@@ -25,6 +25,8 @@ import threading
 import time
 
 from .action_utilities import DATE_FORMATS, CLIPBOARD_OPERATIONS, clipboard_operation, date_text
+from .applications import launch_application, valid_desktop_id
+from .pointer import pointer_operation, validate_pointer
 
 
 MAX_CONFIG_BYTES = 1024 * 1024
@@ -199,13 +201,17 @@ def _validate_steps(steps, action_id):
             _fields(step, ("type", "action"), ("args",), location)
             if (not isinstance(step["action"], str) or not NIRI_ACTION.fullmatch(step["action"])
                     or step["action"] in {"spawn", "spawn-sh"}):
-                _fail(f"{location} needs a niri action name; use a command step to launch applications.")
+                _fail(f"{location} needs a niri action name; use an application or command step to launch applications.")
             if not _argv(step.get("args", []), allow_empty=True):
                 _fail(f"{location} args must be an array of strings.")
         elif kind == "command":
             _fields(step, ("type", "argv"), location=location)
             if not _argv(step["argv"]):
                 _fail(f"{location} argv must be a nonempty array of at most 64 arguments.")
+        elif kind == "application":
+            _fields(step, ("type", "desktop_id"), location=location)
+            if not valid_desktop_id(step["desktop_id"]):
+                _fail(f"{location} needs an installed application ID ending in .desktop, without a directory path.")
         elif kind == "shortcut":
             _fields(step, ("type", "keys"), location=location)
             try:
@@ -220,6 +226,8 @@ def _validate_steps(steps, action_id):
             _fields(step, ("type", "format"), location=location)
             if not isinstance(step["format"], str) or step["format"] not in DATE_FORMATS:
                 _fail(f"{location} needs a supported date format.")
+        elif kind == "pointer":
+            validate_pointer(step)
         elif kind == "clipboard":
             _fields(step, ("type", "operation"), location=location)
             if not isinstance(step["operation"], str) or step["operation"] not in CLIPBOARD_OPERATIONS:
@@ -263,7 +271,7 @@ def profile_references(action):
 
 
 def steps_send_input(steps):
-    return any(step["type"] in ("shortcut", "text", "date") for step in steps)
+    return any(step["type"] in ("shortcut", "text", "date", "pointer") for step in steps)
 
 
 def execution_steps(action, adjustment=None, toggle_state=None, action_id=None):
@@ -353,6 +361,15 @@ def _validate_trigger(value):
 
 
 def _validate_assignments(config, actions, ring_button):
+    if config.get("thumb_wheel") is not None:
+        thumb = config["thumb_wheel"]
+        _fields(thumb, ("action", "sensitivity"), location="thumb_wheel")
+        action = thumb["action"]
+        if not isinstance(action, str) or action not in actions or "adjustment" not in actions[action]:
+            _fail("thumb_wheel needs an existing action with increase and decrease branches.")
+        sensitivity = thumb["sensitivity"]
+        if type(sensitivity) not in (int, float) or not math.isfinite(sensitivity) or not 0.25 <= sensitivity <= 4:
+            _fail("thumb_wheel software sensitivity must be finite from 0.25 to 4.")
     ring = config["ring"]
     if not isinstance(ring, list) or len(ring) != 8 or any(not isinstance(value, str) or value not in actions for value in ring):
         _fail("ring must contain exactly eight existing action IDs.")
@@ -381,7 +398,7 @@ def validate_config(config):
     _fields(config, ("version", "ring", "actions", "button_bindings", "ring_button", "haptic_feedback"),
             ("ring_groups", "assignment_profiles", "active_profiles", "ring_scale", "ring_motion_gain",
              "ring_deadzone", "haptic_events", "haptic_waveforms", "haptic_power_save", "appearance",
-             "autostart", "background", "resume_integration", "adapt_to_app"), location="document")
+             "autostart", "background", "resume_integration", "adapt_to_app", "thumb_wheel"), location="document")
     if type(config["version"]) is not int or config["version"] != 1:
         _fail("only version 1 is supported.")
     actions = config["actions"]
@@ -441,7 +458,7 @@ def validate_config(config):
         for profile_id, profile in profiles.items():
             if not isinstance(profile_id, str) or not ACTION_ID.fullmatch(profile_id):
                 _fail("assignment profile IDs must use the action ID syntax.")
-            _fields(profile, ("label", "app_id", "ring", "button_bindings"), ("ring_groups", "ring_button"), f"profile {profile_id}")
+            _fields(profile, ("label", "app_id", "ring", "button_bindings"), ("ring_groups", "ring_button", "thumb_wheel"), f"profile {profile_id}")
             if not _plain_string(profile["label"], maximum=80) or not _plain_string(profile["app_id"]):
                 _fail(f"profile {profile_id} needs a printable label of 1–80 and app_id of 1–256 characters.")
             _validate_trigger(profile.get("ring_button", ring_button))
@@ -524,8 +541,10 @@ def resolve_config(config, app_id=None, *, for_editing=False):
         root_trigger = config["ring_button"]
         for value in resolved.get("assignment_profiles", {}).values():
             value.setdefault("ring_button", root_trigger)
+            value.setdefault("thumb_wheel", deepcopy(config.get("thumb_wheel")))
         for field in ("ring", "button_bindings", "ring_button"):
             resolved[field] = deepcopy(profile[field])
+        resolved["thumb_wheel"] = deepcopy(profile["thumb_wheel"])
         resolved.pop("ring_groups", None)
         if "ring_groups" in profile:
             resolved["ring_groups"] = deepcopy(profile["ring_groups"])
@@ -764,6 +783,9 @@ class DesktopActions:
         result = {"type": kind}
         if kind == "niri":
             _run(["niri", "msg", "action", step["action"], *step.get("args", [])], timeout=min(5, max(0.1, deadline - time.monotonic())))
+        elif kind == "application":
+            launch_application(step["desktop_id"])
+            result["desktop_id"] = step["desktop_id"]
         elif kind == "command":
             try:
                 process = subprocess.Popen(step["argv"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -785,6 +807,8 @@ class DesktopActions:
                 raise RuntimeError("Date text could not be inserted; input may be partial.") from None
         elif kind == "clipboard":
             clipboard_operation(step["operation"], lambda: self._check(cancelled, deadline))
+        elif kind == "pointer":
+            pointer_operation(step, lambda: self._check(cancelled, deadline))
         elif kind == "local":
             if self.local_handler is None:
                 raise RuntimeError("Local utilities require the native controller.")

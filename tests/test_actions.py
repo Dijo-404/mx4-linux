@@ -338,6 +338,35 @@ def test_command_launch_passes_literal_argv_without_waiting_for_app(monkeypatch)
     assert reaped == [True]
 
 
+def test_installed_application_ring_assignment_persists_and_dispatches_only_on_execution(tmp_path, monkeypatch):
+    launches = []
+    monkeypatch.setattr(actions, "launch_application", launches.append)
+    config = routine([{"type": "application", "desktop_id": "org.example.Editor.desktop"}])
+    config["ring"][0] = "test"
+    store = DesktopConfigStore(tmp_path / "desktop.json")
+    store.save(config)
+    saved = store.read()
+    assert saved == config
+    preview = DesktopActions(saved, dry_run=True).execute(saved["ring"][0])
+    assert preview["steps"] == [{"type": "application", "desktop_id": "org.example.Editor.desktop"}]
+    assert launches == []
+    result = DesktopActions(saved).execute(saved["ring"][0])
+    assert result["ok"] and result["completed"] == 1
+    assert launches == ["org.example.Editor.desktop"]
+    assert result["steps"] == [{"type": "application", "desktop_id": "org.example.Editor.desktop"}]
+
+
+@pytest.mark.parametrize("step", [
+    {"type": "application", "desktop_id": "/tmp/app.desktop"},
+    {"type": "application", "desktop_id": "app"},
+    {"type": "application", "desktop_id": "app.desktop", "argv": ["echo", "not-used"]},
+    {"type": "application"},
+])
+def test_application_steps_reject_paths_and_ambiguous_launch_instructions(step):
+    with pytest.raises(RuntimeError, match="Invalid desktop configuration"):
+        validate_config(routine([step]))
+
+
 def test_macro_cancellation_prevents_subsequent_steps(monkeypatch):
     calls = []
     monkeypatch.setattr(actions, "_run", lambda argv, **_kwargs: calls.append(argv))

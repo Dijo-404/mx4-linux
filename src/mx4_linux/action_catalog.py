@@ -82,8 +82,28 @@ _ADJUSTMENTS = {
     "adjustable-zoom": {"increase": _shortcut("CTRL", "EQUAL"), "decrease": _shortcut("CTRL", "MINUS")},
     "adjustable-brightness": {"increase": _shortcut("BRIGHTNESSUP"), "decrease": _shortcut("BRIGHTNESSDOWN")},
 }
+for _button in ("left", "right", "middle"):
+    _PRESETS["pointer-" + _button + "-click"] = ("Pointer", "Current cursor: " + _button + " click",
+        "Click at the current cursor; keyboard focus does not establish the cursor's target.", "input-mouse-symbolic",
+        [{"type": "pointer", "operation": "click", "button": _button, "count": 1}])
+_PRESETS["pointer-double-click"] = ("Pointer", "Current cursor: double click", "Double click at the current cursor.",
+    "input-mouse-symbolic", [{"type": "pointer", "operation": "click", "button": "left", "count": 2}])
+for _axis in ("horizontal", "vertical"):
+    _step = {"type": "pointer", "operation": "scroll", "horizontal": 0, "vertical": 0}
+    _step[_axis] = 1
+    _PRESETS["adjustable-" + _axis + "-scroll"] = ("Pointer", "Current cursor: " + _axis + " scroll",
+        "Scroll at the current cursor. Software wheel steps depend on the application; no cursor warp.",
+        "input-mouse-symbolic", [deepcopy(_step)])
+    _decrease = deepcopy(_step)
+    _decrease[_axis] = -1
+    _ADJUSTMENTS["adjustable-" + _axis + "-scroll"] = {"increase": [deepcopy(_step)], "decrease": [_decrease]}
+for _id, _dx, _dy in (("left", -40, 0), ("right", 40, 0), ("up", 0, -40), ("down", 0, 40)):
+    _PRESETS["pointer-move-" + _id] = ("Pointer", "Current cursor: move " + _id,
+        "Move the cursor relatively by 40 compositor units.", "input-mouse-symbolic",
+        [{"type": "pointer", "operation": "move", "dx": _dx, "dy": _dy}])
 _TEMPLATES = {
     "application": ("Open", "Open application", "Launch an application with explicit arguments.", "application-x-executable-symbolic", "argv", "Application arguments"),
+    "installed-application": ("Open", "Open installed application", "Open an installed desktop launcher.", "application-x-executable-symbolic", "desktop-id", "Desktop application ID"),
     "command": ("Open", "Run command", "Launch a command as arguments without a shell.", "utilities-terminal-symbolic", "argv", "Command arguments"),
     "file": ("Open", "Open file", "Open a file with its default application.", "text-x-generic-symbolic", "path", "File path"),
     "folder": ("Open", "Open folder", "Open a folder with its default application.", "folder-symbolic", "path", "Folder path"),
@@ -106,6 +126,9 @@ def catalog_availability(preset_id):
     if preset_id.startswith("clipboard-"):
         available = bool(shutil.which("wl-copy") and (preset_id == "clipboard-clear" or shutil.which("wl-paste")))
         return {"available": available, "reason": "Requires wl-clipboard and a compatible Wayland clipboard service."}
+    if preset_id.startswith("pointer-") or preset_id in ("adjustable-horizontal-scroll", "adjustable-vertical-scroll"):
+        from .pointer import pointer_availability
+        return pointer_availability()
     if preset_id == "sound":
         return {"available": bool(shutil.which("pw-play")), "reason": "Requires pw-play and a local audio file; playback depends on the audio service."}
     return {"available": True, "reason": "Desktop input, focus, application support or the native controller may be required at execution."}
@@ -161,6 +184,8 @@ def catalog_action(preset_id, value=None, *, config=None):
             action["adjustment"] = deepcopy(_ADJUSTMENTS[preset_id])
     elif preset_id in ("application", "command"):
         action["steps"] = [{"type": "command", "argv": deepcopy(value)}]
+    elif preset_id == "installed-application":
+        action["steps"] = [{"type": "application", "desktop_id": value}]
     elif preset_id in ("file", "folder"):
         if not isinstance(value, str) or not 1 <= len(value) <= 4096 or not value.isprintable() or not value.strip():
             raise RuntimeError("An explicit nonempty file or folder path is required.")
