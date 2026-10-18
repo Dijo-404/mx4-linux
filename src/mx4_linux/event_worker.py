@@ -312,7 +312,7 @@ def run(request, api=None, commands=None, emit=None, stop_event=None):
                 api.hidpp20 = importlib.import_module("logitech_receiver.hidpp20")
             with _isolated_solaar(api, software_id=0x0D):
                 diagnostics = []
-                with contextlib.closing(_devices(api, diagnostics)) as devices:
+                with contextlib.closing(_devices(api, diagnostics, target)) as devices:
                     for dev, path in devices:
                         if _device_id(path, dev.number) != target:
                             continue
