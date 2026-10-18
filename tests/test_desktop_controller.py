@@ -890,6 +890,7 @@ def test_wait_stopped_uses_final_restoration_outcome_after_exit(runtime, monkeyp
 
 
 def test_reconnect_same_unit_new_connection_recovers_then_starts_once(runtime, monkeypatch):
+    runtime.restoration_confirmed = True
     runtime.window.busy = False
     runtime.requested_enabled = True
     runtime.hardware_paused = False
@@ -912,6 +913,7 @@ def test_reconnect_same_unit_new_connection_recovers_then_starts_once(runtime, m
 
 
 def test_manual_stop_while_reconnect_probe_pending_prevents_recovery_replay_start(runtime, monkeypatch):
+    runtime.restoration_confirmed = True
     runtime.window.busy = False
     runtime.requested_enabled = True
     runtime.hardware_paused = False
@@ -936,6 +938,7 @@ def test_manual_stop_while_reconnect_probe_pending_prevents_recovery_replay_star
 
 
 def test_reconnect_budget_and_preference_are_bounded(runtime, monkeypatch):
+    runtime.restoration_confirmed = True
     scheduled = []
     runtime.requested_enabled = True
     runtime.hardware_paused = False
@@ -963,3 +966,18 @@ def test_explicit_recovery_can_clear_prior_unknown_stop_for_next_operation(runti
     seen = []
     runtime.wait_stopped(seen.append)
     assert seen == [True]
+
+
+@pytest.mark.parametrize('restored', [False, None])
+def test_unconfirmed_stop_blocks_new_and_already_queued_automatic_reconnect(runtime, monkeypatch, restored):
+    scheduled = []
+    runtime.requested_enabled = True
+    runtime.config['resume_integration'] = True
+    runtime.window.backend = SimpleNamespace(scan=Mock())
+    runtime.window.job = Mock()
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda delay, fn: scheduled.append((delay, fn)) or len(scheduled))
+    runtime.event({'type': 'stopped', 'restored': restored})
+    assert scheduled == []
+    runtime._reconnect(runtime._intent_generation)
+    runtime.window.job.assert_not_called()
+    runtime.window.backend.scan.assert_not_called()

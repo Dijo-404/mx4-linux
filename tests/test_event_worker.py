@@ -726,3 +726,19 @@ def test_restore_timeout_after_firmware_change_can_be_confirmed_live():
     assert events[-1]['restored'] is True
     assert dev.reporting[416] == (0x104, 416)
     assert Ownership('unit:a1b2c3d4').read() is None
+
+
+def test_external_owned_bit_change_is_not_reasserted_by_reconfiguration():
+    dev, api, commands, events = setup_session()
+    changed_at = []
+    def emit(event):
+        events.append(event)
+        if event['type'] == 'ready':
+            flags, mapping = dev.reporting[416]
+            dev.reporting[416] = (flags & ~16, mapping)
+            changed_at.append(len(dev.writes))
+            commands.put({'op': 'configure', 'config_id': 1, 'controls': [416], 'ring_button': 416, 'raw_xy': True})
+    assert not worker.run({'device_id': TARGET}, api, commands, emit)
+    assert not any(event['type'] == 'configured' for event in events)
+    # Cleanup may restore the remaining diverted bit, but never re-enable RAW_XY.
+    assert all(not (change & 16) for _cid, change, _mapping in dev.writes[changed_at[0]:])

@@ -298,7 +298,9 @@ class DesktopController:
             self._stop_waiters = []
             for callback in waiters:
                 callback(self.restoration_confirmed)
-            if getattr(self, "requested_enabled", False):
+            if self.restoration_confirmed is not True:
+                self._cancel_reconnect()
+            elif getattr(self, "requested_enabled", False):
                 self._schedule_reconnect()
         elif kind == "button" and event.get("cancelled"):
             self._cancel_adjustments()
@@ -357,6 +359,7 @@ class DesktopController:
 
     def _schedule_reconnect(self):
         if (self.closed or not getattr(self, "requested_enabled", False)
+                or self.restoration_confirmed is not True
                 or not self.config.get("resume_integration", False)
                 or getattr(self, "hardware_paused", False) or self.reconnect_source or self._reconnect_busy):
             return
@@ -370,7 +373,8 @@ class DesktopController:
 
     def _reconnect(self, generation):
         self.reconnect_source = 0
-        if self.closed or generation != self._intent_generation or not self.requested_enabled:
+        if (self.closed or generation != self._intent_generation or not self.requested_enabled
+                or self.restoration_confirmed is not True):
             return GLib.SOURCE_REMOVE
         if self.session.running and not self.session.stopping:
             return GLib.SOURCE_REMOVE
@@ -381,7 +385,8 @@ class DesktopController:
         self._reconnect_busy = True
         identity = self.target_identity
         def cancelled():
-            return self.closed or generation != self._intent_generation or not self.requested_enabled
+            return (self.closed or generation != self._intent_generation or not self.requested_enabled
+                    or self.restoration_confirmed is not True)
         def work():
             from .profiles import replay_remembered
             result = self.window.backend.scan()

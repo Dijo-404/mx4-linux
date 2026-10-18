@@ -191,3 +191,85 @@ def test_native_remap_waits_for_restoration_before_any_write(window):
     settle(window)
     window.backend.write.assert_called_once()
     assert mapping['value']['83'] == 86
+
+
+def test_profile_operation_resumes_only_after_matching_refresh(window):
+    from copy import deepcopy
+    window.desktop.requested_enabled = True
+    window.desktop.target_identity = window.current['stable_id']
+    window.desktop.wait_stopped = lambda callback, **_kw: callback(True)
+    window.desktop.start = Mock()
+    window.backend.scan = Mock(return_value={'ok': True, 'devices': [deepcopy(window.current)], 'diagnostics': []})
+    window.hardware_job(lambda: 1, lambda count: window.refresh_after_write(f'Applied {count} changes.'), 'Applying…')
+    settle(window)
+    window.desktop.start.assert_called_once_with(automatic=True)
+
+
+def test_profile_refresh_failure_does_not_resume_integration(window):
+    window.desktop.requested_enabled = True
+    window.desktop.target_identity = window.current['stable_id']
+    window.desktop.wait_stopped = lambda callback, **_kw: callback(True)
+    window.desktop.start = Mock()
+    window.backend.scan = Mock(side_effect=BackendError('Readback unavailable'))
+    window.hardware_job(lambda: 1, lambda _count: window.refresh_after_write('Applied.'), 'Applying…')
+    settle(window)
+    window.desktop.start.assert_not_called()
+
+
+def test_unknown_physical_identity_prevents_setting_write(window):
+    window.demo = False
+    window.current['stable_id'] = None
+    window.backend.write = Mock()
+    window.change(setting(window, 'dpi'), 1600)
+    window.backend.write.assert_not_called()
+    assert 'verify its identity' in window.status.get_text()
+
+
+@pytest.mark.parametrize('refresh_result', ['different-unit', 'diagnostics', 'manual-stop'])
+def test_profile_refresh_never_resumes_on_stale_or_uncertain_result(window, refresh_result):
+    from copy import deepcopy
+    import threading
+    release = threading.Event()
+    scan_started = threading.Event()
+    device = deepcopy(window.current)
+    diagnostics = []
+    if refresh_result == 'different-unit':
+        device['stable_id'] = 'demo:another-mouse'
+    if refresh_result == 'diagnostics':
+        diagnostics = [{'message': 'One setting was unavailable'}]
+    window.desktop.requested_enabled = True
+    window.desktop.target_identity = window.current['stable_id']
+    window.desktop.wait_stopped = lambda callback, **_kw: callback(True)
+    window.desktop.start = Mock()
+    def scan():
+        scan_started.set()
+        assert release.wait(2)
+        return {'ok': True, 'devices': [device], 'diagnostics': diagnostics}
+    window.backend.scan = Mock(side_effect=scan)
+    window.hardware_job(lambda: 1, lambda _count: window.refresh_after_write('Applied.'), 'Applying…')
+    context = GLib.MainContext.default()
+    deadline = monotonic() + 2
+    while not scan_started.is_set() and monotonic() < deadline:
+        while context.pending():
+            context.iteration(False)
+        sleep(.001)
+    assert scan_started.is_set()
+    window.desktop.start.assert_not_called()
+    if refresh_result == 'manual-stop':
+        window.desktop.stop()
+    release.set()
+    settle(window)
+    window.desktop.start.assert_not_called()
+
+
+@pytest.mark.parametrize('restored', [False, None])
+def test_automatic_recovery_cannot_bypass_unconfirmed_listener_stop(window, restored):
+    window.desktop.session.process = object()
+    window.desktop.restoration_confirmed = restored
+    window.backend.recover = Mock()
+    try:
+        window.recover_current(replay=True, automatic=True)
+        window.backend.recover.assert_not_called()
+        assert not window.busy
+    finally:
+        window.desktop.session.process = None
