@@ -484,6 +484,8 @@ class DesktopController:
         self._open_token += 1
         self._dispatch_token += 1
         token = self._open_token
+        revision, session_id = self._context_revision, self.session.session_id
+        trigger = (self.effective_config or self.config)["ring_button"]
         self._pending_released = False
         self._pending_motion = [0, 0]
         self._opening_motion.clear()
@@ -494,10 +496,26 @@ class DesktopController:
                 return GLib.SOURCE_REMOVE
             self.opening = False
             try:
-                self.target = future.result()
-                if self._is_ring_context(self.target) and self.context:
-                    self.target = deepcopy(self.context)
-                self._ring_config = resolve_config(document, self.target.get("app_id") if self.target else None)
+                target = future.result()
+                # A later observation/configuration wins over this older query.
+                stale = revision != self._context_revision or session_id != self.session.session_id
+                if not stale and self._is_ring_context(target) and self.context:
+                    target = deepcopy(self.context)
+                if not stale and target != self.context:
+                    self.context = deepcopy(target)
+                    self._context_revision += 1
+                    if self.session.running:
+                        self._configure_context()
+                snapshot = resolve_config(document, target.get("app_id") if target else None)
+                if stale or (held and (not self.session.ready or self.session.stopping
+                        or self._active_revision != self._context_revision
+                        or trigger is None or snapshot["ring_button"] != trigger)):
+                    self._pending_motion = [0, 0]
+                    self._opening_motion.clear()
+                    self._pending_released = False
+                    self.notify("Application assignments changed; release and open the ring again.")
+                    return GLib.SOURCE_REMOVE
+                self.target, self._ring_config = target, snapshot
                 if self.ring is None:
                     from .ring import ActionsRing
                     self.ring = ActionsRing(self.window.get_application(), self.selected, self.dismissed, self.hovered, self.adjusted)
