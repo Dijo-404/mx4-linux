@@ -1,0 +1,50 @@
+{
+  "source": "User-authorized Windows installation acquisition; remote SHA-256 compared with local copy",
+  "artifacts": [
+    {
+      "installation_path": "C:\\Program Files\\Logi\\LogiPluginService\\LogiPluginService.dll",
+      "sha256": "5fe3acd14df1ede8956e3bc16980b1dd76d18db20d33d77d5a006afb808b355c",
+      "size": 494744
+    },
+    {
+      "installation_path": "C:\\Program Files\\Logi\\LogiPluginService\\LoupedeckService.dll",
+      "sha256": "1e924b5a86267f8c13ffca814df9b28848d87107c50d1500b950f9d12ac4f835",
+      "size": 1866392
+    },
+    {
+      "installation_path": "C:\\Program Files\\Logi\\LogiPluginService\\GenericPlugin.dll",
+      "sha256": "f462a668ded5357a8451d33820f98c978be49e852adce1f3acec8f30b1b7c9f5",
+      "size": 737432
+    },
+    {
+      "installation_path": "C:\\Program Files\\Logi\\LogiPluginService\\DefaultWinPlugin.dll",
+      "sha256": "35d2048d416239d9815d0cf77f46b21e1c2f18140caa5327678a1214e2905a3f",
+      "size": 3074200
+    },
+    {
+      "installation_path": "C:\\Program Files\\Logi\\LogiPluginService\\LogiConnection.dll",
+      "sha256": "ffb407fc6c22f50410d69746f672568a95f76aac40c8fd8042b94adb9e8ecc5e",
+      "size": 74904
+    },
+    {
+      "installation_path": "C:\\Program Files\\Logi\\LogiPluginService\\PluginApi.dll",
+      "sha256": "3e5160e652db43340a4c9d00726e9be891e07f18c3c3acf786385a191216ebbf",
+      "size": 15104664
+    },
+    {
+      "installation_path": "C:\\Program Files\\Logi\\LogiPluginService\\NativeApi.dll",
+      "sha256": "35328d0e4506ef94261b3f0d6f4b9ff7f5675f818a44d0bdacaac64e26ff107c",
+      "size": 284824
+    },
+    {
+      "installation_path": "C:\\Program Files\\Logi\\LogiPluginService\\LogiPluginServiceExt.exe",
+      "sha256": "c17a71b385b534067b21f0aff60ee85603659e89897746419313720683812d45",
+      "size": 3740312
+    },
+    {
+      "installation_path": "C:\\Program Files\\LogiDownloadAssistant\\bin\\logi_download_assistant.exe",
+      "sha256": "885e25d7c1c6d6fde6476260ffd1b0d30fc14cf5894d7912a6330646dd5a1078",
+      "size": 19199488
+    }
+  ]
+}
