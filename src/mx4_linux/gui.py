@@ -30,6 +30,7 @@ class ControlWindow(Adw.ApplicationWindow):
         self._hardware_resume = None
         self.devices = []
         self.selected_id = None
+        self._selected_explicitly = False
         self.current = None
         self.setting_widgets = {}
         from .desktop import DesktopController
@@ -214,9 +215,13 @@ class ControlWindow(Adw.ApplicationWindow):
         from .reference_shell import TITLES
         if route not in TITLES:
             raise ValueError("Unknown page")
+        if route == "configuration":
+            self.configuration_return = self.route if self.route in ("application", "settings") else "application"
         self.route = route
         self.selected_target = None
         self.shell.update_route()
+        if route in ("ring", "smart-actions"):
+            self.desktop.configure(page="ring" if route == "ring" else "actions")
 
     def select_target(self, target):
         if not self.current or not self.current.get("online") or target not in self.shell.targets:
@@ -233,7 +238,9 @@ class ControlWindow(Adw.ApplicationWindow):
             self.shell.update_route()
 
     def go_back(self):
-        if self.selected_target:
+        if self.route == "configuration":
+            self.navigate(getattr(self, "configuration_return", "application"))
+        elif self.selected_target:
             self.close_inspector()
         else:
             self.navigate("home")
@@ -330,7 +337,11 @@ class ControlWindow(Adw.ApplicationWindow):
             diagnostics = "\n".join(f"{d.get('path', '')}: {d['message']}" for d in result.get("diagnostics", []))
             self.status.set_text(diagnostics or "No accessible MX Master 4 found.")
         else:
-            self.current = next((d for d in self.devices if d["id"] == self.selected_id), self.devices[0])
+            selected = next((d for d in self.devices if d["id"] == self.selected_id), None)
+            if selected is None:
+                self._selected_explicitly = False
+            self.current = (selected if selected and (selected.get("online") or self._selected_explicitly)
+                            else next((d for d in self.devices if d.get("online")), selected or self.devices[0]))
             self.selected_id = self.current["id"]
             if not self.current.get("online"):
                 self.selected_target = None
@@ -343,6 +354,7 @@ class ControlWindow(Adw.ApplicationWindow):
                 self.wheel.set_visible(True)
                 diagnostic_text = " · ".join(d["message"] for d in result.get("diagnostics", []))
                 self.status.set_text("Preview · all changes are simulated" if self.demo else f"{len(self.current['settings'])} settings reported. Changes apply after confirmed readback." + (f" {diagnostic_text}" if diagnostic_text else ""))
+        self.shell.update_devices(result)
         self.shell.update_home()
         self.shell.update_context()
         self.shell.update_route()
@@ -369,7 +381,7 @@ class ControlWindow(Adw.ApplicationWindow):
         edit_row.set_subtitle_lines(3)
         edit = Gtk.Button(label="Edit actions", valign=Gtk.Align.CENTER)
         edit.add_css_class("suggested-action")
-        edit.connect("clicked", lambda *_: self.desktop.configure())
+        edit.connect("clicked", lambda *_: self.desktop.configure(page="actions" if self.route == "smart-actions" else "ring"))
         edit_row.add_suffix(edit)
         group.add(edit_row)
         cancel_row = Adw.ActionRow(use_markup=False, title="Running routine", subtitle="Cancel stops subsequent steps and releases any held shortcut keys.")
@@ -404,8 +416,11 @@ class ControlWindow(Adw.ApplicationWindow):
             self.cancel_action.set_sensitive(self.desktop.action_busy)
 
     def select_device(self, chooser, _param, result):
+        if self.closed or self.busy or self.pending_hardware:
+            return
         index = chooser.get_selected()
-        if index < len(self.devices):
+        if index < len(self.devices) and self.devices[index]["id"] != self.selected_id:
+            self._selected_explicitly = True
             self.operation_epoch += 1
             self.hardware_cancelled.set()
             self.desktop.stop()
@@ -504,7 +519,8 @@ class ControlWindow(Adw.ApplicationWindow):
         if setting["name"] == "reprogrammable-keys":
             names = {82: "Middle button", 83: "Back", 86: "Forward", 195: "Gesture button", 196: "Shift wheel mode", 416: "Haptic panel"}
             labels = [names.get(c["value"], c["label"]) if c["label"] == str(c["value"]) else c["label"] for c in choices]
-        dropdown = Gtk.DropDown.new_from_strings(labels)
+        from .reference_shell import bounded_dropdown
+        dropdown = bounded_dropdown(labels, accessible_name=setting["label"], max_chars=16)
         dropdown.set_enable_search(True)
         dropdown.set_valign(Gtk.Align.CENTER)
         dropdown.set_selected(next((i for i, c in enumerate(choices) if c["value"] == value), Gtk.INVALID_LIST_POSITION))
@@ -652,10 +668,11 @@ class ControlWindow(Adw.ApplicationWindow):
             return GLib.SOURCE_CONTINUE
         identity, device_id = self.current["stable_id"], self.current["id"]
         def loaded(result):
+            result = result if isinstance(result, dict) else {}
             if self.current and self.current.get("stable_id") == identity and self.current["id"] == device_id:
                 for name in ("battery", "battery_percent", "battery_observed_at"):
                     self.current[name] = result.get(name)
-                self.shell.update_home()
+                self.shell.update_battery()
         def failed(_message):
             loaded({})
         self.job(lambda: self.backend.battery(device_id, identity), loaded, "Reading battery…", failed=failed)
@@ -851,7 +868,8 @@ class ControlWindow(Adw.ApplicationWindow):
             return
         names = sorted(profiles)
         load_row = Adw.ActionRow(title="Apply a saved profile")
-        chooser = Gtk.DropDown.new_from_strings(names)
+        from .reference_shell import bounded_dropdown
+        chooser = bounded_dropdown(names, accessible_name="Saved mouse profile", max_chars=22)
         chooser.set_valign(Gtk.Align.CENTER)
         apply_button = Gtk.Button(label="Apply", valign=Gtk.Align.CENTER)
         def apply(*_):

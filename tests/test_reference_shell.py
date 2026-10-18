@@ -297,3 +297,184 @@ def test_native_overlay_dismissal_returns_to_overview_state(window):
     assert window.selected_target is None
     assert window.route == 'buttons'
     assert window.shell.sidebar.get_reveal_child()
+
+
+def test_home_utilities_and_crosslinks_preserve_editor_destination(window):
+    window.desktop.configure = Mock()
+    def find(widget, predicate):
+        if predicate(widget):
+            return widget
+        child = widget.get_first_child()
+        while child:
+            result = find(child, predicate)
+            if result:
+                return result
+            child = child.get_next_sibling()
+    ring = find(window.shell.utilities, lambda w: isinstance(w, Gtk.Button) and w.get_tooltip_text() == 'Actions Ring')
+    smart = find(window.shell.utilities, lambda w: isinstance(w, Gtk.Button) and w.get_tooltip_text() == 'Smart Actions')
+    ring.emit('clicked')
+    assert window.route == 'ring'
+    window.desktop.configure.assert_called_with(page='ring')
+    smart.emit('clicked')
+    assert window.route == 'smart-actions'
+    window.desktop.configure.assert_called_with(page='actions')
+    window.navigate('haptics')
+    link = find(window.shell.targets['haptics'], lambda w: isinstance(w, Gtk.Button) and w.get_label() == 'Open Actions Ring')
+    link.emit('clicked')
+    assert window.route == 'ring'
+    window.desktop.configure.assert_called_with(page='ring')
+    window.backend.scan.assert_not_called()
+
+
+def test_multi_device_picker_prefers_awake_device_and_preserves_explicit_selection(window):
+    first = deepcopy(window.current)
+    first.update(id='offline-mouse', name='Sleeping MX Master 4', online=False, stable_id='demo:sleeping')
+    second = deepcopy(window.current)
+    second.update(id='awake-mouse', name='Awake MX Master 4', stable_id='demo:awake')
+    window.devices = [first, second]
+    result = {'ok': True, 'devices': window.devices, 'diagnostics': []}
+    window.selected_id = None
+    window.render(result)
+    assert window.current['id'] == second['id']
+    chooser = window.shell.device_selector
+    assert chooser.get_model().get_string(0) == first['name']
+    assert chooser.get_model().get_string(1) == second['name']
+    epoch = window.operation_epoch
+    window.desktop.stop = Mock()
+    chooser.set_selected(0)
+    assert window.current['id'] == first['id']
+    assert window.operation_epoch == epoch + 1
+    window.desktop.stop.assert_called_once()
+    window.render(result)
+    assert window.current['id'] == first['id']
+    chooser.set_selected(1)
+    assert window.current['id'] == second['id']
+    assert window.setting_widgets
+    window.backend.scan.assert_not_called()
+
+
+@pytest.mark.parametrize('result', [{'battery': '79%', 'battery_percent': 79, 'battery_observed_at': 1}, {}, None])
+def test_lightweight_battery_updates_all_visible_labels(window, result):
+    window.navigate('point')
+    window.backend.battery = Mock(return_value=result)
+    window.refresh_battery()
+    settle(window)
+    expected = '79%' if result and result.get('battery') else 'Battery unavailable'
+    assert window.shell.device_battery.get_text() == expected
+    assert expected in window.shell.home_battery.get_text()
+    window.shell.apply_appearance('light')
+    window.navigate('haptics')
+    assert window.shell.device_battery.get_text() == expected
+    window.backend.scan.assert_not_called()
+
+
+def test_lightweight_battery_failure_clears_both_displays(window):
+    from mx4_linux.backend import BackendError
+    window.navigate('buttons')
+    window.backend.battery = Mock(side_effect=BackendError('asleep'))
+    window.refresh_battery()
+    settle(window)
+    assert window.shell.device_battery.get_text() == 'Battery unavailable'
+    assert 'Battery unavailable' in window.shell.home_battery.get_text()
+    window.backend.scan.assert_not_called()
+
+
+def test_valid_long_labels_and_context_ids_keep_bounded_closed_display(window):
+    config = deepcopy(window.desktop.config)
+    action_label = 'W' * 80
+    app_id = 'org.example.' + 'W' * 100
+    config['actions']['copy']['label'] = action_label
+    config['assignment_profiles'] = {'long-app': {'label': 'Long application', 'app_id': app_id,
+                                                 'ring': config['ring'][:], 'button_bindings': {'83': 'copy'}}}
+    config['active_profiles'] = {app_id: 'long-app'}
+    window.desktop.store.save(config)
+    window.desktop.reload_config()
+    window.shell.update_context()
+    window.shell.header_context.set_selected(1)
+    dropdown, _keys = window.shell.binding_widgets[83]
+    for widget in (dropdown, window.shell.header_context, window.shell.context):
+        minimum, _natural, _, _ = widget.measure(Gtk.Orientation.HORIZONTAL, -1)
+        assert minimum < 300
+    assert action_label in dropdown.get_tooltip_text()
+    assert app_id in window.shell.header_context.get_tooltip_text()
+    assert app_id in window.shell.context.get_tooltip_text()
+    assert window.shell.effective_config()['button_bindings']['83'] == 'copy'
+
+
+def test_actual_model_and_identifier_have_operating_copy_controls(window):
+    window.shell.copy_text = Mock()
+    window.navigate('settings')
+    for field in ('name', 'stable_id'):
+        window.shell.metadata_copy_buttons[field].emit('clicked')
+        window.shell.copy_text.assert_called_with(window.current[field])
+    assert 'Preview' in window.shell.connection_summary()
+    assert 'serial' not in window.shell.metadata_copy_buttons
+
+
+def test_local_configuration_destination_is_reachable_and_truthful(window):
+    window.navigate('configuration')
+    assert window.route == 'configuration'
+    assert window.shell.stack.get_visible_child_name() == 'configuration'
+    assert str(window.desktop.store.path) in window.shell.configuration_paths.get_text()
+    assert 'not yet available' in window.shell.configuration_status.get_text()
+    window.backend.scan.assert_not_called()
+
+
+def test_existing_editor_opens_requested_routine_tab(window, monkeypatch):
+    from mx4_linux.desktop_editor import DesktopEditor, present_desktop_editor
+    monkeypatch.setattr(DesktopEditor, 'present', lambda _self: None)
+    editor = present_desktop_editor(window, window.desktop.store, lambda: None, page='actions')
+    try:
+        assert editor.stack.get_visible_child_name() == 'actions'
+        assert not editor.dirty
+    finally:
+        editor.destroy()
+
+
+def test_pending_hardware_operation_disables_device_picker(window):
+    second = deepcopy(window.current)
+    second.update(id='second', name='Second MX Master 4', stable_id='demo:second')
+    window.devices = [window.current, second]
+    result = {'ok': True, 'devices': window.devices, 'diagnostics': []}
+    window.render(result)
+    original = window.selected_id
+    epoch = window.operation_epoch
+    window.set_hardware_wait(object())
+    assert not window.shell.device_selector.get_sensitive()
+    window.shell.device_selector.set_selected(1)
+    assert window.selected_id == original
+    assert window.operation_epoch == epoch
+    assert window.shell.device_selector.get_selected() == 0
+    window.set_hardware_wait(None)
+
+
+def test_rebuilt_context_can_open_inspector_before_first_allocation(window, capfd):
+    config = deepcopy(window.desktop.config)
+    for action in config['actions'].values():
+        action['steps'] = [{'type': 'command', 'argv': ['/usr/bin/true']}]
+    config['assignment_profiles'] = {'editor': {'label': 'Editor', 'app_id': 'org.example.Editor',
+                                               'ring': config['ring'][:], 'button_bindings': {'83': 'copy'}}}
+    config['active_profiles'] = {'org.example.Editor': 'editor'}
+    window.desktop.store.save(config)
+    window.desktop.reload_config()
+    window.shell.update_context()
+    context = GLib.MainContext.default()
+    def pump():
+        deadline = monotonic() + .35
+        while monotonic() < deadline:
+            while context.pending():
+                context.iteration(False)
+            sleep(.002)
+    window.present()
+    pump()
+    capfd.readouterr()
+    window.shell.header_context.set_selected(1)
+    assert window.shell.inspector.get_width() == 0
+    window.navigate('buttons')
+    window.select_target('button:83')
+    pump()
+    assert window.selected_target == 'button:83'
+    assert window.shell.inspector.get_show_sidebar()
+    assert window.shell.inspector.get_width() > 0
+    assert window.shell.inspector_stack.get_visible_child_name() == 'button:83'
+    assert 'attempt to allocate AdwBin' not in capfd.readouterr().err

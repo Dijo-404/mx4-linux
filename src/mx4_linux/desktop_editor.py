@@ -867,14 +867,17 @@ class DesktopEditor(Adw.Window):
         return True
 
 
-def present_desktop_editor(parent, store, on_saved, cid=None):
+def present_desktop_editor(parent, store, on_saved, cid=None, page="ring"):
     """Present a modal editor; call ``on_saved()`` after a validated save."""
+    if page not in ("ring", "actions"):
+        raise ValueError("Unknown editor page")
     window = DesktopEditor(parent, store, on_saved)
+    window.stack.set_visible_child_name(page)
     if cid is not None:
-        window.stack.set_visible_child_name("ring")
         window.shortcuts_expander.set_expanded(True)
         target = next((choice for key, choice in window.binding_choices if key == cid), window.ring_preview)
-        window.connect("map", lambda *_: target.grab_focus())
+        if page == "ring":
+            window.connect("map", lambda *_: target.grab_focus())
         window.window_title.set_subtitle(f"Configure {BUTTON_NAMES.get(cid, f'button {cid}')}")
     window.present()
     return window
