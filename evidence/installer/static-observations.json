@@ -1,0 +1,3549 @@
+{
+  "evidence_kind": "ordinary-python-static-observations",
+  "archive": {
+    "source_path": "/home/dj/Downloads/logioptionsplus_installer.zip",
+    "size": 20260402,
+    "sha256": "0b8f5cd5a79fe2b5dea82f8bb11804abd97385ed19e85114420ef01f72222c73",
+    "entry_count": 314,
+    "declared_uncompressed_bytes": 47673958
+  },
+  "entries": [
+    {
+      "path": "logioptionsplus_installer.app/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/._logioptionsplus_installer.app",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/._Contents",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/CodeResources",
+      "size": 1674,
+      "compressed_size": 1164,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/._CodeResources",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/_CodeSignature/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/.__CodeSignature",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/MacOS/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/._MacOS",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/._Resources",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Info.plist",
+      "size": 2102,
+      "compressed_size": 733,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/._Info.plist",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/PkgInfo",
+      "size": 8,
+      "compressed_size": 8,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/._PkgInfo",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/_CodeSignature/CodeResources",
+      "size": 38142,
+      "compressed_size": 9359,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/_CodeSignature/._CodeResources",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/MacOS/logioptionsplus_installer",
+      "size": 38242448,
+      "compressed_size": 13551745,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/MacOS/._logioptionsplus_installer",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/welcome-LogiOptionsPlus@2x.png",
+      "size": 103355,
+      "compressed_size": 103335,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._welcome-LogiOptionsPlus@2x.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-ja-jp.html",
+      "size": 87794,
+      "compressed_size": 16760,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-ja-jp.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/welcome-LogiOptionsPlus.png",
+      "size": 30238,
+      "compressed_size": 30248,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._welcome-LogiOptionsPlus.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-zh-cn.html",
+      "size": 67767,
+      "compressed_size": 15096,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-zh-cn.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-pl-pl.html",
+      "size": 25529,
+      "compressed_size": 8675,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-pl-pl.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/zh-TW.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._zh-TW.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/el-GR.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._el-GR.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage1@2x.png",
+      "size": 341438,
+      "compressed_size": 334563,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage1@2x.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/it-IT.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._it-IT.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-ko-kr.html",
+      "size": 76924,
+      "compressed_size": 15417,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-ko-kr.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-es-es.html",
+      "size": 93945,
+      "compressed_size": 18035,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-es-es.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-nb-no.html",
+      "size": 22001,
+      "compressed_size": 7451,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-nb-no.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage3@2x.png",
+      "size": 208401,
+      "compressed_size": 201833,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage3@2x.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-pt-pt.html",
+      "size": 75685,
+      "compressed_size": 16732,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-pt-pt.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-da-dk.html",
+      "size": 22493,
+      "compressed_size": 7624,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-da-dk.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/nb-NO.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._nb-NO.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/CloseIcon.png",
+      "size": 355,
+      "compressed_size": 341,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._CloseIcon.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-sv-se.html",
+      "size": 89422,
+      "compressed_size": 17666,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-sv-se.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-de-de.html",
+      "size": 25293,
+      "compressed_size": 8688,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-de-de.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/error@2x.png",
+      "size": 21678,
+      "compressed_size": 13079,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._error@2x.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-pt-br.html",
+      "size": 22565,
+      "compressed_size": 7765,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-pt-br.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/styles.css",
+      "size": 1839,
+      "compressed_size": 553,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._styles.css",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/BrownPro-Light.woff2",
+      "size": 28988,
+      "compressed_size": 28950,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._BrownPro-Light.woff2",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ru-RU.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._ru-RU.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-zh-tw.html",
+      "size": 18408,
+      "compressed_size": 6599,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-zh-tw.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-sr-sp.html",
+      "size": 30274,
+      "compressed_size": 8056,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-sr-sp.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-fr-fr.html",
+      "size": 24274,
+      "compressed_size": 8352,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-fr-fr.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/IconWarning.png",
+      "size": 2353,
+      "compressed_size": 2358,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._IconWarning.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ExpanderUp.png",
+      "size": 221,
+      "compressed_size": 216,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._ExpanderUp.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/logo.mp4",
+      "size": 28473,
+      "compressed_size": 27780,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._logo.mp4",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage5.png",
+      "size": 274732,
+      "compressed_size": 273761,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage5.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/es-ES.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._es-ES.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-ru-ru.html",
+      "size": 42611,
+      "compressed_size": 10565,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-ru-ru.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-nl-nl.html",
+      "size": 23825,
+      "compressed_size": 7924,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-nl-nl.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/SendErrorLogsDialog.nib",
+      "size": 37920,
+      "compressed_size": 14491,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._SendErrorLogsDialog.nib",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage4.png",
+      "size": 60163,
+      "compressed_size": 58853,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage4.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/fr-FR.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._fr-FR.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-fi-fi.html",
+      "size": 23100,
+      "compressed_size": 7941,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-fi-fi.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ja-JP.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._ja-JP.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ko-KR.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._ko-KR.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-en-us.html",
+      "size": 21228,
+      "compressed_size": 7175,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-en-us.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-it-it.html",
+      "size": 96340,
+      "compressed_size": 18570,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-it-it.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage3.png",
+      "size": 52270,
+      "compressed_size": 51202,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage3.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/welcome-LogiOptionsPlus.tiff",
+      "size": 155556,
+      "compressed_size": 154039,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._welcome-LogiOptionsPlus.tiff",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-el-gr.html",
+      "size": 140011,
+      "compressed_size": 24121,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-el-gr.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage5@2x.png",
+      "size": 1010343,
+      "compressed_size": 1008590,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage5@2x.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Base.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._Base.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/error.tiff",
+      "size": 38454,
+      "compressed_size": 24247,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._error.tiff",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-ru-ru.html",
+      "size": 75685,
+      "compressed_size": 16732,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-ru-ru.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/MainMenu.nib",
+      "size": 24178,
+      "compressed_size": 11026,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._MainMenu.nib",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/fi-FI.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._fi-FI.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-nl-nl.html",
+      "size": 92536,
+      "compressed_size": 18475,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-nl-nl.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/da-DK.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._da-DK.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/icon_kiros.icns",
+      "size": 66701,
+      "compressed_size": 66229,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._icon_kiros.icns",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ExpanderDown.png",
+      "size": 245,
+      "compressed_size": 241,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._ExpanderDown.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/error.png",
+      "size": 7736,
+      "compressed_size": 6094,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._error.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/app-installed.gif",
+      "size": 31395,
+      "compressed_size": 28216,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._app-installed.gif",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Unsupported-OS.gif",
+      "size": 26348,
+      "compressed_size": 20275,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._Unsupported-OS.gif",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pt-BR.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._pt-BR.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage3.tiff",
+      "size": 335398,
+      "compressed_size": 321200,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage3.tiff",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/nl-NL.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._nl-NL.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-el-gr.html",
+      "size": 41356,
+      "compressed_size": 10369,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-el-gr.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-en-us.html",
+      "size": 75281,
+      "compressed_size": 16707,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-en-us.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-it-it.html",
+      "size": 24243,
+      "compressed_size": 8064,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-it-it.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-fi-fi.html",
+      "size": 91963,
+      "compressed_size": 18187,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-fi-fi.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/zh-CN.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._zh-CN.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/en-US.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._en-US.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage2@2x.png",
+      "size": 331641,
+      "compressed_size": 324475,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage2@2x.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/EndUserModal.nib",
+      "size": 8259,
+      "compressed_size": 5581,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._EndUserModal.nib",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/de-DE.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._de-DE.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-ko-kr.html",
+      "size": 23100,
+      "compressed_size": 6858,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-ko-kr.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/CrashReportDialog.nib",
+      "size": 23808,
+      "compressed_size": 11159,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._CrashReportDialog.nib",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/BrownPro-Bold.woff2",
+      "size": 28948,
+      "compressed_size": 28906,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._BrownPro-Bold.woff2",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage4.tiff",
+      "size": 370402,
+      "compressed_size": 354806,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage4.tiff",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-es-es.html",
+      "size": 23496,
+      "compressed_size": 7820,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-es-es.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/spinner.png",
+      "size": 1233,
+      "compressed_size": 1238,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._spinner.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pl-PL.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._pl-PL.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-ja-jp.html",
+      "size": 26780,
+      "compressed_size": 7530,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-ja-jp.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/sv-SE.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._sv-SE.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-zh-cn.html",
+      "size": 18366,
+      "compressed_size": 6678,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-zh-cn.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-pl-pl.html",
+      "size": 97184,
+      "compressed_size": 19948,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-pl-pl.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._Fonts",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pt-PT.lproj/",
+      "size": 0,
+      "compressed_size": 0,
+      "directory": true
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._pt-PT.lproj",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/KIROSAlert.nib",
+      "size": 18885,
+      "compressed_size": 9154,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._KIROSAlert.nib",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-pt-br.html",
+      "size": 77777,
+      "compressed_size": 15687,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-pt-br.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage4@2x.png",
+      "size": 232754,
+      "compressed_size": 225278,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage4@2x.png",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-de-de.html",
+      "size": 94181,
+      "compressed_size": 19634,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-de-de.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-sr-sp.html",
+      "size": 75685,
+      "compressed_size": 16732,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-sr-sp.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-fr-fr.html",
+      "size": 100977,
+      "compressed_size": 19346,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-fr-fr.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-zh-tw.html",
+      "size": 68482,
+      "compressed_size": 15308,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-zh-tw.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-da-dk.html",
+      "size": 86549,
+      "compressed_size": 17751,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-da-dk.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/privacy-policy-nb-no.html",
+      "size": 89185,
+      "compressed_size": 17440,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._privacy-policy-nb-no.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-pt-pt.html",
+      "size": 23139,
+      "compressed_size": 7713,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-pt-pt.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/DeviceImage5.tiff",
+      "size": 1513604,
+      "compressed_size": 1503558,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._DeviceImage5.tiff",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/eula-sv-se.html",
+      "size": 23007,
+      "compressed_size": 7689,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._eula-sv-se.html",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/BrownPro-Regular.woff2",
+      "size": 28200,
+      "compressed_size": 28199,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/._BrownPro-Regular.woff2",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/zh-TW.lproj/Localizable.strings",
+      "size": 11322,
+      "compressed_size": 3763,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/zh-TW.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/zh-TW.lproj/InfoPlist.strings",
+      "size": 150,
+      "compressed_size": 86,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/zh-TW.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/el-GR.lproj/Localizable.strings",
+      "size": 19667,
+      "compressed_size": 5173,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/el-GR.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/el-GR.lproj/InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 129,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/el-GR.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/it-IT.lproj/Localizable.strings",
+      "size": 12736,
+      "compressed_size": 3939,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/it-IT.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/it-IT.lproj/InfoPlist.strings",
+      "size": 185,
+      "compressed_size": 101,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/it-IT.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/nb-NO.lproj/Localizable.strings",
+      "size": 12142,
+      "compressed_size": 3780,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/nb-NO.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/nb-NO.lproj/InfoPlist.strings",
+      "size": 162,
+      "compressed_size": 86,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/nb-NO.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ru-RU.lproj/Localizable.strings",
+      "size": 17393,
+      "compressed_size": 4768,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/ru-RU.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ru-RU.lproj/InfoPlist.strings",
+      "size": 178,
+      "compressed_size": 125,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/ru-RU.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/es-ES.lproj/Localizable.strings",
+      "size": 12790,
+      "compressed_size": 3958,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/es-ES.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/es-ES.lproj/InfoPlist.strings",
+      "size": 157,
+      "compressed_size": 97,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/es-ES.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/fr-FR.lproj/Localizable.strings",
+      "size": 13279,
+      "compressed_size": 4167,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/fr-FR.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/fr-FR.lproj/InfoPlist.strings",
+      "size": 164,
+      "compressed_size": 95,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/fr-FR.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ja-JP.lproj/Localizable.strings",
+      "size": 14821,
+      "compressed_size": 4202,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/ja-JP.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ja-JP.lproj/InfoPlist.strings",
+      "size": 180,
+      "compressed_size": 109,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/ja-JP.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ko-KR.lproj/Localizable.strings",
+      "size": 13105,
+      "compressed_size": 3945,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/ko-KR.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/ko-KR.lproj/InfoPlist.strings",
+      "size": 171,
+      "compressed_size": 108,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/ko-KR.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Base.lproj/Localizable.strings",
+      "size": 11596,
+      "compressed_size": 3611,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Base.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Base.lproj/InfoPlist.strings",
+      "size": 144,
+      "compressed_size": 85,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Base.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/fi-FI.lproj/Localizable.strings",
+      "size": 12629,
+      "compressed_size": 3989,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/fi-FI.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/fi-FI.lproj/InfoPlist.strings",
+      "size": 144,
+      "compressed_size": 79,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/fi-FI.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/da-DK.lproj/Localizable.strings",
+      "size": 12356,
+      "compressed_size": 3867,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/da-DK.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/da-DK.lproj/InfoPlist.strings",
+      "size": 164,
+      "compressed_size": 97,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/da-DK.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pt-BR.lproj/Localizable.strings",
+      "size": 12443,
+      "compressed_size": 3895,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/pt-BR.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pt-BR.lproj/InfoPlist.strings",
+      "size": 151,
+      "compressed_size": 91,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/pt-BR.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/nl-NL.lproj/Localizable.strings",
+      "size": 12488,
+      "compressed_size": 3954,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/nl-NL.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/nl-NL.lproj/InfoPlist.strings",
+      "size": 159,
+      "compressed_size": 90,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/nl-NL.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/zh-CN.lproj/Localizable.strings",
+      "size": 10966,
+      "compressed_size": 3648,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/zh-CN.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/zh-CN.lproj/InfoPlist.strings",
+      "size": 144,
+      "compressed_size": 86,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/zh-CN.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/en-US.lproj/Localizable.strings",
+      "size": 11596,
+      "compressed_size": 3611,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/en-US.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/en-US.lproj/InfoPlist.strings",
+      "size": 144,
+      "compressed_size": 85,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/en-US.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/de-DE.lproj/Localizable.strings",
+      "size": 13492,
+      "compressed_size": 4262,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/de-DE.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/de-DE.lproj/InfoPlist.strings",
+      "size": 156,
+      "compressed_size": 82,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/de-DE.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pl-PL.lproj/Localizable.strings",
+      "size": 12999,
+      "compressed_size": 4275,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/pl-PL.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pl-PL.lproj/InfoPlist.strings",
+      "size": 145,
+      "compressed_size": 90,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/pl-PL.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/sv-SE.lproj/Localizable.strings",
+      "size": 12578,
+      "compressed_size": 3844,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/sv-SE.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/sv-SE.lproj/InfoPlist.strings",
+      "size": 164,
+      "compressed_size": 87,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/sv-SE.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownLogitechPan-Black.otf",
+      "size": 148024,
+      "compressed_size": 85173,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownLogitechPan-Black.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownLogitechPan-Italic.otf",
+      "size": 153620,
+      "compressed_size": 74337,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownLogitechPan-Italic.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownPro-Light.otf",
+      "size": 84605,
+      "compressed_size": 43099,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownPro-Light.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownPro-Regular.otf",
+      "size": 81580,
+      "compressed_size": 42281,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownPro-Regular.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownLogitechPan-Bold.otf",
+      "size": 150716,
+      "compressed_size": 76049,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownLogitechPan-Bold.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownPro-Bold.otf",
+      "size": 86120,
+      "compressed_size": 44061,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownPro-Bold.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownPro-Thin.otf",
+      "size": 83156,
+      "compressed_size": 42144,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownPro-Thin.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownLogitechPan-Thin.otf",
+      "size": 148764,
+      "compressed_size": 71577,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownLogitechPan-Thin.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownLogitechPan-Medium.otf",
+      "size": 149984,
+      "compressed_size": 84372,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownLogitechPan-Medium.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownLogitechPan-Regular.otf",
+      "size": 149344,
+      "compressed_size": 75435,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownLogitechPan-Regular.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/Fonts/BrownLogitechPan-Light.otf",
+      "size": 149036,
+      "compressed_size": 74300,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/Fonts/._BrownLogitechPan-Light.otf",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pt-PT.lproj/Localizable.strings",
+      "size": 12751,
+      "compressed_size": 3931,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/pt-PT.lproj/._Localizable.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    },
+    {
+      "path": "logioptionsplus_installer.app/Contents/Resources/pt-PT.lproj/InfoPlist.strings",
+      "size": 155,
+      "compressed_size": 94,
+      "directory": false
+    },
+    {
+      "path": "__MACOSX/logioptionsplus_installer.app/Contents/Resources/pt-PT.lproj/._InfoPlist.strings",
+      "size": 212,
+      "compressed_size": 135,
+      "directory": false
+    }
+  ],
+  "resource_summary": {
+    "count": 126,
+    "suffix_counts": {
+      ".css": 1,
+      ".gif": 2,
+      ".html": 40,
+      ".icns": 1,
+      ".mp4": 1,
+      ".nib": 5,
+      ".otf": 11,
+      ".png": 17,
+      ".strings": 40,
+      ".tiff": 5,
+      ".woff2": 3
+    }
+  },
+  "plist": {
+    "path": "logioptionsplus_installer.app/Contents/Info.plist",
+    "sha256": "a997b5cb28d477473a74aa21dd4a09a2ef101d087a4f7c5a868276d96a9c4f54",
+    "parsed": {
+      "ATSApplicationFontsPath": "Fonts/",
+      "BuildMachineOSBuild": "23H420",
+      "CFBundleDisplayName": "logioptionsplus_installer",
+      "CFBundleExecutable": "logioptionsplus_installer",
+      "CFBundleGetInfoString": "logioptionsplus_installer",
+      "CFBundleIconFile": "icon_kiros.icns",
+      "CFBundleIdentifier": "com.logi.optionsplus.installer",
+      "CFBundleInfoDictionaryVersion": "6.0",
+      "CFBundleName": "logioptionsplus_installer",
+      "CFBundlePackageType": "APPL",
+      "CFBundleSupportedPlatforms": [
+        "MacOSX"
+      ],
+      "CFBundleVersion": "2.8.981479",
+      "CSResourcesFileMapped": true,
+      "DTCompiler": "com.apple.compilers.llvm.clang.1_0",
+      "DTPlatformBuild": "24C94",
+      "DTPlatformName": "macosx",
+      "DTPlatformVersion": "15.2",
+      "DTSDKBuild": "24C94",
+      "DTSDKName": "macosx15.2",
+      "DTXcode": "1620",
+      "DTXcodeBuild": "16C5032a",
+      "LSHasLocalizedDisplayName": true,
+      "LSMinimumSystemVersion": "14.0",
+      "LSUIElement": true,
+      "NSAppTransportSecurity": {
+        "NSExceptionDomains": {
+          "logitech.io": {
+            "NSIncludesSubdomains": true,
+            "NSTemporaryExceptionAllowsInsecureHTTPLoads": true
+          }
+        }
+      },
+      "NSHumanReadableCopyright": "Copyright © 2026 Logitech Inc.",
+      "NSMainNibFile": "MainMenu",
+      "NSPrincipalClass": "SentryCrashExceptionApplication"
+    }
+  },
+  "binary": {
+    "path": "logioptionsplus_installer.app/Contents/MacOS/logioptionsplus_installer",
+    "size": 38242448,
+    "sha256": "86aab5e5ed0619263663e47c9ea035c10956221e62939c7226c6321050e2f976",
+    "ascii_string_rule": "all maximal runs of ASCII bytes 0x20-0x7e, minimum length 6",
+    "ascii_string_count": 270221,
+    "searches": {
+      "hidpp": {
+        "regex": "hidpp|hid\\+\\+",
+        "count": 0,
+        "matches": []
+      },
+      "IOHID": {
+        "regex": "IOHID",
+        "count": 0,
+        "matches": []
+      },
+      "SmartShift": {
+        "regex": "smartshift",
+        "count": 0,
+        "matches": []
+      },
+      "MX_Master_4": {
+        "regex": "\\bMX[ _-]*Master[ _-]*4\\b|\\bMX[ _-]*4\\b",
+        "count": 0,
+        "matches": []
+      },
+      "haptic_routes": {
+        "regex": "^/haptic",
+        "count": 22,
+        "matches": [
+          {
+            "file_offset": 11029190,
+            "text": "/haptic_settings/configure"
+          },
+          {
+            "file_offset": 11029451,
+            "text": "/haptics/trigger_waveform_execute"
+          },
+          {
+            "file_offset": 11029607,
+            "text": "/haptics/trigger_haptic_waveform_info"
+          },
+          {
+            "file_offset": 11033247,
+            "text": "/haptics/%s/play_waveform"
+          },
+          {
+            "file_offset": 11033273,
+            "text": "/haptics/%s/stop_waveform"
+          },
+          {
+            "file_offset": 11033299,
+            "text": "/haptics/%s/get_playing_waveform"
+          },
+          {
+            "file_offset": 11033332,
+            "text": "/haptics/%s/start_breathing_exercise"
+          },
+          {
+            "file_offset": 11033369,
+            "text": "/haptics/%s/stop_breathing_exercise"
+          },
+          {
+            "file_offset": 11033405,
+            "text": "/haptics/%s/status_changed"
+          },
+          {
+            "file_offset": 11033432,
+            "text": "/haptics/waveform/event"
+          },
+          {
+            "file_offset": 11033456,
+            "text": "/haptics/%s/event_sources"
+          },
+          {
+            "file_offset": 30012400,
+            "text": "/haptic_settings/configure"
+          },
+          {
+            "file_offset": 30012661,
+            "text": "/haptics/trigger_waveform_execute"
+          },
+          {
+            "file_offset": 30012817,
+            "text": "/haptics/trigger_haptic_waveform_info"
+          },
+          {
+            "file_offset": 30016457,
+            "text": "/haptics/%s/play_waveform"
+          },
+          {
+            "file_offset": 30016483,
+            "text": "/haptics/%s/stop_waveform"
+          },
+          {
+            "file_offset": 30016509,
+            "text": "/haptics/%s/get_playing_waveform"
+          },
+          {
+            "file_offset": 30016542,
+            "text": "/haptics/%s/start_breathing_exercise"
+          },
+          {
+            "file_offset": 30016579,
+            "text": "/haptics/%s/stop_breathing_exercise"
+          },
+          {
+            "file_offset": 30016615,
+            "text": "/haptics/%s/status_changed"
+          },
+          {
+            "file_offset": 30016642,
+            "text": "/haptics/waveform/event"
+          },
+          {
+            "file_offset": 30016666,
+            "text": "/haptics/%s/event_sources"
+          }
+        ]
+      },
+      "mouse_routes": {
+        "regex": "^/mouse/",
+        "count": 12,
+        "matches": [
+          {
+            "file_offset": 11030575,
+            "text": "/mouse/%s/pointer_speed"
+          },
+          {
+            "file_offset": 11030599,
+            "text": "/mouse/%s/angle_snapping"
+          },
+          {
+            "file_offset": 11030624,
+            "text": "/mouse/%s/dpi_always_on"
+          },
+          {
+            "file_offset": 11030648,
+            "text": "/mouse/%s/dpi_lighting_refresh"
+          },
+          {
+            "file_offset": 11030679,
+            "text": "/mouse/%s/precision_mode"
+          },
+          {
+            "file_offset": 11030704,
+            "text": "/mouse/%s/hybrid_engine"
+          },
+          {
+            "file_offset": 30013785,
+            "text": "/mouse/%s/pointer_speed"
+          },
+          {
+            "file_offset": 30013809,
+            "text": "/mouse/%s/angle_snapping"
+          },
+          {
+            "file_offset": 30013834,
+            "text": "/mouse/%s/dpi_always_on"
+          },
+          {
+            "file_offset": 30013858,
+            "text": "/mouse/%s/dpi_lighting_refresh"
+          },
+          {
+            "file_offset": 30013889,
+            "text": "/mouse/%s/precision_mode"
+          },
+          {
+            "file_offset": 30013914,
+            "text": "/mouse/%s/hybrid_engine"
+          }
+        ]
+      },
+      "gesture_routes": {
+        "regex": "^/gestures/",
+        "count": 2,
+        "matches": [
+          {
+            "file_offset": 11032840,
+            "text": "/gestures/%s/interval_before_inertia_stop"
+          },
+          {
+            "file_offset": 30016050,
+            "text": "/gestures/%s/interval_before_inertia_stop"
+          }
+        ]
+      },
+      "bootstrapper": {
+        "regex": "^Starting downloading updates through pipeline\\.$|^Downloading (LZMA-compressed )?depot|^Finished downloading depot|^\\-\\[AppDelegate _download\\]$|^logioptionsplus_(agent|updater)$|^pipeline://logioptionsplus/data/devices\\.json$|^https://updates[^/\\s]*$",
+        "count": 26,
+        "matches": [
+          {
+            "file_offset": 10959062,
+            "text": "logioptionsplus_agent"
+          },
+          {
+            "file_offset": 10959084,
+            "text": "logioptionsplus_updater"
+          },
+          {
+            "file_offset": 10968150,
+            "text": "-[AppDelegate _download]"
+          },
+          {
+            "file_offset": 10974611,
+            "text": "Starting downloading updates through pipeline."
+          },
+          {
+            "file_offset": 11019457,
+            "text": "pipeline://logioptionsplus/data/devices.json"
+          },
+          {
+            "file_offset": 11024282,
+            "text": "https://updates-beta.logitech.com"
+          },
+          {
+            "file_offset": 11024316,
+            "text": "https://updates.logitech.com"
+          },
+          {
+            "file_offset": 11025102,
+            "text": "https://updates.optionsplus.logitechg.com"
+          },
+          {
+            "file_offset": 11125222,
+            "text": "Downloading LZMA-compressed depot '%s' of build_id '%s'..."
+          },
+          {
+            "file_offset": 11125281,
+            "text": "Downloading depot '%s' of build_id '%s'..."
+          },
+          {
+            "file_offset": 11125358,
+            "text": "Downloading depot '%s' of build_id '%s'..."
+          },
+          {
+            "file_offset": 11126142,
+            "text": "Finished downloading depot '%s' of build_id '%s' with status %ld to file '%s'."
+          },
+          {
+            "file_offset": 16019731,
+            "text": "-[AppDelegate _download]"
+          },
+          {
+            "file_offset": 29940749,
+            "text": "logioptionsplus_agent"
+          },
+          {
+            "file_offset": 29940771,
+            "text": "logioptionsplus_updater"
+          },
+          {
+            "file_offset": 29949845,
+            "text": "-[AppDelegate _download]"
+          },
+          {
+            "file_offset": 29956312,
+            "text": "Starting downloading updates through pipeline."
+          },
+          {
+            "file_offset": 30002667,
+            "text": "pipeline://logioptionsplus/data/devices.json"
+          },
+          {
+            "file_offset": 30007492,
+            "text": "https://updates-beta.logitech.com"
+          },
+          {
+            "file_offset": 30007526,
+            "text": "https://updates.logitech.com"
+          },
+          {
+            "file_offset": 30008312,
+            "text": "https://updates.optionsplus.logitechg.com"
+          },
+          {
+            "file_offset": 30106021,
+            "text": "Downloading LZMA-compressed depot '%s' of build_id '%s'..."
+          },
+          {
+            "file_offset": 30106080,
+            "text": "Downloading depot '%s' of build_id '%s'..."
+          },
+          {
+            "file_offset": 30106157,
+            "text": "Downloading depot '%s' of build_id '%s'..."
+          },
+          {
+            "file_offset": 30106941,
+            "text": "Finished downloading depot '%s' of build_id '%s' with status %ld to file '%s'."
+          },
+          {
+            "file_offset": 34905857,
+            "text": "-[AppDelegate _download]"
+          }
+        ]
+      }
+    },
+    "slices": [
+      {
+        "architecture": "x86_64",
+        "cpu_subtype": 3,
+        "offset": 16384,
+        "size": 19434736,
+        "sha256": "0e194ca78e1f7b73c47bc5dca7edade261fe56084d8543fdd66228939fc62775",
+        "uuid": "4b3ab154a6cc3d5b880a5fabfe8dc2ad",
+        "dependencies": [
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/UserNotifications.framework/Versions/A/UserNotifications"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/ScriptingBridge.framework/Versions/A/ScriptingBridge"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreText.framework/Versions/A/CoreText"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/libbsm.0.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreBluetooth.framework/Versions/A/CoreBluetooth"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Security.framework/Versions/A/Security"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Carbon.framework/Versions/A/Carbon"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Cocoa.framework/Versions/A/Cocoa"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/IOBluetooth.framework/Versions/A/IOBluetooth"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/libobjc.A.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/libc++.1.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/libSystem.B.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreData.framework/Versions/A/CoreData"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/System/Library/Frameworks/MetricKit.framework/Versions/A/MetricKit"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/swift/libswiftCore.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftCoreFoundation.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftCoreImage.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftDarwin.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/swift/libswiftDispatch.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftIOKit.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftMetal.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftMetricKit.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftOSLog.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftObjectiveC.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftQuartzCore.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftXPC.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftos.dylib"
+          }
+        ],
+        "sections": [
+          {
+            "segment": "__TEXT",
+            "section": "__text",
+            "address": "0x10000d580",
+            "size": 10442272,
+            "file_offset": 71040
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__stubs",
+            "address": "0x100a02ba0",
+            "size": 7602,
+            "file_offset": 10513312
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__init_offsets",
+            "address": "0x100a04954",
+            "size": 896,
+            "file_offset": 10520916
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__gcc_except_tab",
+            "address": "0x100a04cd4",
+            "size": 433532,
+            "file_offset": 10521812
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__cstring",
+            "address": "0x100a6ea50",
+            "size": 745572,
+            "file_offset": 10955344
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__objc_methname",
+            "address": "0x100b24ab4",
+            "size": 103415,
+            "file_offset": 11700916
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__objc_classname",
+            "address": "0x100b3deab",
+            "size": 4560,
+            "file_offset": 11804331
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__objc_methtype",
+            "address": "0x100b3f07b",
+            "size": 20083,
+            "file_offset": 11808891
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__const",
+            "address": "0x100b43ef0",
+            "size": 467071,
+            "file_offset": 11828976
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__oslogstring",
+            "address": "0x100bb5f6f",
+            "size": 11,
+            "file_offset": 12296047
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_typeref",
+            "address": "0x100bb5f7a",
+            "size": 4602,
+            "file_offset": 12296058
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__constg_swiftt",
+            "address": "0x100bb7174",
+            "size": 7728,
+            "file_offset": 12300660
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_fieldmd",
+            "address": "0x100bb8fa4",
+            "size": 5040,
+            "file_offset": 12308388
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_builtin",
+            "address": "0x100bba354",
+            "size": 220,
+            "file_offset": 12313428
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_reflstr",
+            "address": "0x100bba430",
+            "size": 3150,
+            "file_offset": 12313648
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_assocty",
+            "address": "0x100bbb080",
+            "size": 792,
+            "file_offset": 12316800
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_proto",
+            "address": "0x100bbb398",
+            "size": 748,
+            "file_offset": 12317592
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_types",
+            "address": "0x100bbb684",
+            "size": 444,
+            "file_offset": 12318340
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_capture",
+            "address": "0x100bbb840",
+            "size": 636,
+            "file_offset": 12318784
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_mpenum",
+            "address": "0x100bbbabc",
+            "size": 20,
+            "file_offset": 12319420
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__unwind_info",
+            "address": "0x100bbbad0",
+            "size": 156768,
+            "file_offset": 12319440
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__eh_frame",
+            "address": "0x100be1f30",
+            "size": 192,
+            "file_offset": 12476208
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__got",
+            "address": "0x100be2000",
+            "size": 14712,
+            "file_offset": 12476416
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__const",
+            "address": "0x100be5980",
+            "size": 393760,
+            "file_offset": 12491136
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__cfstring",
+            "address": "0x100c45ba0",
+            "size": 48832,
+            "file_offset": 12884896
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_classlist",
+            "address": "0x100c51a60",
+            "size": 1912,
+            "file_offset": 12933728
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_nlclslist",
+            "address": "0x100c521d8",
+            "size": 24,
+            "file_offset": 12935640
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_catlist",
+            "address": "0x100c521f0",
+            "size": 64,
+            "file_offset": 12935664
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_protolist",
+            "address": "0x100c52230",
+            "size": 392,
+            "file_offset": 12935728
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_imageinfo",
+            "address": "0x100c523b8",
+            "size": 8,
+            "file_offset": 12936120
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_arraydata",
+            "address": "0x100c523c0",
+            "size": 240,
+            "file_offset": 12936128
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_arrayobj",
+            "address": "0x100c524b0",
+            "size": 288,
+            "file_offset": 12936368
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_intobj",
+            "address": "0x100c525d0",
+            "size": 24,
+            "file_offset": 12936656
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_doubleobj",
+            "address": "0x100c525e8",
+            "size": 16,
+            "file_offset": 12936680
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_dictobj",
+            "address": "0x100c525f8",
+            "size": 80,
+            "file_offset": 12936696
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_const",
+            "address": "0x100c53000",
+            "size": 191408,
+            "file_offset": 12939264
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_selrefs",
+            "address": "0x100c81bb0",
+            "size": 20232,
+            "file_offset": 13130672
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_protorefs",
+            "address": "0x100c86ab8",
+            "size": 160,
+            "file_offset": 13150904
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_classrefs",
+            "address": "0x100c86b58",
+            "size": 2408,
+            "file_offset": 13151064
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_superrefs",
+            "address": "0x100c874c0",
+            "size": 872,
+            "file_offset": 13153472
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_ivar",
+            "address": "0x100c87828",
+            "size": 6208,
+            "file_offset": 13154344
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_data",
+            "address": "0x100c89068",
+            "size": 50680,
+            "file_offset": 13160552
+          },
+          {
+            "segment": "__DATA",
+            "section": "__data",
+            "address": "0x100c95660",
+            "size": 107573,
+            "file_offset": 13211232
+          },
+          {
+            "segment": "__DATA",
+            "section": "crashpad_info",
+            "address": "0x100cafa98",
+            "size": 56,
+            "file_offset": 13318808
+          },
+          {
+            "segment": "__DATA",
+            "section": "__swift_hooks",
+            "address": "0x100cafad0",
+            "size": 184,
+            "file_offset": 13318864
+          },
+          {
+            "segment": "__DATA",
+            "section": "__swift51_hooks",
+            "address": "0x100cafb88",
+            "size": 184,
+            "file_offset": 13319048
+          },
+          {
+            "segment": "__DATA",
+            "section": "__s_async_hook",
+            "address": "0x100cafc40",
+            "size": 400,
+            "file_offset": 13319232
+          },
+          {
+            "segment": "__DATA",
+            "section": "__swift56_hooks",
+            "address": "0x100cafdd0",
+            "size": 176,
+            "file_offset": 13319632
+          },
+          {
+            "segment": "__DATA",
+            "section": "__thread_vars",
+            "address": "0x100cafe80",
+            "size": 192,
+            "file_offset": 13319808
+          },
+          {
+            "segment": "__DATA",
+            "section": "__thread_data",
+            "address": "0x100caff40",
+            "size": 64,
+            "file_offset": 13320000
+          },
+          {
+            "segment": "__DATA",
+            "section": "__thread_bss",
+            "address": "0x100caff80",
+            "size": 104,
+            "file_offset": 16384
+          },
+          {
+            "segment": "__DATA",
+            "section": "__bss",
+            "address": "0x100cafff0",
+            "size": 128536,
+            "file_offset": 16384
+          },
+          {
+            "segment": "__DATA",
+            "section": "__common",
+            "address": "0x100ccf640",
+            "size": 1280,
+            "file_offset": 16384
+          }
+        ],
+        "symbol_count": 69057,
+        "topic_symbols": {
+          "hidpp": {
+            "count": 0,
+            "sample": [],
+            "sample_limit": 12
+          },
+          "IOHID": {
+            "count": 0,
+            "sample": [],
+            "sample_limit": 12
+          },
+          "haptic": {
+            "count": 28,
+            "sample": [
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi13configuration18feature_flag_namesL37s_windows_haptics_integration_enabledE",
+              "__ZN4logi6routes7devicesL27s_haptic_settings_configureE",
+              "__ZN4logi6routes7devicesL30s_trigger_haptic_waveform_infoE",
+              "__ZN4logi6routes7hapticsL15s_play_waveformE"
+            ],
+            "sample_limit": 12
+          },
+          "waveform": {
+            "count": 6,
+            "sample": [
+              "__ZN4logi6routes7devicesL26s_trigger_waveform_executeE",
+              "__ZN4logi6routes7devicesL30s_trigger_haptic_waveform_infoE",
+              "__ZN4logi6routes7hapticsL15s_play_waveformE",
+              "__ZN4logi6routes7hapticsL15s_stop_waveformE",
+              "__ZN4logi6routes7hapticsL22s_get_playing_waveformE",
+              "__ZN4logi6routes7hapticsL16s_waveform_eventE"
+            ],
+            "sample_limit": 12
+          },
+          "pointer_speed": {
+            "count": 1,
+            "sample": [
+              "__ZN4logi6routes5mouseL19s_pointer_speed_forE"
+            ],
+            "sample_limit": 12
+          },
+          "download_compressed_depot": {
+            "count": 1,
+            "sample": [
+              "__ZN4logi8pipeline22capsule_download_group31download_compressed_depot_asyncERKNS_8protocol7updates21Depot_DownloadContextENS0_11compressionE"
+            ],
+            "sample_limit": 12
+          },
+          "AppDelegate": {
+            "count": 401,
+            "sample": [
+              "-[AppDelegate clickButton:]",
+              "-[AppDelegate clickOnSendErrorReport:]",
+              "___38-[AppDelegate clickOnSendErrorReport:]_block_invoke",
+              "-[AppDelegate clickOnSecondaryButton:]",
+              "-[AppDelegate clickConsentCheck:]",
+              "-[AppDelegate _withBrand:]",
+              "-[AppDelegate _quitApplicationWithExecutableName:]",
+              "-[AppDelegate _makeFileInvisible:]",
+              "-[AppDelegate _quitLogiApplications]",
+              "-[AppDelegate _disableApiClientSignatureCheck]",
+              "-[AppDelegate _updateUIBasedOnValidationSequence]",
+              "-[AppDelegate _performCleanupAndContinue]"
+            ],
+            "sample_limit": 12
+          },
+          "pipeline": {
+            "count": 1356,
+            "sample": [
+              "__ZNSt3__110shared_ptrIN4logi8pipeline8pipelineEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline22pipeline_configurationEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline18ireporting_handlerEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline26pipeline_read_only_storageEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline20simple_cache_managerEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline18download_group_jobEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline18depot_download_jobEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline25pipeline_download_contextEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline14download_groupEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline23short_json_download_jobEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline18ianalytics_handlerEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline22long_json_download_jobEED1B8ne180100Ev"
+            ],
+            "sample_limit": 12
+          }
+        }
+      },
+      {
+        "architecture": "arm64",
+        "cpu_subtype": 0,
+        "offset": 19464192,
+        "size": 18778256,
+        "sha256": "bbd397ef045332f8ff12041e31f1a0af50c0d0b6c1ce06eeaf622b40eecb8065",
+        "uuid": "a6b96c510ec93439b7a923ca192cee34",
+        "dependencies": [
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/UserNotifications.framework/Versions/A/UserNotifications"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/ScriptingBridge.framework/Versions/A/ScriptingBridge"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreAudio.framework/Versions/A/CoreAudio"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreText.framework/Versions/A/CoreText"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/libbsm.0.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreBluetooth.framework/Versions/A/CoreBluetooth"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Security.framework/Versions/A/Security"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Carbon.framework/Versions/A/Carbon"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/Cocoa.framework/Versions/A/Cocoa"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/IOBluetooth.framework/Versions/A/IOBluetooth"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/libobjc.A.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/libc++.1.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/libSystem.B.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/System/Library/Frameworks/CoreData.framework/Versions/A/CoreData"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/System/Library/Frameworks/MetricKit.framework/Versions/A/MetricKit"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/swift/libswiftCore.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftCoreFoundation.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftCoreImage.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftDarwin.dylib"
+          },
+          {
+            "command": "0xc",
+            "name": "/usr/lib/swift/libswiftDispatch.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftIOKit.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftMetal.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftMetricKit.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftOSLog.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftObjectiveC.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftQuartzCore.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftXPC.dylib"
+          },
+          {
+            "command": "0x80000018",
+            "name": "/usr/lib/swift/libswiftos.dylib"
+          }
+        ],
+        "sections": [
+          {
+            "segment": "__TEXT",
+            "section": "__text",
+            "address": "0x10000d480",
+            "size": 9845224,
+            "file_offset": 19518592
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__stubs",
+            "address": "0x100970e68",
+            "size": 15096,
+            "file_offset": 29363816
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__objc_stubs",
+            "address": "0x100974960",
+            "size": 76800,
+            "file_offset": 29378912
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__init_offsets",
+            "address": "0x100987560",
+            "size": 888,
+            "file_offset": 29455712
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__objc_methlist",
+            "address": "0x1009878d8",
+            "size": 44764,
+            "file_offset": 29456600
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__gcc_except_tab",
+            "address": "0x1009927b4",
+            "size": 435620,
+            "file_offset": 29501364
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__cstring",
+            "address": "0x1009fcd60",
+            "size": 743296,
+            "file_offset": 29936992
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__objc_methname",
+            "address": "0x100ab24e0",
+            "size": 103466,
+            "file_offset": 30680288
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__objc_classname",
+            "address": "0x100acb90a",
+            "size": 4560,
+            "file_offset": 30783754
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__objc_methtype",
+            "address": "0x100accada",
+            "size": 17112,
+            "file_offset": 30788314
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__const",
+            "address": "0x100ad0dc0",
+            "size": 507683,
+            "file_offset": 30805440
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__oslogstring",
+            "address": "0x100b4cce3",
+            "size": 11,
+            "file_offset": 31313123
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__ustring",
+            "address": "0x100b4ccee",
+            "size": 88,
+            "file_offset": 31313134
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_typeref",
+            "address": "0x100b4cd46",
+            "size": 4676,
+            "file_offset": 31313222
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__constg_swiftt",
+            "address": "0x100b4df8c",
+            "size": 7728,
+            "file_offset": 31317900
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_fieldmd",
+            "address": "0x100b4fdbc",
+            "size": 5040,
+            "file_offset": 31325628
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_builtin",
+            "address": "0x100b5116c",
+            "size": 220,
+            "file_offset": 31330668
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_reflstr",
+            "address": "0x100b51250",
+            "size": 3150,
+            "file_offset": 31330896
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_assocty",
+            "address": "0x100b51ea0",
+            "size": 792,
+            "file_offset": 31334048
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_proto",
+            "address": "0x100b521b8",
+            "size": 748,
+            "file_offset": 31334840
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_types",
+            "address": "0x100b524a4",
+            "size": 444,
+            "file_offset": 31335588
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_capture",
+            "address": "0x100b52660",
+            "size": 636,
+            "file_offset": 31336032
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__swift5_mpenum",
+            "address": "0x100b528dc",
+            "size": 20,
+            "file_offset": 31336668
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__unwind_info",
+            "address": "0x100b528f0",
+            "size": 160720,
+            "file_offset": 31336688
+          },
+          {
+            "segment": "__TEXT",
+            "section": "__eh_frame",
+            "address": "0x100b79cc0",
+            "size": 9008,
+            "file_offset": 31497408
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__got",
+            "address": "0x100b7c000",
+            "size": 13352,
+            "file_offset": 31506432
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__const",
+            "address": "0x100b7f430",
+            "size": 407944,
+            "file_offset": 31519792
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__cfstring",
+            "address": "0x100be2db8",
+            "size": 48896,
+            "file_offset": 31927736
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_classlist",
+            "address": "0x100beecb8",
+            "size": 1912,
+            "file_offset": 31976632
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_nlclslist",
+            "address": "0x100bef430",
+            "size": 24,
+            "file_offset": 31978544
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_catlist",
+            "address": "0x100bef448",
+            "size": 64,
+            "file_offset": 31978568
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_protolist",
+            "address": "0x100bef488",
+            "size": 392,
+            "file_offset": 31978632
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_imageinfo",
+            "address": "0x100bef610",
+            "size": 8,
+            "file_offset": 31979024
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_arraydata",
+            "address": "0x100bef618",
+            "size": 240,
+            "file_offset": 31979032
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_arrayobj",
+            "address": "0x100bef708",
+            "size": 288,
+            "file_offset": 31979272
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_intobj",
+            "address": "0x100bef828",
+            "size": 24,
+            "file_offset": 31979560
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_doubleobj",
+            "address": "0x100bef840",
+            "size": 16,
+            "file_offset": 31979584
+          },
+          {
+            "segment": "__DATA_CONST",
+            "section": "__objc_dictobj",
+            "address": "0x100bef850",
+            "size": 80,
+            "file_offset": 31979600
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_const",
+            "address": "0x100bf0000",
+            "size": 124792,
+            "file_offset": 31981568
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_selrefs",
+            "address": "0x100c0e778",
+            "size": 24152,
+            "file_offset": 32106360
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_protorefs",
+            "address": "0x100c145d0",
+            "size": 160,
+            "file_offset": 32130512
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_classrefs",
+            "address": "0x100c14670",
+            "size": 2408,
+            "file_offset": 32130672
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_superrefs",
+            "address": "0x100c14fd8",
+            "size": 872,
+            "file_offset": 32133080
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_ivar",
+            "address": "0x100c15340",
+            "size": 3104,
+            "file_offset": 32133952
+          },
+          {
+            "segment": "__DATA",
+            "section": "__objc_data",
+            "address": "0x100c15f60",
+            "size": 31896,
+            "file_offset": 32137056
+          },
+          {
+            "segment": "__DATA",
+            "section": "__data",
+            "address": "0x100c1dbf8",
+            "size": 106946,
+            "file_offset": 32168952
+          },
+          {
+            "segment": "__DATA",
+            "section": "crashpad_info",
+            "address": "0x100c37dc0",
+            "size": 56,
+            "file_offset": 32275904
+          },
+          {
+            "segment": "__DATA",
+            "section": "__s_async_hook",
+            "address": "0x100c37df8",
+            "size": 400,
+            "file_offset": 32275960
+          },
+          {
+            "segment": "__DATA",
+            "section": "__swift56_hooks",
+            "address": "0x100c37f88",
+            "size": 176,
+            "file_offset": 32276360
+          },
+          {
+            "segment": "__DATA",
+            "section": "__thread_vars",
+            "address": "0x100c38038",
+            "size": 192,
+            "file_offset": 32276536
+          },
+          {
+            "segment": "__DATA",
+            "section": "__thread_data",
+            "address": "0x100c38100",
+            "size": 64,
+            "file_offset": 32276736
+          },
+          {
+            "segment": "__DATA",
+            "section": "__thread_bss",
+            "address": "0x100c38140",
+            "size": 104,
+            "file_offset": 19464192
+          },
+          {
+            "segment": "__DATA",
+            "section": "__bss",
+            "address": "0x100c381b0",
+            "size": 127744,
+            "file_offset": 19464192
+          },
+          {
+            "segment": "__DATA",
+            "section": "__common",
+            "address": "0x100c574c0",
+            "size": 1568,
+            "file_offset": 19464192
+          }
+        ],
+        "symbol_count": 69536,
+        "topic_symbols": {
+          "hidpp": {
+            "count": 0,
+            "sample": [],
+            "sample_limit": 12
+          },
+          "IOHID": {
+            "count": 0,
+            "sample": [],
+            "sample_limit": 12
+          },
+          "haptic": {
+            "count": 0,
+            "sample": [],
+            "sample_limit": 12
+          },
+          "waveform": {
+            "count": 0,
+            "sample": [],
+            "sample_limit": 12
+          },
+          "pointer_speed": {
+            "count": 0,
+            "sample": [],
+            "sample_limit": 12
+          },
+          "download_compressed_depot": {
+            "count": 1,
+            "sample": [
+              "__ZN4logi8pipeline22capsule_download_group31download_compressed_depot_asyncERKNS_8protocol7updates21Depot_DownloadContextENS0_11compressionE"
+            ],
+            "sample_limit": 12
+          },
+          "AppDelegate": {
+            "count": 401,
+            "sample": [
+              "-[AppDelegate clickButton:]",
+              "-[AppDelegate clickOnSendErrorReport:]",
+              "___38-[AppDelegate clickOnSendErrorReport:]_block_invoke",
+              "-[AppDelegate clickOnSecondaryButton:]",
+              "-[AppDelegate clickConsentCheck:]",
+              "-[AppDelegate _withBrand:]",
+              "-[AppDelegate _quitApplicationWithExecutableName:]",
+              "-[AppDelegate _makeFileInvisible:]",
+              "-[AppDelegate _quitLogiApplications]",
+              "-[AppDelegate _disableApiClientSignatureCheck]",
+              "-[AppDelegate _updateUIBasedOnValidationSequence]",
+              "-[AppDelegate _performCleanupAndContinue]"
+            ],
+            "sample_limit": 12
+          },
+          "pipeline": {
+            "count": 1322,
+            "sample": [
+              "__ZNSt3__110shared_ptrIN4logi8pipeline8pipelineEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline22pipeline_configurationEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline18ireporting_handlerEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline26pipeline_read_only_storageEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline20simple_cache_managerEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline18download_group_jobEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline18depot_download_jobEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline25pipeline_download_contextEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline14download_groupEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline23short_json_download_jobEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline18ianalytics_handlerEED1B8ne180100Ev",
+              "__ZNSt3__110shared_ptrIN4logi8pipeline22long_json_download_jobEED1B8ne180100Ev"
+            ],
+            "sample_limit": 12
+          }
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "These records were produced by the accompanying Python stdlib script, not a REA provider.",
+    "ZIP member inventory does not interpret bytes outside archive entries.",
+    "Mach-O parsing covers this supplied FAT_MAGIC/nlist64 layout, declared dependency loads, sections and symbol names; it performs no disassembly, control-flow or reference recovery.",
+    "String matches are byte observations; they do not establish execution, handlers, API availability, device support or hardware protocol semantics.",
+    "No-match results apply only to the listed ASCII string rule and regexes; compiled, encoded or obfuscated implementations may leave no matching string.",
+    "No target code, installer, network endpoint or hardware command was executed.",
+    "Apple code signatures and publisher authenticity were not verified."
+  ],
+  "local_observation_id": "local_sha256_aae3f58937b3b9fa452afa4b8add785b487179f584a1f019d27b4b4079a390e4"
+}

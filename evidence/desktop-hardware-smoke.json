@@ -1,0 +1,27 @@
+{
+  "model": "MX Master 4",
+  "listener_ready": true,
+  "events": [
+    {
+      "type": "ready",
+      "controls": [
+        416
+      ],
+      "ring_button": 416,
+      "raw_xy": true
+    },
+    {
+      "type": "stopped"
+    }
+  ],
+  "before_flags_mapping": [
+    0,
+    416
+  ],
+  "after_flags_mapping": [
+    0,
+    416
+  ],
+  "restored": true,
+  "exit_code": 0
+}
