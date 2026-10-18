@@ -1,0 +1,187 @@
+[
+  {
+    "name": "settings-400-dark",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "point-400-dark",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "buttons-400-dark",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "assignment-popup",
+    "width": 279,
+    "height": 398
+  },
+  {
+    "name": "ring-400-dark",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "actions-400-dark",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "picker-400",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "picker-search-400",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "picker-empty-400",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "settings-400-light",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "point-400-light",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "buttons-400-light",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "ring-400-light",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "actions-400-light",
+    "width": 400,
+    "height": 740
+  },
+  {
+    "name": "settings-620-dark",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "point-620-dark",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "buttons-620-dark",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "ring-620-dark",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "actions-620-dark",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "settings-620-light",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "point-620-light",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "buttons-620-light",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "ring-620-light",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "actions-620-light",
+    "width": 620,
+    "height": 740
+  },
+  {
+    "name": "settings-1100-dark",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "point-1100-dark",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "buttons-1100-dark",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "ring-1100-dark",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "actions-1100-dark",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "picker-1100",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "picker-search-1100",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "picker-empty-1100",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "settings-1100-light",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "point-1100-light",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "buttons-1100-light",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "ring-1100-light",
+    "width": 1100,
+    "height": 800
+  },
+  {
+    "name": "actions-1100-light",
+    "width": 1100,
+    "height": 800
+  }
+]
