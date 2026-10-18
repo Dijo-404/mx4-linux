@@ -35,6 +35,7 @@ class DesktopController:
         self._events_pending = False
         self.session = EventSession(self.queue_event)
         self.ring = None
+        self.editor = None
         self.target = None
         self.opening = False
         self.starting = False
@@ -257,6 +258,13 @@ class DesktopController:
         if not self.config or not self.session.ready or self.session.stopping:
             return
         resolved = resolve_config(self.config, self.context.get("app_id") if self.context else None)
+        if not self._pending_configs and resolved == self.effective_config:
+            # A new focused window often uses the same General assignments.
+            # They are already acknowledged: rereading hardware here would
+            # suppress the next press and could interrupt reporting mid-click.
+            # A pending different profile must still reach a worker boundary.
+            self._active_revision = self._context_revision
+            return
         config_id = self.session.configure(resolved)
         if config_id is not None:
             self._pending_configs = {config_id: (resolved, self._context_revision)}
@@ -922,18 +930,42 @@ class DesktopController:
         if self.action_busy:
             self.notify("Wait for or cancel the running routine before editing.")
             return
-        self.stop()
+        # Opening an editor must not revoke the user's enabled integration.
+        # Cancel only the current popup/selection; saved changes are reconciled
+        # through the worker's existing release boundary.
+        self._open_token += 1
+        self.opening = False
+        self._held_ring_button = None
+        self._pending_released = False
+        self._pending_motion = [0, 0]
+        self._opening_motion.clear()
+        self.dismissed()
+        if self.ring:
+            self.ring.dismiss()
         try:
             from .desktop_editor import present_desktop_editor
-            present_desktop_editor(self.window, self.store, self.saved, cid=cid, page=page)
+            self.editor = present_desktop_editor(self.window, self.store, self.saved, cid=cid, page=page)
+            self.editor.connect("notify::visible", self._editor_visibility_changed)
+            self.editor.connect("destroy", self._editor_destroyed)
         except (RuntimeError, OSError) as exc:
             self.notify(str(exc))
 
+    def _editor_destroyed(self, editor):
+        if getattr(self, "editor", None) is editor:
+            self.editor = None
+
+    def _editor_visibility_changed(self, editor, _property):
+        # Gtk.Window.destroy() hides the window; its destroy signal may wait
+        # for this Python reference to be released before it is emitted.
+        if not editor.get_visible():
+            self._editor_destroyed(editor)
+
     def saved(self):
-        self.reload_config()
+        self.reconcile_config()
         if hasattr(self.window, "desktop_config_changed"):
             self.window.desktop_config_changed()
-        self.notify(self.error or "Configuration saved. Enable mouse integration to use the new assignments.")
+        self.notify(self.error or ("Configuration saved." if self.session.running else
+                                  "Configuration saved. Enable mouse integration to use the new assignments."))
 
     def close(self):
         if getattr(self, "utilities", None) is not None:

@@ -210,8 +210,101 @@ def test_context_profile_becomes_live_only_after_worker_ack(runtime):
     assert runtime.effective_config['button_bindings'] == {'83': 'paste'}
 
 
+def test_first_ring_press_after_ready_does_not_wait_for_redundant_configuration(runtime):
+    runtime.open_ring = Mock()
+    runtime.event({'type': 'ready'})
+    runtime.session.configure.assert_not_called()
+    runtime.event({'type': 'button', 'control': 416, 'pressed': True})
+    runtime.open_ring.assert_called_once_with(held=True)
+
+
+@pytest.mark.parametrize('page', ['ring', 'actions'])
+def test_opening_editor_preserves_enabled_integration_and_cancels_popup(runtime, monkeypatch, page):
+    editor = Mock()
+    monkeypatch.setattr('mx4_linux.desktop_editor.present_desktop_editor', editor)
+    runtime.store = Mock()
+    runtime.requested_enabled = True
+    runtime.opening = True
+    runtime._held_ring_button = 416
+    runtime._pending_motion = [10, 20]
+    runtime._opening_motion.append((10, 20))
+    before_open, before_dispatch = runtime._open_token, runtime._dispatch_token
+    runtime.configure(page=page)
+    runtime.session.stop.assert_not_called()
+    assert runtime.requested_enabled
+    assert not runtime.opening and runtime._held_ring_button is None
+    assert runtime._open_token > before_open and runtime._dispatch_token > before_dispatch
+    assert runtime._pending_motion == [0, 0] and not runtime._opening_motion
+    runtime.ring.dismiss.assert_called_once()
+    editor.assert_called_once_with(runtime.window, runtime.store, runtime.saved, cid=None, page=page)
+
+
+def test_editor_save_updates_live_assignments_at_worker_boundary_without_disabling(runtime):
+    runtime.requested_enabled = True
+    document = deepcopy(runtime.config)
+    document['assignment_profiles']['general']['button_bindings'] = {'82': 'paste'}
+    runtime.store = SimpleNamespace(read=lambda: deepcopy(document))
+    runtime.window.desktop_config_changed = Mock()
+    runtime.saved()
+    runtime.session.stop.assert_not_called()
+    assert runtime.requested_enabled
+    assert runtime.effective_config['button_bindings'] == {'82': 'copy'}
+    runtime.event({'type': 'button', 'control': 82, 'pressed': True})
+    runtime.execute.assert_not_called()
+    runtime.event({'type': 'configured', 'config_id': 1})
+    runtime.event({'type': 'button', 'control': 82, 'pressed': True})
+    assert runtime.execute.call_args.args == ('paste',)
+    runtime.window.desktop_config_changed.assert_called_once()
+
+
+def test_closing_editor_releases_only_its_own_controller_reference(runtime):
+    runtime.editor = SimpleNamespace()
+    editor = runtime.editor
+    runtime._editor_destroyed(SimpleNamespace())
+    assert runtime.editor is editor
+    runtime._editor_destroyed(editor)
+    assert runtime.editor is None
+
+
+def test_hidden_editor_releases_controller_reference_before_object_finalization(runtime):
+    runtime.editor = SimpleNamespace(get_visible=Mock(return_value=True))
+    editor = runtime.editor
+    runtime._editor_visibility_changed(editor, None)
+    assert runtime.editor is editor
+    editor.get_visible.return_value = False
+    runtime._editor_visibility_changed(editor, None)
+    assert runtime.editor is None
+
+
+def test_focus_change_with_identical_assignments_keeps_ring_and_shortcuts_ready(runtime):
+    runtime.open_ring = Mock()
+    runtime.event({'type': 'context', 'context': {'app_id': 'browser', 'window_id': 8}, 'context_token': 0})
+    runtime.session.configure.assert_not_called()
+    assert runtime._active_revision == runtime._context_revision
+    runtime.event({'type': 'button', 'control': 416, 'pressed': True})
+    runtime.open_ring.assert_called_once_with(held=True)
+    runtime.event({'type': 'button', 'control': 82, 'pressed': True})
+    runtime.execute.assert_called_once_with('copy', target={'app_id': 'browser', 'window_id': 8},
+                                           config=runtime.effective_config)
+
+
+def test_returning_to_acknowledged_assignments_still_waits_for_pending_profile(runtime):
+    runtime.event({'type': 'context', 'context': {'app_id': 'editor', 'window_id': 7}, 'context_token': 0})
+    runtime.session.configure.return_value = 2
+    runtime.event({'type': 'context', 'context': {'app_id': 'browser', 'window_id': 8}, 'context_token': 0})
+    assert runtime.session.configure.call_count == 2
+    runtime.event({'type': 'configured', 'config_id': 1})
+    runtime.event({'type': 'button', 'control': 82, 'pressed': True})
+    runtime.execute.assert_not_called()
+    runtime.event({'type': 'configured', 'config_id': 2})
+    runtime.event({'type': 'button', 'control': 82, 'pressed': True})
+    assert runtime.execute.call_args.args == ('copy',)
+
+
 def test_observer_failure_returns_general_and_ignores_stale_context(runtime):
+    from mx4_linux.actions import resolve_config
     runtime.context = {'app_id': 'editor', 'window_id': 7}
+    runtime.effective_config = resolve_config(runtime.config, 'editor')
     runtime.event({'type': 'context-unavailable', 'context_token': 0, 'message': 'General fallback'})
     assert runtime.context is None
     assert runtime.session.configure.call_args.args[0]['button_bindings'] == {'82': 'copy'}
@@ -486,21 +579,39 @@ def test_feedback_rejects_device_selection_changed_while_session_ready(runtime):
     runtime.session.feedback.assert_not_called()
 
 
-def test_unsupported_feedback_warning_keeps_real_worker_context_transitions_alive(runtime):
+@pytest.mark.parametrize('failure', ['unsupported-waveform', 'hardware-disabled', 'playback-rejected'])
+def test_optional_feedback_warning_keeps_real_worker_context_transitions_alive(runtime, failure, tmp_path, monkeypatch):
     """Exercise the worker protocol, including native restore after the warning."""
     import struct
 
-    from test_event_worker import INDEX, add_control, run, setup_session
+    from logitech_receiver.exceptions import FeatureCallError
+    from test_event_worker import HAPTIC, INDEX, add_control, run, setup_session
 
+    monkeypatch.setenv('XDG_STATE_HOME', str(tmp_path))
     dev, api, commands, events = setup_session()
     add_control(dev, 83)
     before = dict(dev.reporting)
     runtime.observer = SimpleNamespace(stop=Mock())
+    runtime.open_ring = Mock()
     observer = runtime.observer
-    setting = SimpleNamespace(choices=[0], write=Mock())
+    setting = SimpleNamespace(choices=[0] if failure == 'unsupported-waveform' else [0, 1], write=Mock())
     api.settings_templates.SETTINGS = [SimpleNamespace(name='haptic-play')]
     api.settings_templates.check_feature.return_value = setting
+    if failure == 'playback-rejected':
+        setting.write.side_effect = FeatureCallError(number=2, request=2893, error=5, params=b'\x00')
+    elif failure == 'hardware-disabled':
+        original = dev._feature_request
+
+        def request(feature, function, *data):
+            if feature == HAPTIC:
+                assert function == 0x10 and not data
+                return b'\x00\x32\x00'
+            return original(feature, function, *data)
+
+        dev.feature_request.side_effect = request
     commands.put({'op': 'haptic', 'waveform': 1})
+    if failure != 'unsupported-waveform':
+        commands.put({'op': 'haptic', 'waveform': 1})
     config_id, reads = 0, 0
 
     def configure(config):
@@ -520,35 +631,47 @@ def test_unsupported_feedback_warning_keeps_real_worker_context_transitions_aliv
     def read(*_args):
         nonlocal reads
         reads += 1
+        assert runtime.error is None
+        assert runtime.session.ready
+        runtime.session.stop.assert_not_called()
+        observer.stop.assert_not_called()
         if reads == 1:
-            assert runtime.error is None
-            observer.stop.assert_not_called()
             assert runtime._context_token == 0
             runtime.event({'type': 'context', 'context': {'app_id': 'editor', 'window_id': 7}, 'context_token': 0})
         elif reads == 2:
             assert dev.reporting[82] == before[82]
             assert dev.reporting[83][0] & 1
-            observer.stop.assert_not_called()
             return 17, 255, bytes([INDEX, 0]) + struct.pack('!4H', 83, 0, 0, 0) + b'\0' * 8
-        else:
+        elif reads == 3:
             assert runtime.execute.call_args.args == ('paste',)
+            return 17, 255, bytes([INDEX, 0]) + struct.pack('!4H', 416, 0, 0, 0) + b'\0' * 8
+        else:
+            runtime.open_ring.assert_called_once_with(held=True)
             commands.put({'op': 'stop'})
 
     runtime.session.configure.side_effect = configure
     api.base.read.side_effect = read
     assert run(dev, api, commands, Events(), controls=[82, 416])
-    assert any(e['type'] == 'warning' and e['source'] == 'haptic' for e in events)
+    warnings = [e for e in events if e['type'] == 'warning' and e['source'] == 'haptic']
+    assert len(warnings) == 1
+    assert events[0]['type'] == 'ready'
+    assert not any(e['type'] == 'error' for e in events)
+    assert events[-1] == {'type': 'stopped', 'restored': True}
+    if failure == 'playback-rejected':
+        assert 'HID++ error 0x05, request 0x0B4D' in warnings[0]['message']
+        setting.write.assert_called_once_with(1, save=False)
+    else:
+        setting.write.assert_not_called()
     assert dev.reporting == before
-    setting.write.assert_not_called()
 
 
 def test_fatal_integration_error_requests_restoration_and_stops_observation(runtime):
     runtime.observer = SimpleNamespace(stop=Mock())
     observer = runtime.observer
-    runtime.event({'type': 'error', 'message': 'Device did not acknowledge haptic playback'})
+    runtime.event({'type': 'error', 'message': 'Mouse reporting configuration could not be confirmed'})
     runtime.session.stop.assert_called_once()
     observer.stop.assert_called_once()
-    assert runtime.error == 'Device did not acknowledge haptic playback'
+    assert runtime.error == 'Mouse reporting configuration could not be confirmed'
     assert runtime._context_token == 1
 
 @pytest.fixture
