@@ -8,6 +8,7 @@ applications and return after starting them, so an editor can stay open.
 """
 
 from copy import deepcopy
+from collections.abc import MutableMapping
 
 import fcntl
 import json
@@ -277,6 +278,33 @@ def execution_steps(action, adjustment=None, toggle_state=None, action_id=None):
         index = index if definition == action else 0
         return [action["steps"], *action["toggle_steps"]][index]
     return action["steps"]
+
+
+class ToggleState(MutableMapping):
+    """Controller-session entries; compound selection/reset/commit uses this same lock."""
+    def __init__(self, entries=None):
+        self.lock = threading.RLock()
+        self._entries = dict(entries or {})
+
+    def __getitem__(self, key):
+        with self.lock:
+            return self._entries[key]
+
+    def __setitem__(self, key, value):
+        with self.lock:
+            self._entries[key] = value
+
+    def __delitem__(self, key):
+        with self.lock:
+            del self._entries[key]
+
+    def __iter__(self):
+        with self.lock:
+            return iter(tuple(self._entries))
+
+    def __len__(self):
+        with self.lock:
+            return len(self._entries)
 
 
 class ExecutionSelection:
@@ -587,7 +615,8 @@ class DesktopActions:
         self.dry_run = bool(dry_run)
         self.local_handler = local_handler
         self.local_preflight = local_preflight
-        self.toggle_state = toggle_state if toggle_state is not None else {}
+        self.toggle_state = toggle_state if toggle_state is not None else ToggleState()
+        self._toggle_lock = getattr(self.toggle_state, "lock", threading.RLock())
         self._keyboard = None
         self._lock = threading.RLock()
 
@@ -604,7 +633,8 @@ class DesktopActions:
                 raise RuntimeError(f"Unknown Smart Action {action_id!r}.")
             action = deepcopy(self.config["actions"][action_id])
             if selection is None:
-                selection = ExecutionSelection(action_id, action, adjustment, self.toggle_state)
+                with self._toggle_lock:
+                    selection = ExecutionSelection(action_id, action, adjustment, self.toggle_state)
             elif (not isinstance(selection, ExecutionSelection) or selection.action_id != action_id
                   or selection.action != action or selection.adjustment != adjustment):
                 raise RuntimeError("The execution selection does not match this Smart Action snapshot.")
@@ -638,15 +668,18 @@ class DesktopActions:
                     result["steps"].append(performed)
                     result["completed"] += 1
                 self._check(cancelled, deadline)
-                if adjustment is None and selection.may_advance(self.config, self.toggle_state):
-                    if "toggle_steps" not in action:
-                        self.toggle_state.pop(action_id, None)
-                    else:
-                        self.toggle_state[action_id] = (
-                            deepcopy(action), (selection.toggle_index + 1) % (1 + len(action["toggle_steps"])))
-                        # The validated document bounds this controller-session map.
-                        for removed in self.toggle_state.keys() - self.config["actions"].keys():
-                            del self.toggle_state[removed]
+                if adjustment is None:
+                    next_entry = ((deepcopy(action), (selection.toggle_index + 1) % (1 + len(action["toggle_steps"])))
+                                  if "toggle_steps" in action else None)
+                    with self._toggle_lock:
+                        if selection.may_advance(self.config, self.toggle_state):
+                            if next_entry is None:
+                                self.toggle_state.pop(action_id, None)
+                            else:
+                                self.toggle_state[action_id] = next_entry
+                                # The validated document bounds this controller-session map.
+                                for removed in self.toggle_state.keys() - self.config["actions"].keys():
+                                    del self.toggle_state[removed]
                 return result
             except (RuntimeError, OSError) as exc:
                 raise RuntimeError(f"Smart Action {action['label']!r} stopped after {result['completed']}/{len(steps)} steps: {exc}") from exc

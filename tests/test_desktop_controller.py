@@ -1563,3 +1563,118 @@ def test_pinned_completion_does_not_overwrite_newer_toggle_index(runtime, monkey
         callbacks.pop(0)()
     assert futures[-1].result()['completed'] == 1
     assert runtime._toggle_state['test'] is newer_entry
+
+
+@pytest.mark.parametrize('mutation', ['definition-reset', 'newer-entry'])
+def test_cycle_commit_must_be_atomic_with_reset_or_newer_entry(runtime, monkeypatch, mutation):
+    from threading import Event, Thread
+    import mx4_linux.actions as actions
+    cfg = default_config()
+    action = {'label': 'Original', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+              'toggle_steps': [[{'type': 'delay', 'milliseconds': 1}], [{'type': 'delay', 'milliseconds': 2}]]}
+    cfg['actions']['test'] = action
+    origin = {'app_id': 'editor', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime._toggle_state = {'test': (deepcopy(action), 0)}
+    newer = deepcopy(cfg)
+    newer['actions']['test']['label'] = 'New definition'
+    newer_entry = (deepcopy(action), 2)
+    effect_finished, commit_copy, mutation_done = Event(), Event(), Event()
+    original_copy = actions.deepcopy
+    def instrumented_copy(value, *args, **kwargs):
+        if effect_finished.is_set() and value == action:
+            commit_copy.set()
+            assert mutation_done.wait(1), 'Mutation did not run during commit copy'
+        return original_copy(value, *args, **kwargs)
+    monkeypatch.setattr(actions, 'deepcopy', instrumented_copy)
+    def effect(*_):
+        effect_finished.set()
+        return {'type': 'delay'}
+    monkeypatch.setattr(actions.DesktopActions, '_step', effect)
+    def change_at_commit():
+        assert commit_copy.wait(1), 'Cycle commit was not reached'
+        if mutation == 'definition-reset':
+            runtime._reset_changed_toggles(newer)
+        else:
+            runtime._toggle_state['test'] = newer_entry
+        mutation_done.set()
+    worker = Thread(target=change_at_commit)
+    worker.start()
+    runtime.execute('test', target=origin)
+    worker.join(1)
+    assert not worker.is_alive()
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 1
+    if mutation == 'definition-reset':
+        assert 'test' not in runtime._toggle_state
+    else:
+        assert runtime._toggle_state['test'] is newer_entry
+
+
+@pytest.mark.parametrize('mutation', ['definition-reset', 'newer-entry'])
+def test_toggle_guard_and_commit_share_lock_with_other_writers(runtime, monkeypatch, mutation):
+    from threading import Event, Thread
+    import mx4_linux.actions as actions
+    cfg = default_config()
+    action = {'label': 'Original', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+        'toggle_steps': [[{'type': 'delay', 'milliseconds': 1}], [{'type': 'delay', 'milliseconds': 2}]]}
+    cfg['actions']['test'] = action
+    origin = {'app_id': 'editor', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    runtime._toggle_state = {'test': (deepcopy(action), 0)}
+    newer = deepcopy(cfg)
+    newer['actions']['test']['label'] = 'New definition'
+    newer_entry = (deepcopy(action), 2)
+    checking, attempted, changed = Event(), Event(), Event()
+    original = actions.ExecutionSelection.may_advance
+    def checked(selection, config, state):
+        checking.set()
+        assert attempted.wait(1)
+        assert not changed.is_set(), 'A writer entered inside the cycle-commit critical section'
+        return original(selection, config, state)
+    monkeypatch.setattr(actions.ExecutionSelection, 'may_advance', checked)
+    def mutate():
+        assert checking.wait(1)
+        attempted.set()
+        if mutation == 'definition-reset':
+            runtime._reset_changed_toggles(newer)
+        else:
+            runtime._toggle_state['test'] = newer_entry
+        changed.set()
+    worker = Thread(target=mutate)
+    worker.start()
+    runtime.execute('test', target=origin)
+    worker.join(1)
+    assert not worker.is_alive() and changed.is_set()
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 1
+    if mutation == 'definition-reset':
+        assert 'test' not in runtime._toggle_state
+    else:
+        assert runtime._toggle_state['test'] is newer_entry
+
+
+def test_toggle_state_lock_is_not_held_across_action_effect(runtime, monkeypatch):
+    from threading import Event, Thread
+    cfg = default_config()
+    cfg['actions']['test'] = {'label': 'Original', 'steps': [{'type': 'delay', 'milliseconds': 0}],
+        'toggle_steps': [[{'type': 'delay', 'milliseconds': 1}]]}
+    origin = {'app_id': 'editor', 'window_id': 7}
+    callbacks, futures = utility_execution(runtime, monkeypatch, cfg, origin)
+    changed = Event()
+    newer = deepcopy(cfg)
+    newer['actions']['test']['label'] = 'New definition'
+    def effect(*_):
+        worker = Thread(target=lambda: (runtime._reset_changed_toggles(newer), changed.set()))
+        worker.start()
+        assert changed.wait(1), 'An action effect held the session-state lock'
+        worker.join(1)
+        return {'type': 'delay'}
+    monkeypatch.setattr('mx4_linux.actions.DesktopActions._step', effect)
+    runtime.execute('test', target=origin)
+    while callbacks:
+        callbacks.pop(0)()
+    assert futures[-1].result()['completed'] == 1
+    assert 'test' not in runtime._toggle_state
