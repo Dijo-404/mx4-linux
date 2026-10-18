@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security reporting
+    url: https://github.com/Dijo-404/mx4-linux/blob/main/SECURITY.md
+    about: Read private reporting guidance before sharing security-sensitive information.

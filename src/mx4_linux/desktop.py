@@ -1,5 +1,6 @@
 """Coordinate the overlay, Smart Actions, and opt-in hardware events."""
 
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 import json
@@ -22,7 +23,10 @@ class DesktopController:
         self.action_busy = False
         self.cancelled = threading.Event()
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mx4-actions")
-        self.session = EventSession(lambda event: GLib.idle_add(self.event, event))
+        self._event_lock = threading.Lock()
+        self._event_queue = deque()
+        self._events_pending = False
+        self.session = EventSession(self.queue_event)
         self.ring = None
         self.target = None
         self.opening = False
@@ -31,6 +35,26 @@ class DesktopController:
         self._pending_released = False
         self._pending_motion = [0, 0]
         self.reload_config()
+
+    def queue_event(self, event):
+        """Batch UI dispatch without changing the radius-clamped motion path."""
+        with self._event_lock:
+            if self.closed:
+                return
+            self._event_queue.append(dict(event))
+            if self._events_pending:
+                return
+            self._events_pending = True
+        GLib.idle_add(self.flush_events)
+
+    def flush_events(self):
+        with self._event_lock:
+            events = tuple(self._event_queue)
+            self._event_queue.clear()
+            self._events_pending = False
+        for event in events:
+            self.event(event)
+        return GLib.SOURCE_REMOVE
 
     def reload_config(self):
         try:
@@ -252,6 +276,8 @@ class DesktopController:
 
     def close(self):
         self.closed = True
+        with self._event_lock:
+            self._event_queue.clear()
         self._open_token += 1
         self._dispatch_token += 1
         self.cancelled.set()

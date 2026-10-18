@@ -25,6 +25,7 @@ import time
 MAX_CONFIG_BYTES = 1024 * 1024
 MAX_ACTIONS = 128
 MAX_STEPS = 64
+MAX_GROUP_ACTIONS = 6
 MAX_DELAY_MS = 30_000
 MAX_TOTAL_DELAY_MS = 60_000
 MAX_RUN_SECONDS = 120
@@ -178,7 +179,8 @@ def _wtype_shortcut_args(codes):
 
 def validate_config(config):
     """Validate the entire document before it is saved or any action is run."""
-    _fields(config, ("version", "ring", "actions", "button_bindings", "ring_button", "haptic_feedback"), location="document")
+    _fields(config, ("version", "ring", "actions", "button_bindings", "ring_button", "haptic_feedback"),
+            ("ring_groups",), location="document")
     if type(config["version"]) is not int or config["version"] != 1:
         _fail("only version 1 is supported.")
     actions = config["actions"]
@@ -235,6 +237,17 @@ def validate_config(config):
     ring = config["ring"]
     if not isinstance(ring, list) or len(ring) != 8 or any(not isinstance(value, str) or value not in actions for value in ring):
         _fail("ring must contain exactly eight existing action IDs.")
+    groups = config.get("ring_groups", {})
+    if not isinstance(groups, dict):
+        _fail("ring_groups must map ring positions 0–7 to lists of action IDs.")
+    for position, children in groups.items():
+        if not isinstance(position, str) or position not in {str(index) for index in range(8)}:
+            _fail("ring_groups positions must be decimal strings from 0 to 7.")
+        if (not isinstance(children, list) or not 1 <= len(children) <= MAX_GROUP_ACTIONS
+                or any(not isinstance(child, str) or child not in actions for child in children)):
+            _fail(f"ring group {position} needs 1–{MAX_GROUP_ACTIONS} existing action IDs.")
+        if len(set(children)) != len(children):
+            _fail(f"ring group {position} cannot repeat an action ID.")
     ring_button = config["ring_button"]
     if type(ring_button) is not int or ring_button not in BUTTON_IDS:
         _fail("ring_button must be one of 82, 83, 86, 195, 196 or 416.")

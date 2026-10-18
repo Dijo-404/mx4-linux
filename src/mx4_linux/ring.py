@@ -1,20 +1,39 @@
-"""Centered Wayland Actions Ring, operated by pointer, keyboard or raw XY."""
+"""Compact native Actions Ring with animated icon buttons and action groups."""
 
 import math
+from time import monotonic
 
-from .gtk_support import Adw, Gdk, Gtk, Layer
-from .ring_model import RingState
+from .gtk_support import Gdk, Gtk, Layer
+from gi.repository import GObject, Pango
+from .motion import Transition
+from .ring_icons import action_icon
+from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, RingState, button_center
+
+
+WIDTH, HEIGHT = 720, 460
+CENTER_X, CENTER_Y = 270, 220
+CHILD_RADIUS = 23
 
 
 class ActionsRing(Gtk.Window):
     def __init__(self, application, selected, dismissed, hovered=None):
         super().__init__(application=application, title="MX4 Actions Ring", decorated=False,
-                         resizable=False, default_width=460, default_height=500)
+                         resizable=False, default_width=WIDTH, default_height=HEIGHT)
         self.state = RingState()
         self.on_selected, self.on_dismissed, self.on_hover = selected, dismissed, hovered
         self.config = None
         self.preview = False
-        self.overlay_supported = bool(Layer and Layer.is_supported())
+        self.tick_id = 0
+        self.reveal = Transition(1, duration=0.18)
+        self.group_reveal = Transition(0, duration=0.16)
+        self.label_reveal = Transition(1, duration=0.10)
+        self.spread = 1.0
+        self.group_slot = self.child_selected = None
+        self.children = []
+        self.child_positions = []
+        self.settings = Gtk.Settings.get_default()
+        display = Gdk.Display.get_default()
+        self.overlay_supported = bool(Layer and display.__gtype__.name == "GdkWaylandDisplay" and Layer.is_supported())
         if self.overlay_supported:
             Layer.init_for_window(self)
             Layer.set_namespace(self, "mx4-actions-ring")
@@ -23,31 +42,134 @@ class ActionsRing(Gtk.Window):
             Layer.set_exclusive_zone(self, 0)
         self.add_css_class("mx4-ring")
         css = Gtk.CssProvider()
-        css.load_from_string("window.mx4-ring { background: transparent; box-shadow: none; }")
-        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        self.canvas = Gtk.DrawingArea(content_width=460, content_height=500, focusable=True)
+        css.load_from_string("""
+            window.mx4-ring { background: transparent; box-shadow: none; }
+            .mx4-ring button.ring-action, .mx4-ring button.ring-close {
+                background: #eef2f4; color: #15181d; border: 1px solid alpha(black, 0.15);
+                border-radius: 9999px; padding: 0; box-shadow: 0 2px 5px alpha(black, 0.16);
+                min-width: 0; min-height: 0;
+            }
+            .mx4-ring button.ring-action.selected { background: #15181d; color: white; border-color: #eef2f4; }
+            .mx4-ring button.ring-close { background: #d9e1e5; }
+            .mx4-ring button:focus-visible { outline: 3px solid #3584e4; outline-offset: 3px; }
+            .mx4-ring .ring-callout {
+                background: #f8fafb; color: #15181d; border: 1px solid alpha(black, 0.12);
+                border-radius: 12px; padding: 7px 10px; box-shadow: 0 2px 5px alpha(black, 0.12);
+            }
+            .mx4-ring .ring-shortcut { color: #53616b; font-size: 11px; }
+            .mx4-ring .ring-hint {
+                background: #20242b; color: #f0f3f6; border-radius: 12px;
+                padding: 6px 12px; font-size: 12px;
+            }
+        """)
+        Gtk.StyleContext.add_provider_for_display(display, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.canvas = Gtk.DrawingArea(content_width=WIDTH, content_height=HEIGHT, focusable=True)
+        self.canvas.update_property([Gtk.AccessibleProperty.LABEL],
+                                    ["Actions Ring. Arrow keys select, Enter opens or runs, keys 1 through 8 choose, Escape goes back or closes."])
         self.canvas.set_draw_func(self.draw)
-        self.set_child(self.canvas)
+        self.surface = Gtk.Overlay(child=self.canvas)
+        self.labels = Gtk.Fixed()
+        self.surface.add_overlay(self.labels)
+        self.buttons, self.icons = [], []
+        for index in range(8):
+            button, icon = self.make_button(BUTTON_RADIUS)
+            button.connect("clicked", lambda _button, i=index: self.commit(i) if not self.state.held else None)
+            focus = Gtk.EventControllerFocus()
+            focus.connect("enter", lambda _controller, i=index: self.focus_action(i))
+            button.add_controller(focus)
+            self.labels.put(button, 0, 0)
+            self.buttons.append(button)
+            self.icons.append(icon)
+        self.child_buttons, self.child_icons = [], []
+        for index in range(6):
+            button, icon = self.make_button(CHILD_RADIUS)
+            button.add_css_class("child-action")
+            button.set_visible(False)
+            button.connect("clicked", lambda _button, i=index: self.commit_child(i))
+            focus = Gtk.EventControllerFocus()
+            focus.connect("enter", lambda _controller, i=index: self.focus_child(i))
+            button.add_controller(focus)
+            self.labels.put(button, 0, 0)
+            self.child_buttons.append(button)
+            self.child_icons.append(icon)
+        self.close_button = Gtk.Button(icon_name="window-close-symbolic", width_request=32, height_request=32,
+                                       tooltip_text="Close Actions Ring")
+        self.close_button.add_css_class("ring-close")
+        self.close_button.update_property([Gtk.AccessibleProperty.LABEL], ["Close Actions Ring"])
+        self.close_button.connect("clicked", lambda *_: self.dismiss())
+        self.labels.put(self.close_button, CENTER_X - CENTER_RADIUS, CENTER_Y - CENTER_RADIUS)
+        self.callout = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER)
+        self.callout.add_css_class("ring-callout")
+        self.callout.set_can_target(False)
+        self.callout_label = Gtk.Label(wrap=True, lines=2, wrap_mode=Pango.WrapMode.WORD_CHAR,
+                                       ellipsize=Pango.EllipsizeMode.END, max_width_chars=1, hexpand=True)
+        self.callout.append(self.callout_label)
+        self.callout_key = Gtk.Label()
+        self.callout_key.add_css_class("ring-shortcut")
+        self.callout.append(self.callout_key)
+        self.labels.put(self.callout, 0, 0)
+        self.instructions = Gtk.Label(width_request=480)
+        self.instructions.add_css_class("ring-hint")
+        self.instructions.set_can_target(False)
+        self.labels.put(self.instructions, 30, HEIGHT - 28)
+        self.set_child(self.surface)
         motion = Gtk.EventControllerMotion()
         motion.connect("motion", self.pointer_motion)
-        self.canvas.add_controller(motion)
+        motion.connect("leave", self.pointer_leave)
+        self.surface.add_controller(motion)
         click = Gtk.GestureClick(button=1)
+        # Native buttons have square allocations. Claim pointer clicks here so
+        # only the actual circular faces can select an action.
+        click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        click.connect("pressed", lambda gesture, *_: gesture.set_state(Gtk.EventSequenceState.CLAIMED))
         click.connect("released", self.pointer_click)
-        self.canvas.add_controller(click)
+        self.surface.add_controller(click)
         keys = Gtk.EventControllerKey()
+        keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         keys.connect("key-pressed", self.key_pressed)
         self.add_controller(keys)
         self.connect("close-request", lambda *_: self.dismiss() or True)
+        self.connect("unmap", lambda *_: self.stop_animation())
+        self.settings.connect("notify::gtk-enable-animations", self.motion_preference_changed)
+
+    @staticmethod
+    def make_button(radius):
+        button = Gtk.Button(width_request=radius * 2, height_request=radius * 2)
+        button.add_css_class("ring-action")
+        icon = Gtk.Image(pixel_size=23)
+        button.set_child(icon)
+        return button, icon
+
+    def groups(self):
+        return self.config.get("ring_groups", {}) if self.config else {}
 
     def show_ring(self, config, held=False, preview=False):
         self.config, self.preview = config, preview
+        self.close_group()
         self.state.open(held)
-        self.canvas.queue_draw()
+        for index, action_id in enumerate(config["ring"]):
+            action = config["actions"][action_id]
+            grouped = str(index) in self.groups()
+            self.icons[index].set_from_icon_name(action_icon(action, grouped=grouped))
+            text = f"{index + 1}. {action['label']}" + (". Open action group" if grouped else "")
+            self.buttons[index].set_tooltip_text(text)
+            self.buttons[index].update_property([Gtk.AccessibleProperty.LABEL], [text])
+            if grouped:
+                self.expanded_state(self.buttons[index], False)
+            else:
+                self.buttons[index].reset_state(Gtk.AccessibleState.EXPANDED)
+        self.reveal.move(0, animate=False)
+        self.reveal.move(1, animate=self.animations_enabled())
+        self.apply_frame(monotonic())
+        self.update_labels()
         self.present()
         self.canvas.grab_focus()
+        self.animate()
 
     def hide_ring(self):
         self.state.cancel()
+        self.close_group()
+        self.stop_animation()
         self.set_visible(False)
         Gdk.Display.get_default().flush()
 
@@ -58,17 +180,29 @@ class ActionsRing(Gtk.Window):
         return False
 
     def commit(self, index):
+        if not self.state.visible or type(index) is not int or not 0 <= index < 8:
+            return
+        if str(index) in self.groups():
+            self.state.held = False
+            self.state.selected = index
+            self.open_group(index, focus=True)
+            return
         chosen = self.state.choose(index)
         if chosen is not None:
             self.hide_ring()
             self.on_selected(self.config["ring"][chosen], self.preview)
 
     def release_button(self):
+        index = self.state.selected
+        if self.state.visible and self.state.held and index is not None and str(index) in self.groups():
+            self.commit(index)
+            return
         index = self.state.release()
         if index is not None:
             self.hide_ring()
             self.on_selected(self.config["ring"][index], self.preview)
         else:
+            self.update_labels()
             self.canvas.queue_draw()
 
     def motion(self, dx, dy):
@@ -77,95 +211,289 @@ class ActionsRing(Gtk.Window):
         self.changed(before)
 
     def changed(self, before):
-        if before != self.state.selected and self.state.selected is not None and self.on_hover:
-            self.on_hover(self.state.selected)
+        if before != self.state.selected:
+            self.child_selected = None
+            self.update_labels()
+            if self.state.selected is not None and self.on_hover:
+                self.on_hover(self.state.selected)
+        if before != self.state.selected or self.state.held:
+            self.canvas.queue_draw()
+
+    def focus_action(self, index):
+        if self.state.visible and not self.state.held:
+            if self.group_slot is not None and index != self.group_slot:
+                self.close_group()
+            before = self.state.selected
+            self.state.selected = index
+            self.changed(before)
+
+    def open_group(self, index, focus=False):
+        children = self.groups().get(str(index))
+        if not children or not self.state.visible:
+            return
+        if self.group_slot != index:
+            if self.group_slot is not None:
+                self.expanded_state(self.buttons[self.group_slot], False)
+            self.group_slot, self.children, self.child_selected = index, list(children), None
+            self.expanded_state(self.buttons[index], True)
+            for i, button in enumerate(self.child_buttons):
+                button.set_visible(i < len(children))
+                if i < len(children):
+                    action = self.config["actions"][children[i]]
+                    self.child_icons[i].set_from_icon_name(action_icon(action))
+                    label = f"{i + 1}. {action['label']}"
+                    button.set_tooltip_text(label)
+                    button.update_property([Gtk.AccessibleProperty.LABEL], [label])
+            self.group_reveal.move(0, animate=False)
+            self.group_reveal.move(1, animate=self.animations_enabled())
+            self.apply_frame(monotonic())
+            self.animate()
+        if focus:
+            self.child_selected = 0
+            self.child_buttons[0].grab_focus()
+        self.update_labels()
+
+    def close_group(self):
+        if self.group_slot is not None:
+            self.expanded_state(self.buttons[self.group_slot], False)
+        self.group_slot = self.child_selected = None
+        self.children = []
+        self.child_positions = []
+        self.group_reveal.move(0, animate=False)
+        for button in getattr(self, "child_buttons", []):
+            button.set_visible(False)
+
+    def focus_child(self, index):
+        if self.state.visible and self.group_slot is not None and index < len(self.children):
+            before = self.child_selected
+            self.child_selected = index
+            self.update_labels()
+            if before != index and self.on_hover:
+                self.on_hover(index)
+
+    def commit_child(self, index):
+        if (self.state.visible and not self.state.held and self.group_slot is not None
+                and type(index) is int and 0 <= index < len(self.children)):
+            action_id = self.children[index]
+            self.hide_ring()
+            self.on_selected(action_id, self.preview)
+
+    def update_labels(self):
+        for index, button in enumerate(self.buttons):
+            self.selected_style(button, index == self.state.selected or index == self.group_slot)
+        for index, button in enumerate(self.child_buttons):
+            self.selected_style(button, index == self.child_selected)
+        selected = self.state.selected
+        child = self.child_selected
+        self.callout.set_visible(selected is not None or child is not None)
+        if child is not None and self.group_slot is not None:
+            action_id = self.children[child]
+            x, y = self.child_positions[child]
+            position, width = (x + CHILD_RADIUS + 10, y - 18), 176
+            key = str(child + 1)
+        elif self.group_slot is not None:
+            action_id = self.config["ring"][self.group_slot]
+            position, width = (CENTER_X + 150, 4), 230
+            key = "group"
+        elif selected is not None:
+            action_id = self.config["ring"][selected]
+            dx, dy = button_center(selected)
+            x, y = CENTER_X + dx, CENTER_Y + dy
+            width = 116 if dx < -40 else 170
+            if abs(dx) < 40:
+                position = (x - width / 2, y - 86 if dy < 0 else y + 40)
+            elif dx < 0:
+                position = (max(8, x - BUTTON_RADIUS - width - 10), y - 20)
+            else:
+                position = (x + BUTTON_RADIUS + 10, y - 20)
+            key = str(selected + 1)
+        else:
+            action_id = None
+        if action_id is not None:
+            text = self.config["actions"][action_id]["label"]
+            if text != self.callout_label.get_text():
+                self.label_reveal.move(0, animate=False)
+                self.label_reveal.move(1, animate=self.animations_enabled())
+                self.animate()
+            self.callout_label.set_text(text)
+            self.callout_label.set_lines(1 if self.group_slot is not None and child is None else 2)
+            self.callout_key.set_text(key)
+            self.callout.set_size_request(width, -1)
+            self.labels.move(self.callout, *position)
+            self.callout.set_opacity(self.label_reveal.value())
+        if self.group_slot is not None:
+            hint = f"{'Preview · ' if self.preview else ''}Choose a group action · 1–{len(self.children)} · Esc to go back"
+        else:
+            hint = ("Preview · " if self.preview else "") + ("Hold · move · release" if self.state.held else "Choose an action · 1–8 · Esc to close")
+        self.instructions.set_text(hint)
+
+    @staticmethod
+    def expanded_state(button, expanded):
+        value = GObject.Value(GObject.TYPE_INT, int(expanded))
+        button.update_state([Gtk.AccessibleState.EXPANDED], [value])
+
+    @staticmethod
+    def selected_style(button, selected):
+        if selected:
+            button.add_css_class("selected")
+        else:
+            button.remove_css_class("selected")
+
+    def animations_enabled(self):
+        return self.settings.get_property("gtk-enable-animations")
+
+    def animate(self):
+        if self.state.visible and self.animations_enabled() and not self.tick_id:
+            self.tick_id = self.canvas.add_tick_callback(self.tick)
+
+    def apply_frame(self, now):
+        reveal = self.reveal.value(now)
+        self.spread = 0.78 + 0.22 * reveal
+        self.surface.set_opacity(reveal)
+        for index, button in enumerate(self.buttons):
+            dx, dy = button_center(index)
+            self.labels.move(button, CENTER_X + dx * self.spread - BUTTON_RADIUS,
+                             CENTER_Y + dy * self.spread - BUTTON_RADIUS)
+        self.callout.set_opacity(self.label_reveal.value(now))
+        if self.group_slot is not None:
+            progress = self.group_reveal.value(now)
+            dx, dy = button_center(self.group_slot)
+            origin_x, origin_y = CENTER_X + dx, CENTER_Y + dy
+            self.child_positions = []
+            for index in range(len(self.children)):
+                offset = index - (len(self.children) - 1) / 2
+                x, y = CENTER_X + 214 - abs(offset) * 7, CENTER_Y + offset * 62
+                px, py = origin_x + (x - origin_x) * progress, origin_y + (y - origin_y) * progress
+                self.child_positions.append((px, py))
+                self.labels.move(self.child_buttons[index], px - CHILD_RADIUS, py - CHILD_RADIUS)
+                self.child_buttons[index].set_opacity(progress)
+            if self.child_selected is not None:
+                x, y = self.child_positions[self.child_selected]
+                self.labels.move(self.callout, x + CHILD_RADIUS + 10, y - 18)
+
+    def tick(self, _widget, _clock):
+        now = monotonic()
+        self.apply_frame(now)
         self.canvas.queue_draw()
+        active = self.state.visible and any(t.active(now) for t in (self.reveal, self.group_reveal, self.label_reveal))
+        if not active:
+            self.tick_id = 0
+        return active
+
+    def stop_animation(self):
+        if self.tick_id:
+            self.canvas.remove_tick_callback(self.tick_id)
+            self.tick_id = 0
+
+    def motion_preference_changed(self, *_):
+        if not self.animations_enabled():
+            self.stop_animation()
+            for transition in (self.reveal, self.group_reveal, self.label_reveal):
+                transition.move(transition.target, animate=False)
+            self.apply_frame(monotonic())
+            self.canvas.queue_draw()
+
+    def child_at(self, x, y):
+        if not math.isfinite(x) or not math.isfinite(y):
+            return None
+        for index, (cx, cy) in enumerate(self.child_positions):
+            if math.hypot(x - cx, y - cy) > CHILD_RADIUS:
+                continue
+            # Revealing children start on their parent. A trigger click must
+            # never execute an overlapping, still emerging child action.
+            main_centers = ((CENTER_X + dx * self.spread, CENTER_Y + dy * self.spread)
+                            for dx, dy in (button_center(i) for i in range(8)))
+            if any(math.hypot(cx - mx, cy - my) <= CHILD_RADIUS + BUTTON_RADIUS for mx, my in main_centers):
+                continue
+            if any(i != index and math.hypot(cx - px, cy - py) < CHILD_RADIUS * 2
+                   for i, (px, py) in enumerate(self.child_positions)):
+                continue
+            return index
+        return None
 
     def pointer_motion(self, _controller, x, y):
-        if self.state.held:
-            return  # Raw XY remains relative to the ring center while held.
+        if not self.state.visible or self.state.held:
+            return
+        if self.group_slot is not None:
+            child = self.child_at(x, y)
+            if child is not None:
+                self.focus_child(child)
+                return
         before = self.state.selected
-        self.state.point(x - self.canvas.get_width() / 2, y - 225)
+        self.state.point(x - CENTER_X, y - CENTER_Y, spread=self.spread)
+        selected = self.state.selected
+        if selected is not None and str(selected) in self.groups():
+            self.open_group(selected)
+        elif selected is not None:
+            self.close_group()
+        elif self.group_slot is not None:
+            self.state.selected = self.group_slot
+            self.child_selected = None
         self.changed(before)
+        self.update_labels()
+
+    def pointer_leave(self, *_):
+        if not self.state.held and self.group_slot is None:
+            before = self.state.selected
+            self.state.selected = None
+            self.changed(before)
 
     def pointer_click(self, _gesture, _count, x, y):
-        if self.state.held:
+        if self.state.held or not self.state.visible:
             return
-        self.state.point(x - self.canvas.get_width() / 2, y - 225)
+        if math.hypot(x - CENTER_X, y - CENTER_Y) <= CENTER_RADIUS:
+            self.dismiss()
+            return
+        if self.group_slot is not None:
+            child = self.child_at(x, y)
+            if child is not None:
+                self.commit_child(child)
+                return
+        self.state.point(x - CENTER_X, y - CENTER_Y, spread=self.spread)
         if self.state.selected is None:
             self.dismiss()
         else:
             self.commit(self.state.selected)
 
     def key_pressed(self, _controller, keyval, _keycode, _state):
-        if keyval == Gdk.KEY_Escape:
+        if not self.state.visible:
+            return False
+        if keyval in (Gdk.KEY_Escape, Gdk.KEY_BackSpace) and self.group_slot is not None:
+            parent = self.group_slot
+            self.close_group()
+            self.state.selected = parent
+            self.buttons[parent].grab_focus()
+            self.update_labels()
+        elif keyval == Gdk.KEY_Escape:
             self.dismiss()
         elif Gdk.KEY_1 <= keyval <= Gdk.KEY_8:
-            self.commit(keyval - Gdk.KEY_1)
-        elif keyval in (Gdk.KEY_Return, Gdk.KEY_space) and self.state.selected is not None:
-            self.commit(self.state.selected)
+            index = keyval - Gdk.KEY_1
+            self.commit_child(index) if self.group_slot is not None else self.commit(index)
+        elif keyval in (Gdk.KEY_Return, Gdk.KEY_space):
+            if self.get_focus() == self.close_button:
+                self.dismiss()
+            elif self.group_slot is not None and self.child_selected is not None:
+                self.commit_child(self.child_selected)
+            elif self.state.selected is not None:
+                self.commit(self.state.selected)
         elif keyval in (Gdk.KEY_Right, Gdk.KEY_Down, Gdk.KEY_Left, Gdk.KEY_Up):
-            before = self.state.selected
             direction = 1 if keyval in (Gdk.KEY_Right, Gdk.KEY_Down) else -1
-            self.state.selected = ((before if before is not None else -direction) + direction) % 8
-            self.changed(before)
+            if self.group_slot is not None:
+                before = self.child_selected
+                self.child_selected = ((before if before is not None else -direction) + direction) % len(self.children)
+                self.child_buttons[self.child_selected].grab_focus()
+                self.update_labels()
+            else:
+                before = self.state.selected
+                self.state.selected = ((before if before is not None else -direction) + direction) % 8
+                self.buttons[self.state.selected].grab_focus()
+                self.changed(before)
         else:
             return False
         return True
 
-    @staticmethod
-    def label(cr, text, x, y, size=12, bold=False, width=104):
-        # Pango handles user labels, Unicode and wrapping without markup.
-        from gi.repository import Pango, PangoCairo
-        layout = PangoCairo.create_layout(cr)
-        description = Pango.FontDescription.from_string(f"Sans {'Bold ' if bold else ''}{size}")
-        layout.set_font_description(description)
-        layout.set_text(text, -1)
-        layout.set_width(width * Pango.SCALE)
-        layout.set_alignment(Pango.Alignment.CENTER)
-        layout.set_wrap(Pango.WrapMode.WORD_CHAR)
-        layout.set_height(-2)
-        layout.set_ellipsize(Pango.EllipsizeMode.END)
-        _w, height = layout.get_pixel_size()
-        cr.move_to(x - width / 2, y - height / 2)
-        PangoCairo.show_layout(cr, layout)
-
     def draw(self, _area, cr, width, height):
-        if not self.config:
-            return
-        cx, cy = width / 2, 225
-        # Opaque ring segments remain legible over every desktop wallpaper.
-        for index in range(8):
-            angle = index * math.pi / 4 - math.pi / 2
-            a, b = angle - math.pi / 8 + .025, angle + math.pi / 8 - .025
-            cr.new_path()
-            cr.arc(cx, cy, 205, a, b)
-            cr.arc_negative(cx, cy, 76, b, a)
-            cr.close_path()
-            if self.state.selected == index:
-                cr.set_source_rgba(.22, .45, .92, .99)
-            else:
-                cr.set_source_rgba(.13, .14, .17, .98)
-            cr.fill_preserve()
-            cr.set_source_rgba(.4, .43, .52, .4)
-            cr.set_line_width(1)
-            cr.stroke()
-            x, y = cx + 143 * math.cos(angle), cy + 143 * math.sin(angle)
-            cr.set_source_rgb(.64, .70, .85)
-            self.label(cr, str(index + 1), x, y - 26, 10)
-            cr.set_source_rgb(1, 1, 1)
-            action = self.config["actions"][self.config["ring"][index]]
-            self.label(cr, action["label"], x, y + 3, 11, True)
-        cr.arc(cx, cy, 71, 0, 2 * math.pi)
-        cr.set_source_rgba(.09, .10, .12, .98)
-        cr.fill()
-        cr.set_source_rgb(.95, .96, 1)
-        self.label(cr, "Preview" if self.preview else "Actions Ring", cx, cy - 8, 12, True)
-        cr.set_source_rgb(.65, .68, .75)
-        self.label(cr, "Esc to close", cx, cy + 20, 9)
-        cr.set_source_rgb(.83, .85, .91)
-        self.label(cr, "Hold, move, release" if self.state.held else "Click an action · keys 1–8", cx, 455, 10, width=420)
-        if self.state.held:
-            cr.arc(cx + self.state.x, cy + self.state.y, 4, 0, 2 * math.pi)
-            cr.set_source_rgb(1, 1, 1)
+        if self.state.visible and self.state.held:
+            cr.arc(CENTER_X + self.state.x, CENTER_Y + self.state.y, 3, 0, math.tau)
+            cr.set_source_rgb(0.2, 0.52, 0.92)
             cr.fill()

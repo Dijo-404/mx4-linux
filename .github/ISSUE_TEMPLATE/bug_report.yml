@@ -1,0 +1,22 @@
+name: Bug report
+description: Report reproducible application behavior.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: App version, distribution, Python/GTK/Libadwaita versions, desktop/compositor, and Bolt or Bluetooth.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result, and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics and relevant logs
+      description: Include doctor --json or a traceback when relevant. Remove device serials, usernames, and other private information.
+      render: text

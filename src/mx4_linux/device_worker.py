@@ -63,6 +63,7 @@ def _isolated_solaar(api, software_id=0x0C):
     old_persister = api.configuration.persister
     old_pending = api.hidpp10.set_configuration_pending_flags
     old_open, old_close = api.base.open_path, api.base.close
+    old_find_paired = getattr(api.base, "find_paired_node", None)
     has_software_id = hasattr(api.base, "SOLAAR_SOFTWARE_ID")
     old_software_id = getattr(api.base, "SOLAAR_SOFTWARE_ID", None)
     handles = {}
@@ -86,6 +87,10 @@ def _isolated_solaar(api, software_id=0x0C):
     api.configuration.persister = lambda _device: None
     api.hidpp10.set_configuration_pending_flags = lambda *_args, **_kwargs: True
     api.base.open_path, api.base.close = tracked_open, tracked_close
+    if old_find_paired is not None:
+        # The receiver handle works while a paired udev node appears. Solaar's
+        # one-second busy wait otherwise repeats for every request and scan.
+        api.base.find_paired_node = lambda path, number, timeout: old_find_paired(path, number, min(timeout, .01))
     if has_software_id:
         api.base.SOLAAR_SOFTWARE_ID = software_id
     try:
@@ -97,6 +102,8 @@ def _isolated_solaar(api, software_id=0x0C):
             except Exception:
                 logging.getLogger(__name__).exception("Closing HID handle")
         api.base.open_path, api.base.close = old_open, old_close
+        if old_find_paired is not None:
+            api.base.find_paired_node = old_find_paired
         api.configuration.persister = old_persister
         api.hidpp10.set_configuration_pending_flags = old_pending
         if has_software_id:
@@ -205,11 +212,11 @@ def _describe_setting(setting, dev, api):
     return result
 
 
-def _discover_settings(dev, api, path, diagnostics):
+def _discover_settings(dev, api, path, diagnostics, names=ALLOWED_SETTINGS):
     """Only build reviewed templates: broad discovery can add event handlers."""
     found = []
     templates = api.settings_templates.SETTINGS
-    for name in ALLOWED_SETTINGS:
+    for name in names:
         for template in templates:
             if template.name != name or not template.feature:
                 continue
@@ -250,9 +257,18 @@ def _children(owner, info, diagnostics):
             diagnostics.append(_diagnostic(info.path, error))
 
 
-def _devices(api, diagnostics):
+def _devices(api, diagnostics, target_id=None):
     """Yield devices while owning their receiver/direct-device handle."""
+    if target_id is not None:
+        try:
+            target_path, target_number = json.loads(target_id)
+            if not isinstance(target_path, str) or type(target_number) is not int:
+                return
+        except (ValueError, TypeError):
+            return
     for info in api.base.receivers_and_devices():
+        if target_id is not None and str(info.path) != target_path:
+            continue
         owner = None
         try:
             factory = api.device.create_device if info.isDevice else api.receiver.create_receiver
@@ -260,7 +276,17 @@ def _devices(api, diagnostics):
             if owner is None:
                 diagnostics.append(_diagnostic(info.path, RuntimeError("Unable to open HID device")))
                 continue
-            for dev in _children(owner, info, diagnostics):
+            # Open only enumerated paths; a selection must never become an
+            # arbitrary user-supplied path or probe unrelated receiver slots.
+            if target_id is None:
+                children = _children(owner, info, diagnostics)
+            elif info.isDevice:
+                children = (owner,) if owner.number == target_number else ()
+            else:
+                children = (owner[target_number],) if 1 <= target_number <= 7 else ()
+            for dev in children:
+                if dev is None:
+                    continue
                 try:
                     dev.ping()
                     if _is_mx4(dev.name):
@@ -343,13 +369,19 @@ def _write(request, api):
     if "value" not in request:
         raise ValueError("A setting value is required")
     diagnostics = []
-    with contextlib.closing(_devices(api, diagnostics)) as discovered:
+    with contextlib.closing(_devices(api, diagnostics, target_id)) as discovered:
         for dev, path in discovered:
             if _device_id(path, dev.number) != target_id:
                 continue
             if not dev.online:
                 raise RuntimeError("Device is offline; wake it and scan again")
-            settings = _discover_settings(dev, api, path, diagnostics)
+            names = [name]
+            if name in ("smart-shift", "scroll-ratchet"):
+                names.append("scroll-ratchet" if name == "smart-shift" else "smart-shift")
+            elif name == "scroll-ratchet-torque":
+                names.append("scroll-ratchet")
+            settings = _discover_settings(dev, api, path, diagnostics, names)
+            refresh_required = bool(diagnostics)
             setting = next((item for item in settings if item.name == name), None)
             if setting is None:
                 raise ValueError("Setting is not supported by the connected device")
@@ -371,7 +403,24 @@ def _write(request, api):
                 actual = actual.get(key, actual.get(str(key)))
             if actual is None or type(value) is bool and type(actual) is not bool or actual != value:
                 raise RuntimeError(f"Device readback did not confirm the change (received {_json_value(actual)!r})")
-            return {"ok": True, "value": _json_value(actual)}
+            response = {"ok": True, "value": _json_value(actual)}
+            values = {}
+            for related in settings:
+                if related is not setting:
+                    try:
+                        value = _read_live(related, dev, api)
+                        if value is not None:
+                            values[related.name] = _json_value(value)
+                        else:
+                            refresh_required = True
+                    except Exception:
+                        refresh_required = True
+                        logging.getLogger(__name__).debug("Reading related setting %s", related.name, exc_info=True)
+            if values:
+                response["values"] = values
+            if refresh_required:
+                response["refresh_required"] = True
+            return response
     message = "Device is unavailable; scan again"
     if diagnostics:
         message += ": " + "; ".join(item["message"] for item in diagnostics)

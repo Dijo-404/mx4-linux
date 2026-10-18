@@ -4,7 +4,7 @@ MX4 Linux separates hardware profiles from desktop actions. Both use `$XDG_CONFI
 
 ## Desktop configuration
 
-`desktop.json` holds the ring, routines, button bindings and feedback preference. Edit it through **Configure** in the GUI, or export the complete document before changing it:
+`desktop.json` holds the ring, routines, button bindings and feedback preference. Edit it through **Actions → Edit actions** in the GUI, or export the complete document before changing it:
 
 ```bash
 .venv/bin/mx4-linux actions show > desktop.json
@@ -14,18 +14,31 @@ MX4 Linux separates hardware profiles from desktop actions. Both use `$XDG_CONFI
 
 `validate` checks without saving or executing. `import` validates then replaces the saved document. Disable and re-enable mouse integration after importing changed button bindings while the GUI is running. Saving in the GUI stops mouse integration; enable it again afterwards.
 
-All top-level fields are required. Unknown fields are rejected. The file and its serialized configuration are limited to 1 MiB.
+All top-level fields except `ring_groups` are required. Unknown fields are rejected. The file and its serialized configuration are limited to 1 MiB.
 
 | Field | Type and limits | Default when no file exists |
 | :--- | :--- | :--- |
 | `version` | Integer, exactly `1` | `1` |
 | `ring` | Exactly eight existing action IDs, clockwise from the top; IDs may repeat | `overview`, `screenshot`, `terminal`, `workspace-next`, `paste`, `copy`, `undo`, `workspace-previous` |
+| `ring_groups` | Optional object mapping decimal ring positions `"0"`–`"7"` to 1–6 distinct existing action IDs in display order | Absent; each position runs its assigned action directly |
 | `actions` | Object containing 1–128 named routines | Eight built-in routines listed below |
 | `button_bindings` | Object mapping supported decimal button IDs to existing action IDs | `{}` |
 | `ring_button` | Integer: one of `82`, `83`, `86`, `195`, `196`, `416` | `416` (haptic panel) |
 | `haptic_feedback` | Boolean controlling selection feedback | `true` |
 
 `button_bindings` cannot assign the selected `ring_button`. Supported IDs are a configuration allowlist; the listener also verifies that the connected device supports each selected control. Primary left/right click and scrolling are excluded from diversion.
+
+### Action groups
+
+Expand **Action groups (optional)** in the Actions Ring editor to make a position open a submenu. Its assigned routine provides the group's label and icon; choosing a child runs that child's existing routine. A group belongs to a ring position, so assigning the same routine elsewhere does not create another group. Calling the parent routine directly, including through a mouse button shortcut, still runs its normal steps.
+
+For example, this optional fragment puts three routines behind the right-hand position (position `"2"`):
+
+```json
+"ring_groups": {"2": ["copy", "paste", "undo"]}
+```
+
+Choose entries in the order you want them displayed. Empty dropdowns are omitted; leaving all six empty removes the group. Groups have one level and cannot repeat an action within the same group. Renaming a routine updates its group entries when you save. Deleting a routine removes its entries and removes groups left empty. Existing version 1 files without `ring_groups` continue to work unchanged.
 
 ### Routines
 

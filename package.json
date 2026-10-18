@@ -1,0 +1,28 @@
+{
+  "name": "mx4-linux",
+  "version": "0.2.0",
+  "description": "Native Linux controls, Actions Ring and Smart Actions for Logitech MX Master 4",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "bin": { "mx4-linux": "bin/mx4-linux.js" },
+  "engines": { "node": ">=22" },
+  "os": ["linux"],
+  "repository": { "type": "git", "url": "git+https://github.com/Dijo-404/mx4-linux.git" },
+  "homepage": "https://github.com/Dijo-404/mx4-linux#readme",
+  "bugs": { "url": "https://github.com/Dijo-404/mx4-linux/issues" },
+  "keywords": ["logitech", "mx-master-4", "linux", "gtk", "hidpp", "wayland"],
+  "files": [
+    "bin/", "src/mx4_linux/**/*.py", "src/mx4_linux/icons/*.svg",
+    "data/", "scripts/*.sh", "pyproject.toml",
+    "docs/", "CONTRIBUTING.md", "CHANGELOG.md", "SECURITY.md"
+  ],
+  "scripts": {
+    "start": "node bin/mx4-linux.js",
+    "setup": "node bin/mx4-linux.js setup",
+    "test": "node --test tests/npm/*.test.js",
+    "check": "node --check bin/mx4-linux.js && node --check scripts/check-package.js && node scripts/check-package.js",
+    "test:package": "node scripts/check-package.js --smoke",
+    "test:native": "node scripts/check-package.js --smoke --native"
+  },
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" }
+}
