@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from mx4_linux.ring_model import RingState, sector
+from mx4_linux.ring_model import BUTTON_RADIUS, ORBIT_RADIUS, RingState, button_at, button_center, sector
 
 
 @pytest.mark.parametrize("index", range(8))
@@ -38,7 +38,7 @@ def test_short_click_latches_then_pointer_choose_closes():
     ring.press()
     assert ring.release() is None
     assert ring.visible and not ring.held
-    assert ring.point(140, 0) == 2
+    assert ring.point(*button_center(2)) == 2
     assert ring.choose(2) == 2
     assert not ring.visible
 
@@ -47,7 +47,7 @@ def test_second_press_cancels_latched_ring_and_release_does_nothing():
     ring = RingState()
     ring.press()
     ring.release()
-    ring.point(0, -140)
+    ring.point(*button_center(0))
     assert ring.press() == "cancel"
     assert not ring.visible and not ring.held
     assert ring.release() is None
@@ -75,11 +75,62 @@ def test_raw_motion_is_ignored_when_closed_or_latched_and_radius_is_bounded():
     assert ring.x == ring.y == 0
 
 
-@pytest.mark.parametrize("radius,expected", [(0, None), (65, None), (71, None), (75.99, None), (76, 2), (140, 2), (205, 2), (205.01, None)])
-def test_pointer_hit_area_matches_visible_ring(radius, expected):
+@pytest.mark.parametrize("index", range(8))
+def test_pointer_selects_each_circular_button(index):
     ring = RingState()
     ring.open()
-    assert ring.point(radius, 0) == expected
+    assert ring.point(*button_center(index)) == index
+
+
+@pytest.mark.parametrize("index", range(8))
+def test_button_centers_match_clockwise_orbit(index):
+    x, y = button_center(index)
+    assert math.hypot(x, y) == pytest.approx(ORBIT_RADIUS)
+    assert sector(x, y) == index
+
+
+@pytest.mark.parametrize("offset,expected", [(-26.01, None), (-26, 2), (0, 2), (26, 2), (26.01, None)])
+def test_pointer_hit_area_stops_at_circle_boundary(offset, expected):
+    assert button_at(ORBIT_RADIUS + offset, 0) == expected
+
+
+@pytest.mark.parametrize("index", range(8))
+def test_gaps_between_buttons_do_not_select_invisible_sector(index):
+    angle = (index + .5) * math.pi / 4
+    assert button_at(ORBIT_RADIUS * math.sin(angle), -ORBIT_RADIUS * math.cos(angle)) is None
+
+
+@pytest.mark.parametrize("x,y", [(0, 0), (23, 0), (205, 0), (float("nan"), 100), (100, float("inf"))])
+def test_pointer_center_outside_and_nonfinite_positions_clear_selection(x, y):
+    ring = RingState()
+    ring.open()
+    ring.point(*button_center(0))
+    assert ring.point(x, y) is None
+
+
+def test_pointer_cannot_select_in_a_button_bounding_box_corner():
+    assert button_at(ORBIT_RADIUS + BUTTON_RADIUS, BUTTON_RADIUS) is None
+
+
+def test_pointer_is_ignored_when_closed():
+    ring = RingState()
+    assert ring.point(*button_center(0)) is None
+
+
+def test_pointer_tracks_painted_button_positions_during_entry():
+    ring = RingState()
+    ring.open()
+    x, y = button_center(0)
+    spread = .78
+    assert ring.point(x * spread, y * spread, spread=spread) == 0
+    assert ring.point(x * spread, y * spread + BUTTON_RADIUS - 1, spread=spread) == 0
+    assert ring.point(x, y - BUTTON_RADIUS, spread=spread) is None
+    assert ring.point(x * spread + BUTTON_RADIUS, y * spread + BUTTON_RADIUS, spread=spread) is None
+
+
+@pytest.mark.parametrize("spread", [0, -1, float("nan"), float("inf")])
+def test_invalid_animation_spread_has_no_pointer_target(spread):
+    assert button_at(*button_center(0), spread=spread) is None
 
 
 @pytest.mark.parametrize("index", [-1, 8, 3.2, True, "1", None])

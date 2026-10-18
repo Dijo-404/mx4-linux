@@ -29,6 +29,41 @@ def test_defaults_are_fresh_valid_and_have_eight_ring_actions():
     assert len(default_config()["actions"]["copy"]["steps"]) == 1
 
 
+def test_optional_groups_round_trip_without_changing_parent_execution(tmp_path):
+    config = default_config()
+    config["ring_groups"] = {"2": ["copy", "paste", "undo"], "7": ["overview"]}
+    store = DesktopConfigStore(tmp_path / "desktop.json")
+    store.save(config)
+    assert store.read() == config
+    assert DesktopActions(config, dry_run=True).execute(config["ring"][2])["action_id"] == "terminal"
+
+
+def test_legacy_configuration_validation_keeps_optional_groups_absent():
+    config = default_config()
+    assert "ring_groups" not in config
+    assert validate_config(config) is config
+    assert "ring_groups" not in config
+
+
+def test_groups_accept_all_positions_and_six_distinct_children():
+    config = default_config()
+    config["ring_groups"] = {str(index): config["ring"][:6] for index in range(8)}
+    assert validate_config(config) is config
+
+
+@pytest.mark.parametrize("groups", [
+    None, [], "groups", {0: ["copy"]}, {True: ["copy"]}, {"8": ["copy"]},
+    {"-1": ["copy"]}, {"00": ["copy"]}, {"1.0": ["copy"]},
+    {"0": []}, {"0": ["copy"] * 7}, {"0": ("copy",)}, {"0": "copy"},
+    {"0": ["missing"]}, {"0": [None]}, {"0": [{}]}, {"0": ["copy", "copy"]},
+])
+def test_invalid_action_groups_rejected(groups):
+    config = default_config()
+    config["ring_groups"] = groups
+    with pytest.raises(RuntimeError, match="Invalid desktop configuration: ring[_ ]group"):
+        validate_config(config)
+
+
 def test_terminal_environment_is_split_into_literal_argv(monkeypatch):
     monkeypatch.setenv("TERMINAL", 'kitty --title "hello $(touch nope)"')
     monkeypatch.setattr(actions.shutil, "which", lambda program: "/usr/bin/" + program)

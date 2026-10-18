@@ -3,6 +3,30 @@
 import math
 
 
+ORBIT_RADIUS = 116
+BUTTON_RADIUS = 26
+CENTER_RADIUS = 16
+_BUTTON_CENTERS = tuple(
+    (ORBIT_RADIUS * math.sin(index * math.pi / 4), -ORBIT_RADIUS * math.cos(index * math.pi / 4))
+    for index in range(8)
+)
+
+
+def button_center(index):
+    """Return a button center relative to the middle of the ring."""
+    return _BUTTON_CENTERS[index]
+
+
+def button_at(x, y, *, spread=1.0):
+    """Select only a painted button circle, leaving the gaps inert."""
+    if not math.isfinite(x) or not math.isfinite(y) or not math.isfinite(spread) or spread <= 0:
+        return None
+    for index, (cx, cy) in enumerate(_BUTTON_CENTERS):
+        if math.hypot(x - cx * spread, y - cy * spread) <= BUTTON_RADIUS:
+            return index
+    return None
+
+
 def sector(x, y, deadzone=24):
     if not math.isfinite(x) or not math.isfinite(y) or math.hypot(x, y) < deadzone:
         return None
@@ -41,9 +65,9 @@ class RingState:
         self.selected = sector(self.x, self.y)
         return self.selected
 
-    def point(self, x, y):
+    def point(self, x, y, *, spread=1.0):
         if self.visible:
-            self.selected = sector(x, y, 76) if math.hypot(x, y) <= 205 else None
+            self.selected = button_at(x, y, spread=spread)
         return self.selected
 
     def release(self):
