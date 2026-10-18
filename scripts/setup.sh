@@ -2,6 +2,7 @@
 set -euo pipefail
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_dir"
+"$project_dir/scripts/setup-font.sh"
 python_bin="${PYTHON:-python3}"
 "$python_bin" - <<'PY'
 try:
