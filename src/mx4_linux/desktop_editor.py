@@ -15,9 +15,10 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
 from .actions import SHOW_RING, set_button_assignment, ACTION_ID, MAX_ACTIONS, MAX_GROUP_ACTIONS, MAX_STEPS, validate_config
+from .applications import installed_applications
 from .ring_preview import RingPreview
 
 
@@ -27,7 +28,7 @@ BUTTON_NAMES = {82: "Middle button", 83: "Back button", 86: "Forward button",
                 195: "Gesture button", 196: "Wheel mode button", 416: "Haptic panel"}
 TEMPLATES = (
     ("Keyboard shortcut", "shortcut", "Keyboard shortcut", [{"type": "shortcut", "keys": ["CTRL", "C"]}]),
-    ("Launch application", "launch", "Launch application", [{"type": "command", "argv": ["xdg-open", str(Path.home())]}]),
+    ("Open application", "launch", "Open application", []),
     ("Insert text", "text", "Insert text", [{"type": "text", "text": "Hello from MX4 Linux"}]),
     ("Multiple steps", "routine", "Copy and paste", [
         {"type": "shortcut", "keys": ["CTRL", "C"]},
@@ -37,10 +38,11 @@ TEMPLATES = (
 )
 STEP_TYPES = (
     ("Keyboard shortcut", "shortcut", {"type": "shortcut", "keys": ["CTRL", "C"]}),
-    ("Open application", "command", {"type": "command", "argv": ["xdg-open", str(Path.home())]}),
+    ("Run command", "command", {"type": "command", "argv": ["xdg-open", str(Path.home())]}),
     ("Insert text", "text", {"type": "text", "text": "Hello"}),
     ("Wait", "delay", {"type": "delay", "milliseconds": 150}),
     ("Niri desktop action", "niri", {"type": "niri", "action": "toggle-overview", "args": []}),
+    ("Open application", "application", None),
 )
 STEP_NAMES = {kind: label for label, kind, _default in STEP_TYPES}
 
@@ -52,6 +54,8 @@ def _step_values(step):
         value, extra = " + ".join(step["keys"]), ""
     elif kind == "command":
         value, extra = shlex.join(step["argv"]), ""
+    elif kind == "application":
+        value, extra = step["desktop_id"], ""
     elif kind == "text":
         value, extra = step["text"], ""
     elif kind == "delay":
@@ -68,6 +72,8 @@ def _values_step(values):
         return {"type": kind, "keys": [key.strip().upper() for key in value.split("+") if key.strip()]}
     if kind == "command":
         return {"type": kind, "argv": shlex.split(value)}
+    if kind == "application":
+        return {"type": kind, "desktop_id": value}
     if kind == "text":
         return {"type": kind, "text": value}
     if kind == "delay":
@@ -81,8 +87,9 @@ class _DraftError(ValueError):
         self.action_id = action_id
 
 
-def _label(text, *, dim=False):
-    widget = Gtk.Label(label=text, xalign=0, wrap=True)
+def _label(text, *, dim=False, alert=False):
+    options = {"accessible_role": Gtk.AccessibleRole.ALERT} if alert else {}
+    widget = Gtk.Label(label=text, xalign=0, wrap=True, **options)
     if dim:
         widget.add_css_class("dim-label")
     return widget
@@ -91,7 +98,8 @@ def _label(text, *, dim=False):
 def _page():
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24,
                   margin_start=24, margin_end=24, margin_top=24, margin_bottom=24)
-    clamp = Adw.Clamp(maximum_size=820, tightening_threshold=650)
+    box.add_css_class("mx4-editor-page")
+    clamp = Adw.Clamp(maximum_size=760, tightening_threshold=560)
     clamp.set_child(box)
     scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
     scroll.set_child(clamp)
@@ -99,29 +107,92 @@ def _page():
 
 
 def _action_dropdown(*, accessible_name, **kwargs):
-    choice = Gtk.DropDown(enable_search=True, **kwargs)
-    choice.update_property([Gtk.AccessibleProperty.LABEL], [accessible_name])
-    factory = Gtk.SignalListItemFactory()
-
-    def setup(_factory, item):
-        item.set_child(Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END, max_width_chars=30))
-
-    def bind(_factory, item):
-        label = item.get_child()
-        text = item.get_item().get_string()
-        label.set_text(text)
-        label.set_tooltip_text(text)
-
-    factory.connect("setup", setup)
-    factory.connect("bind", bind)
-    choice.set_factory(factory)
+    from .reference_shell import bounded_dropdown
+    choice = bounded_dropdown([], accessible_name=accessible_name)
+    for name, value in kwargs.items():
+        choice.set_property(name.replace("_", "-"), value)
     return choice
+
+
+def _intro(title, description):
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    box.add_css_class("mx4-editor-intro")
+    heading = _label(title)
+    heading.add_css_class("title-2")
+    box.append(heading)
+    box.append(_label(description, dim=True))
+    return box
+
+
+class ApplicationPicker(Gtk.Box):
+    """An inline, searchable list: choosing a launcher only changes the draft."""
+
+    def __init__(self, on_selected, on_cancel):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add_css_class("mx4-application-picker")
+        self.on_selected = on_selected
+        self.applications = installed_applications()
+        header = Gtk.Box(spacing=8)
+        self.search = Gtk.SearchEntry(hexpand=True, placeholder_text="Search installed applications")
+        self.search.update_property([Gtk.AccessibleProperty.LABEL], ["Search installed applications"])
+        self.search.connect("search-changed", self._search_changed)
+        self.search.connect("stop-search", lambda *_: on_cancel())
+        header.append(self.search)
+        cancel = Gtk.Button(icon_name="window-close-symbolic", valign=Gtk.Align.CENTER,
+                            tooltip_text="Cancel application selection")
+        cancel.update_property([Gtk.AccessibleProperty.LABEL], ["Cancel application selection"])
+        cancel.connect("clicked", lambda *_: on_cancel())
+        header.append(cancel)
+        self.append(header)
+        self.list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self.list.add_css_class("boxed-list")
+        self.list.connect("row-activated", lambda _list, row: self.on_selected(row.application))
+        self.rows = []
+        for application in self.applications:
+            row = Adw.ActionRow(title=application["name"], subtitle=application["desktop_id"],
+                                use_markup=False, activatable=True, title_lines=1, subtitle_lines=1)
+            row.application = application
+            row.search_text = " ".join((application["name"], application["desktop_id"], application["description"])).casefold()
+            icon = (Gtk.Image.new_from_gicon(application["icon"]) if application["icon"]
+                    else Gtk.Image.new_from_icon_name("application-x-executable-symbolic"))
+            icon.set_pixel_size(24)
+            row.add_prefix(icon)
+            row.add_suffix(Gtk.Image.new_from_icon_name("list-add-symbolic"))
+            self.list.append(row)
+            self.rows.append(row)
+        self.list.set_filter_func(lambda row: self.search.get_text().casefold().strip() in row.search_text)
+        self.scroll = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER,
+                                         min_content_height=180, max_content_height=270,
+                                         propagate_natural_height=True, child=self.list)
+        self.append(self.scroll)
+        self.empty = _label("No installed applications found. You can add a Run command step instead.", dim=True)
+        self.append(self.empty)
+        self._search_changed()
+
+    def _search_changed(self, *_):
+        self.list.invalidate_filter()
+        query = self.search.get_text().casefold().strip()
+        any_match = any(query in row.search_text for row in self.rows)
+        self.scroll.set_visible(any_match)
+        self.empty.set_visible(not any_match)
+        self.empty.set_text("No applications match your search." if self.applications
+                            else "No installed applications found. You can add a Run command step instead.")
 
 
 class DesktopEditor(Adw.Window):
     def __init__(self, parent, store, on_saved):
         super().__init__(title="Actions Ring and Smart Actions", transient_for=parent,
-                         modal=True, default_width=900, default_height=760)
+                         modal=True, default_width=840, default_height=760)
+        self.add_css_class("mx4-shell")
+        self.add_css_class("mx4-editor")
+        self.style = Adw.StyleManager.get_default()
+        self.settings = Gtk.Settings.get_default()
+        self.style_handler = self.motion_handler = 0
+        self.compact = False
+        self.connect("map", self._connect_visual_preferences)
+        self.connect("unmap", self._disconnect_visual_preferences)
+        self.connect("destroy", self._disconnect_visual_preferences)
+        self._sync_appearance()
         self.store = store
         self.on_saved = on_saved
         self.config = deepcopy(store.read())
@@ -141,6 +212,11 @@ class DesktopEditor(Adw.Window):
         self.ring_choices = []
         self.group_choices = []
         self.binding_choices = []
+        self.page_boxes = []
+        self.toolbar_rows = []
+        self.choice_rows = []
+        self.application_picker = None
+        self.integration = getattr(parent, "desktop", None)
         self.connect("close-request", self._close_requested)
 
         toolbar = Adw.ToolbarView()
@@ -149,6 +225,8 @@ class DesktopEditor(Adw.Window):
                                            subtitle="Customize your mouse workflow")
         header.set_title_widget(self.window_title)
         self.save_button = Gtk.Button(label="Save changes", sensitive=False)
+        self.save_button.set_tooltip_text("Save changes · Ctrl+S")
+        self.save_button.update_property([Gtk.AccessibleProperty.LABEL], ["Save changes"])
         self.save_button.add_css_class("suggested-action")
         self.save_button.connect("clicked", self._save)
         header.pack_end(self.save_button)
@@ -157,7 +235,7 @@ class DesktopEditor(Adw.Window):
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.stack = Gtk.Stack(vexpand=True)
         self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self.stack.set_transition_duration(160)
+        self._sync_motion()
         switcher = Gtk.StackSwitcher(stack=self.stack, halign=Gtk.Align.CENTER,
                                      margin_top=10, margin_bottom=10)
         content.append(switcher)
@@ -165,7 +243,7 @@ class DesktopEditor(Adw.Window):
         self._build_actions()
         content.append(self.stack)
 
-        self.error = _label("", dim=False)
+        self.error = _label("", alert=True)
         self.error.add_css_class("error")
         self.error.set_selectable(True)
         self.error.set_focusable(True)
@@ -176,31 +254,135 @@ class DesktopEditor(Adw.Window):
         self.error.set_visible(False)
         content.append(self.error)
         toolbar.set_content(content)
-        self.set_content(toolbar)
+        responsive = Adw.BreakpointBin(child=toolbar, width_request=320, height_request=300)
+        compact = Adw.Breakpoint(condition=Adw.BreakpointCondition.parse("max-width: 620px"))
+        compact.connect("apply", lambda *_: self._set_compact(True))
+        compact.connect("unapply", lambda *_: self._set_compact(False))
+        responsive.add_breakpoint(compact)
+        self.set_content(responsive)
+        keys = Gtk.EventControllerKey()
+        # Let native popovers consume Escape before dismissing the editor.
+        keys.set_propagation_phase(Gtk.PropagationPhase.BUBBLE)
+        keys.connect("key-pressed", self._key_pressed)
+        self.add_controller(keys)
         self._refresh_choices()
         self._load_selected()
         self.loading = False
 
+    def _sync_appearance(self, *_):
+        if self.style.get_dark():
+            self.remove_css_class("mx4-light")
+        else:
+            self.add_css_class("mx4-light")
+
+    def _sync_motion(self, *_):
+        enabled = self.settings.get_property("gtk-enable-animations")
+        self.stack.set_transition_duration(180 if enabled else 0)
+        if enabled:
+            self.remove_css_class("reduced-motion")
+        else:
+            self.add_css_class("reduced-motion")
+
+    def _connect_visual_preferences(self, *_):
+        self._sync_appearance()
+        self._sync_motion()
+        if not self.style_handler:
+            self.style_handler = self.style.connect("notify::dark", self._sync_appearance)
+        if not self.motion_handler:
+            self.motion_handler = self.settings.connect("notify::gtk-enable-animations", self._sync_motion)
+
+    def _disconnect_visual_preferences(self, *_):
+        if self.style_handler:
+            self.style.disconnect(self.style_handler)
+            self.style_handler = 0
+        if self.motion_handler:
+            self.settings.disconnect(self.motion_handler)
+            self.motion_handler = 0
+
+    def _set_compact(self, compact):
+        self.compact = compact
+        self.window_title.set_title("Actions & routines" if compact else "Actions Ring and Smart Actions")
+        self.save_button.set_label("Saving…" if self.saving else "Save" if compact else "Save changes")
+        for page in self.page_boxes:
+            page.set_margin_start(16 if compact else 24)
+            page.set_margin_end(16 if compact else 24)
+        for row in self.toolbar_rows:
+            row.set_orientation(Gtk.Orientation.VERTICAL if compact else Gtk.Orientation.HORIZONTAL)
+        for body, copy, choice in self.choice_rows:
+            body.set_orientation(Gtk.Orientation.VERTICAL if compact else Gtk.Orientation.HORIZONTAL)
+            copy.set_hexpand(not compact)
+            choice.set_hexpand(compact)
+            choice.set_size_request(-1 if compact else 230, -1)
+
+    def _choice_row(self, title, subtitle, choice):
+        from .reference_shell import choice_row
+        row = choice_row(title, subtitle, choice)
+        body = row.get_child()
+        copy = body.get_first_child()
+        body.set_orientation(Gtk.Orientation.HORIZONTAL)
+        copy.set_hexpand(True)
+        copy.set_valign(Gtk.Align.CENTER)
+        choice.set_hexpand(False)
+        choice.set_size_request(230, -1)
+        self.choice_rows.append((body, copy, choice))
+        return row
+
+    def _key_pressed(self, _controller, keyval, _keycode, state):
+        modifiers = state & Gtk.accelerator_get_default_mod_mask()
+        if modifiers == Gdk.ModifierType.CONTROL_MASK and keyval in (Gdk.KEY_s, Gdk.KEY_S):
+            if self.dirty and not self.saving:
+                self._save()
+            return True
+        if keyval == Gdk.KEY_Escape and not modifiers:
+            if self.application_picker is not None:
+                box, previous_focus = self.application_picker
+                if box.get_visible() and box.get_root() is self:
+                    box.set_visible(False)
+                    if previous_focus is not None and previous_focus.get_root() is self:
+                        previous_focus.grab_focus()
+                    return True
+            if not self.saving:
+                self.close()
+            return True
+        return False
+
     def _build_ring(self):
         page, scroll = _page()
-        intro = _label("Your shortcuts, one gesture away")
-        intro.add_css_class("title-2")
-        page.append(intro)
-        page.append(_label("Hold the haptic panel, move toward an action, then release. "
+        self.page_boxes.append(page)
+        page.append(_intro("Your shortcuts, one gesture away",
+                           "Hold the haptic panel, move toward an action, then release. "
                            "A short click opens the ring for point-and-click selection. "
-                           "Choose what each position does below.", dim=True))
+                           "Choose what each position does below."))
+        if self.integration is not None:
+            integration_group = Adw.PreferencesGroup()
+            self.integration_status = Adw.ActionRow(title="Mouse integration", use_markup=False)
+            self.integration_status.set_subtitle_lines(0)
+            self.integration_toggle = Gtk.Button(valign=Gtk.Align.CENTER)
+            self.integration_toggle.connect("clicked", self._toggle_integration)
+            self.integration_status.add_suffix(self.integration_toggle)
+            integration_group.add(self.integration_status)
+            page.append(integration_group)
+            self.update_integration_status()
+        application_controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.add_application_button = Gtk.Button(label="Add application", halign=Gtk.Align.START,
+                                                 valign=Gtk.Align.CENTER)
+        self.add_application_button.connect("clicked", self._open_ring_application_picker)
+        application_controls.append(self.add_application_button)
+        self.ring_application_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, visible=False)
+        application_controls.append(self.ring_application_box)
+        self.application_notice = _label("", dim=True)
+        self.application_notice.set_visible(False)
+        application_controls.append(self.application_notice)
+        page.append(application_controls)
         self.ring_preview = RingPreview(self.config, on_selected=self._preview_selected)
         page.append(self.ring_preview)
         group = Adw.PreferencesGroup(title="Ring positions", description="Eight actions, clockwise from the top. Edit their steps in Smart Actions.")
         for index, name in enumerate(SLOT_NAMES):
-            row = Adw.ActionRow(use_markup=False, title=name, subtitle=f"Position {index + 1} · key {index + 1} in the ring")
             choice = _action_dropdown(accessible_name=f"Action at {name.lower()} ring position", valign=Gtk.Align.CENTER)
             choice.set_tooltip_text(f"Action at ring position {index + 1}: {name}")
-            choice.set_hexpand(False)
             choice.connect("notify::selected", self._ring_changed, index)
-            row.add_suffix(choice)
             self.ring_choices.append(choice)
-            group.add(row)
+            group.add(self._choice_row(name, f"Position {index + 1} · key {index + 1} in the ring", choice))
         page.append(group)
 
         groups = Adw.PreferencesGroup(description="Turn a ring position into a group of up to six routines. "
@@ -209,12 +391,10 @@ class DesktopEditor(Adw.Window):
             row = Adw.ExpanderRow(title=name, use_markup=False)
             choices = []
             for child in range(MAX_GROUP_ACTIONS):
-                child_row = Adw.ActionRow(title=f"Action {child + 1}", use_markup=False)
                 choice = _action_dropdown(accessible_name=f"Group action {child + 1} at {name.lower()} ring position",
                                           valign=Gtk.Align.CENTER)
                 choice.connect("notify::selected", self._group_changed, index)
-                child_row.add_suffix(choice)
-                row.add_row(child_row)
+                row.add_row(self._choice_row(f"Action {child + 1}", "", choice))
                 choices.append(choice)
             self.group_choices.append((row, choices))
             groups.add(row)
@@ -230,6 +410,7 @@ class DesktopEditor(Adw.Window):
         feedback = Adw.ActionRow(use_markup=False, title="Haptic feedback",
                                  subtitle="Feel a pulse when the ring opens.")
         self.haptics = Gtk.Switch(active=self.config["haptic_feedback"], valign=Gtk.Align.CENTER)
+        self.haptics.update_property([Gtk.AccessibleProperty.LABEL], ["Haptic feedback when the ring opens"])
         self.haptics.connect("notify::active", self._haptics_changed)
         feedback.add_suffix(self.haptics)
         feedback.set_activatable_widget(self.haptics)
@@ -239,13 +420,11 @@ class DesktopEditor(Adw.Window):
         bindings = Adw.PreferencesGroup(
                                         description="A shortcut replaces that button's normal function while desktop controls are enabled.")
         for cid, name in BUTTON_NAMES.items():
-            row = Adw.ActionRow(use_markup=False, title=name)
             choice = _action_dropdown(accessible_name=f"Smart Action for {name.lower()}", valign=Gtk.Align.CENTER)
             choice.set_tooltip_text(f"Smart Action for {name.lower()}")
             choice.connect("notify::selected", self._binding_changed, cid)
-            row.add_suffix(choice)
             self.binding_choices.append((cid, choice))
-            bindings.add(row)
+            bindings.add(self._choice_row(name, "", choice))
         shortcuts = Gtk.Expander(label="Additional button shortcuts")
         self.shortcuts_expander = shortcuts
         shortcuts.set_child(bindings)
@@ -254,37 +433,42 @@ class DesktopEditor(Adw.Window):
 
     def _build_actions(self):
         page, scroll = _page()
-        intro = _label("Make a shortcut your own")
-        intro.add_css_class("title-2")
-        page.append(intro)
-        page.append(_label("Choose a routine, name it, then add the steps you need. "
+        self.page_boxes.append(page)
+        page.append(_intro("Make a shortcut your own",
+                           "Choose a routine, name it, then add the steps you need. "
                            "Assign it to a ring position or mouse button in Actions Ring. "
-                           "Editing and saving never run a routine.", dim=True))
+                           "Editing and saving never run a routine."))
+        chooser = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         chooser_title = _label("Routine")
         chooser_title.add_css_class("heading")
-        page.append(chooser_title)
+        chooser.append(chooser_title)
         chooser_row = Gtk.Box(spacing=12)
         self.action_choice = _action_dropdown(accessible_name="Routine to edit", hexpand=True)
         self.action_choice.set_tooltip_text("Select a routine to edit")
         self.action_choice.connect("notify::selected", self._action_selected)
         chooser_row.append(self.action_choice)
-        self.delete = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Delete selected routine")
+        self.delete = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Delete selected routine",
+                                 valign=Gtk.Align.CENTER)
         self.delete.update_property([Gtk.AccessibleProperty.LABEL], ["Delete selected routine"])
         self.delete.add_css_class("destructive-action")
         self.delete.connect("clicked", self._delete_selected)
         chooser_row.append(self.delete)
-        page.append(chooser_row)
+        chooser.append(chooser_row)
 
         add_row = Gtk.Box(spacing=12)
-        self.template_choice = Gtk.DropDown.new_from_strings([item[0] for item in TEMPLATES])
-        self.template_choice.update_property([Gtk.AccessibleProperty.LABEL], ["New routine template"])
+        self.template_choice = _action_dropdown(accessible_name="New routine template")
+        self.template_choice.set_model(Gtk.StringList.new([item[0] for item in TEMPLATES]))
         self.template_choice.set_tooltip_text("Starting point for a new routine")
         self.template_choice.set_hexpand(True)
         add_row.append(self.template_choice)
-        self.add_routine_button = Gtk.Button(label="New routine")
+        self.add_routine_button = Gtk.Button(label="New routine", valign=Gtk.Align.CENTER)
         self.add_routine_button.connect("clicked", self._add_routine)
         add_row.append(self.add_routine_button)
-        page.append(add_row)
+        chooser.append(add_row)
+        self.toolbar_rows.append(add_row)
+        self.action_application_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, visible=False)
+        chooser.append(self.action_application_box)
+        page.append(chooser)
 
         fields = Adw.PreferencesGroup(title="Routine details")
         self.name_entry = Adw.EntryRow(title="Name")
@@ -298,28 +482,37 @@ class DesktopEditor(Adw.Window):
         fields.add(self.name_entry)
         fields.add(self.app_entry)
         page.append(fields)
+        self.details_error = _label("", alert=True)
+        self.details_error.add_css_class("error")
+        self.details_error.set_visible(False)
+        page.append(self.details_error)
         page.append(_label("Leave the application field empty to run anywhere. "
                            "To limit a routine, enter the exact focused Niri app ID.", dim=True))
 
+        steps_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.steps_group = Adw.PreferencesGroup(title="Steps", description="Run from top to bottom. Expand a step to edit it.")
-        page.append(self.steps_group)
+        steps_section.append(self.steps_group)
         self.step_rows = []
-        self.step_error = _label("")
+        self.step_error = _label("", alert=True)
         self.step_error.add_css_class("error")
         self.step_error.set_visible(False)
-        page.append(self.step_error)
+        steps_section.append(self.step_error)
 
         step_add = Gtk.Box(spacing=12)
-        self.step_choice = Gtk.DropDown.new_from_strings([item[0] for item in STEP_TYPES])
-        self.step_choice.update_property([Gtk.AccessibleProperty.LABEL], ["New step type"])
+        self.step_choice = _action_dropdown(accessible_name="New step type")
+        self.step_choice.set_model(Gtk.StringList.new([item[0] for item in STEP_TYPES]))
         self.step_choice.set_hexpand(True)
         self.step_choice.set_tooltip_text("Type of step to add")
         step_add.append(self.step_choice)
-        self.add_step_button = Gtk.Button(label="Add step")
+        self.add_step_button = Gtk.Button(label="Add step", valign=Gtk.Align.CENTER)
         self.add_step_button.connect("clicked", self._add_step)
         step_add.append(self.add_step_button)
-        page.append(step_add)
+        steps_section.append(step_add)
+        self.toolbar_rows.append(step_add)
         self.step_add_box = step_add
+        self.step_application_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, visible=False)
+        steps_section.append(self.step_application_box)
+        page.append(steps_section)
 
         steps_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         title = _label("Steps (JSON)")
@@ -369,6 +562,7 @@ class DesktopEditor(Adw.Window):
             {"type": "niri", "action": "focus-workspace-down", "args": []},
         ]
         code = Gtk.Label(label=json.dumps(examples, indent=2), xalign=0, selectable=True,
+                         wrap=True, wrap_mode=Pango.WrapMode.WORD_CHAR, max_width_chars=1,
                          margin_start=12, margin_end=12, margin_top=8, margin_bottom=8)
         code.add_css_class("monospace")
         help_box.append(code)
@@ -377,6 +571,128 @@ class DesktopEditor(Adw.Window):
         help_expander.set_child(help_box)
         page.append(help_expander)
         self.stack.add_titled(scroll, "actions", "Smart Actions")
+
+    def update_integration_status(self):
+        if self.integration is None:
+            return
+        desktop = self.integration
+        self.integration_status.set_subtitle(desktop.message)
+        active = desktop.session.running
+        self.integration_toggle.set_label("Disable" if active else "Enable")
+        self.integration_toggle.set_sensitive(
+            not desktop.window.demo and not desktop.session.stopping
+            and (active or (not desktop.starting and not desktop.window.busy
+                            and not desktop.window.pending_hardware
+                            and bool(desktop.window.current and desktop.window.current.get("online")))))
+        self.integration_toggle.set_tooltip_text("Use the saved ring and button assignments" if not active
+                                                 else "Restore the mouse's previous button behavior")
+
+    def _toggle_integration(self, *_):
+        if self.integration.session.running:
+            self.integration.stop()
+        else:
+            self.integration.start()
+        self.update_integration_status()
+
+    @staticmethod
+    def _clear_box(box):
+        while (child := box.get_first_child()) is not None:
+            box.remove(child)
+
+    def _show_application_picker(self, box, on_selected):
+        previous_focus = self.get_focus()
+        self._clear_box(box)
+        try:
+            picker = ApplicationPicker(on_selected, lambda: box.set_visible(False))
+        except Exception as exc:
+            self.error.set_text(f"Installed applications could not be read: {exc}")
+            self.error.set_visible(True)
+            return None
+        box.append(picker)
+        self.application_picker = (box, previous_focus)
+        box.set_visible(True)
+        picker.search.grab_focus()
+        return picker
+
+    def _open_ring_application_picker(self, *_):
+        if self.ring_application_box.get_visible():
+            self.ring_application_box.set_visible(False)
+            return
+        position = _action_dropdown(accessible_name="Ring position for application")
+        position.set_model(Gtk.StringList.new(list(SLOT_NAMES)))
+        position.set_selected(self.ring_preview.selected or 0)
+        picker = self._show_application_picker(
+            self.ring_application_box,
+            lambda application: self._add_application(application, ring_index=position.get_selected()))
+        if picker is None:
+            return
+        target = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        target.append(_label("Replace the action at"))
+        target.append(position)
+        self.ring_application_box.prepend(target)
+
+    def _new_draft(self, prefix, label, steps):
+        number = 1
+        used_ids = set(self.drafts) | {draft["id"] for draft in self.drafts.values()}
+        while f"{prefix}-{number}" in used_ids:
+            number += 1
+        action_id = f"{prefix}-{number}"
+        # Shared assignment validators use this working document while the
+        # editable draft can still contain incomplete form values.
+        self.config["actions"][action_id] = {"label": label[:80], "steps": deepcopy(steps)}
+        self.drafts[action_id] = {"id": action_id, "label": label[:80], "app_id": "",
+                                  "steps_text": json.dumps(steps, indent=2)}
+        self.selected_id = action_id
+        self._mark_dirty()
+        return action_id
+
+    def _add_application(self, application, *, ring_index=None):
+        if len(self.drafts) >= MAX_ACTIONS:
+            return
+        action_id = self._new_draft("application", application["name"],
+                                    [{"type": "application", "desktop_id": application["desktop_id"]}])
+        if ring_index is not None:
+            self.config["ring"][ring_index] = action_id
+            self.config.get("ring_groups", {}).pop(str(ring_index), None)
+            self.ring_preview.select(ring_index)
+            self.application_notice.set_text(f"{application['name']} assigned to {SLOT_NAMES[ring_index].lower()}. Save changes to use it.")
+            self.application_notice.set_visible(True)
+        self.ring_application_box.set_visible(False)
+        self.action_application_box.set_visible(False)
+        self._refresh_choices()
+        self._load_selected()
+        if ring_index is None:
+            self.name_entry.grab_focus()
+
+    def _choose_step_application(self, index=None, box=None):
+        action_id = self.selected_id
+        values = self.drafts[action_id]["form_values"]
+        if index is None and len(values) >= MAX_STEPS:
+            return
+        target = values[index] if index is not None else None
+        box = box if box is not None else self.step_application_box
+
+        def chosen(application):
+            # A picker must not replace a different draft if a routine changed.
+            if (action_id != self.selected_id or self.drafts[action_id].get("form_values") is not values
+                    or (target is not None and not any(value is target for value in values))):
+                box.set_visible(False)
+                return
+            value = _step_values({"type": "application", "desktop_id": application["desktop_id"]})
+            if target is None:
+                if len(values) >= MAX_STEPS:
+                    return
+                values.append(value)
+                selected = len(values) - 1
+            else:
+                selected = next(i for i, item in enumerate(values) if item is target)
+                values[selected] = value
+            box.set_visible(False)
+            self._mark_dirty()
+            self._render_steps(expanded=selected)
+            self._validate_selected()
+
+        self._show_application_picker(box, chosen)
 
     def _mark_dirty(self):
         self.dirty = True
@@ -399,15 +715,28 @@ class DesktopEditor(Adw.Window):
 
     def _validate_selected(self):
         draft = self.drafts[self.selected_id]
+        self.details_error.set_visible(False)
+        for field in (self.name_entry, self.id_entry):
+            field.remove_css_class("error")
+            field.reset_state(Gtk.AccessibleState.INVALID)
+        issue = None
+        if not draft["label"]:
+            issue = self.name_entry, "Give this routine a name."
+        elif not ACTION_ID.fullmatch(draft["id"]):
+            issue = self.id_entry, "Use 1–64 lowercase letters, numbers, hyphens or underscores for the action ID."
+        elif any(key != self.selected_id and other["id"] == draft["id"] for key, other in self.drafts.items()):
+            issue = self.id_entry, "This action ID already belongs to another routine. Choose a unique ID."
+        if issue:
+            field, message = issue
+            field.add_css_class("error")
+            field.update_state([Gtk.AccessibleState.INVALID], [int(Gtk.AccessibleInvalidState.TRUE)])
+            self.details_error.set_text(message)
+            self.details_error.set_visible(True)
+            if field is self.id_entry:
+                self.advanced.set_expanded(True)
+            self._show_step_error()
+            return False
         try:
-            if not draft["label"]:
-                raise ValueError("Give this routine a name.")
-            if not ACTION_ID.fullmatch(draft["id"]):
-                self.advanced.set_expanded(True)
-                raise ValueError("Use 1–64 lowercase letters, numbers, hyphens or underscores for the action ID.")
-            if any(key != self.selected_id and other["id"] == draft["id"] for key, other in self.drafts.items()):
-                self.advanced.set_expanded(True)
-                raise ValueError("This action ID already belongs to another routine. Choose a unique ID.")
             steps = (self._form_steps(draft["form_values"]) if draft.get("form_values") is not None
                      else json.loads(draft["steps_text"]))
             action = {**deepcopy(self.config["actions"].get(self.selected_id, {})), "label": draft["label"], "steps": steps}
@@ -434,6 +763,8 @@ class DesktopEditor(Adw.Window):
         for index, value in enumerate(values):
             row = Adw.ExpanderRow(title=f"{index + 1}. {STEP_NAMES[value['type']]}",
                                   subtitle=self._step_summary(value), use_markup=False)
+            row.set_title_lines(2)
+            row.set_subtitle_lines(1)
             for icon, label, offset in (("user-trash-symbolic", "Remove step", 0),
                                         ("go-down-symbolic", "Move step down", 1),
                                         ("go-up-symbolic", "Move step up", -1)):
@@ -454,6 +785,10 @@ class DesktopEditor(Adw.Window):
                 scroll = Gtk.ScrolledWindow(min_content_height=100)
                 scroll.set_child(text)
                 row.add_row(scroll)
+            elif kind == "application":
+                application_row = Adw.ActionRow(title="Installed application", subtitle=value["value"],
+                                                use_markup=False, subtitle_lines=0)
+                row.add_row(application_row)
             else:
                 title = {"shortcut": "Keys, separated by +", "command": "Application and arguments",
                          "delay": "Wait in milliseconds (0–30000)", "niri": "Niri action"}[kind]
@@ -464,8 +799,19 @@ class DesktopEditor(Adw.Window):
                     arguments = Adw.EntryRow(title="Arguments (optional)", text=value["extra"])
                     arguments.connect("changed", self._step_changed, index, "extra", row)
                     row.add_row(arguments)
+            if kind in ("application", "command"):
+                application_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
+                                          margin_start=12, margin_end=12, margin_top=12, margin_bottom=12)
+                choose = Gtk.Button(label="Choose application", halign=Gtk.Align.START, valign=Gtk.Align.CENTER)
+                picker_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, visible=False)
+                choose.connect("clicked", lambda _button, step=index, container=picker_box:
+                               self._choose_step_application(step, container))
+                application_box.append(choose)
+                application_box.append(picker_box)
+                row.add_row(application_box)
             hint = {"shortcut": "For example: CTRL + SHIFT + S. Use Linux key names such as ENTER, F1 and SPACE.",
                     "command": 'For example: kitty --title "My terminal". Quote arguments with spaces; commands run directly.',
+                    "application": "Opens the installed application's desktop launcher when this routine runs.",
                     "text": "Insert this text into the focused application. Line breaks are preserved.",
                     "delay": "1000 milliseconds = 1 second. Keep waits short for responsive routines.",
                     "niri": "For example: toggle-overview or focus-workspace-down. Requires Niri."}[kind]
@@ -511,6 +857,9 @@ class DesktopEditor(Adw.Window):
         values = self.drafts[self.selected_id]["form_values"]
         if len(values) >= MAX_STEPS:
             return
+        if STEP_TYPES[self.step_choice.get_selected()][1] == "application":
+            self._choose_step_application()
+            return
         values.append(_step_values(deepcopy(STEP_TYPES[self.step_choice.get_selected()][2])))
         self._mark_dirty()
         self._render_steps(len(values) - 1)
@@ -519,6 +868,7 @@ class DesktopEditor(Adw.Window):
     def _toggle_json(self, *_):
         if self.loading:
             return
+        self.step_application_box.set_visible(False)
         draft = self.drafts[self.selected_id]
         use_json = self.json_toggle.get_active()
         try:
@@ -572,6 +922,7 @@ class DesktopEditor(Adw.Window):
         self.action_choice.set_selected(self.choice_ids.index(self.selected_id))
         self.delete.set_sensitive(len(self.drafts) > 1)
         self.add_routine_button.set_sensitive(len(self.drafts) < MAX_ACTIONS)
+        self.add_application_button.set_sensitive(len(self.drafts) < MAX_ACTIONS)
         self.loading = previous
         self._refresh_ring_preview()
 
@@ -687,6 +1038,8 @@ class DesktopEditor(Adw.Window):
     def _load_selected(self):
         previous = self.loading
         self.loading = True
+        self.step_application_box.set_visible(False)
+        self.action_application_box.set_visible(False)
         draft = self.drafts[self.selected_id]
         self.name_entry.set_text(draft["label"])
         self.id_entry.set_text(draft["id"])
@@ -712,15 +1065,10 @@ class DesktopEditor(Adw.Window):
         if len(self.drafts) >= MAX_ACTIONS:
             return
         _, prefix, label, steps = TEMPLATES[self.template_choice.get_selected()]
-        number = 1
-        used_ids = set(self.drafts) | {draft["id"] for draft in self.drafts.values()}
-        while f"{prefix}-{number}" in used_ids:
-            number += 1
-        action_id = f"{prefix}-{number}"
-        self.drafts[action_id] = {"id": action_id, "label": label, "app_id": "",
-                                  "steps_text": json.dumps(steps, indent=2)}
-        self.selected_id = action_id
-        self._mark_dirty()
+        if prefix == "launch":
+            self._show_application_picker(self.action_application_box, self._add_application)
+            return
+        self._new_draft(prefix, label, steps)
         self._refresh_choices()
         self._load_selected()
         self.name_entry.grab_focus()
@@ -744,6 +1092,7 @@ class DesktopEditor(Adw.Window):
             if response != "delete":
                 return
             del self.drafts[action_id]
+            self.config["actions"].pop(action_id, None)
             self.config["ring"] = [fallback if item == action_id else item for item in self.config["ring"]]
             self.config["button_bindings"] = {cid: item for cid, item in self.config["button_bindings"].items()
                                                if item != action_id}
@@ -804,7 +1153,8 @@ class DesktopEditor(Adw.Window):
                 self._refresh_choices()
                 self._load_selected()
                 self.stack.set_visible_child_name("actions")
-            self.error.set_text(str(exc))
+            self.error.set_text(self.details_error.get_text() if isinstance(exc, _DraftError) and self.details_error.get_visible()
+                                else str(exc).removeprefix("Invalid desktop configuration: "))
             self.error.set_visible(True)
             self.error.grab_focus()
             return
@@ -833,7 +1183,7 @@ class DesktopEditor(Adw.Window):
     def _save_finished(self, error):
         self.saving = False
         self.stack.set_sensitive(True)
-        self.save_button.set_label("Save changes")
+        self.save_button.set_label("Save" if self.compact else "Save changes")
         if error:
             self.save_button.set_sensitive(self.dirty)
             self.window_title.set_subtitle("Unsaved changes")

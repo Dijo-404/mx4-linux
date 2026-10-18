@@ -14,15 +14,16 @@ try:
 except ValueError as exc:
     pytest.skip(str(exc), allow_module_level=True)
 
-from gi.repository import Adw, GLib, Gtk
+from gi.repository import Adw, Gdk, GLib, GObject, Gtk
 
 from mx4_linux.actions import default_config, validate_config
-from mx4_linux.desktop_editor import DesktopEditor, _DraftError, _step_values, _values_step
+from mx4_linux.desktop_editor import ApplicationPicker, DesktopEditor, _DraftError, _step_values, _values_step
 
 
 @pytest.mark.parametrize("step", [
     {"type": "shortcut", "keys": ["CTRL", "SHIFT", "S"]},
     {"type": "command", "argv": ["kitty", "--title", "Hello $(touch nope)", ""]},
+    {"type": "application", "desktop_id": "org.example.Editor.desktop"},
     {"type": "text", "text": "Hello\n世界"},
     {"type": "delay", "milliseconds": 150},
     {"type": "niri", "action": "focus-workspace", "args": ["work space"]},
@@ -286,6 +287,68 @@ def test_failed_background_save_keeps_draft_and_allows_retry(editor, monkeypatch
     assert notifications == [True]
 
 
+def test_keyboard_save_validates_the_current_draft_before_writing(editor):
+    select(editor, "copy")
+    editor.name_entry.set_text("")
+    assert editor._key_pressed(None, Gdk.KEY_s, 0, Gdk.ModifierType.CONTROL_MASK)
+    assert editor.store.saved is None and editor.dirty
+    assert editor.error.get_visible()
+    assert editor.name_entry.get_text() == ""
+    assert editor.details_error.get_visible()
+    assert editor.error.get_text() == "Give this routine a name."
+    assert Gtk.test_accessible_has_state(editor.name_entry, Gtk.AccessibleState.INVALID)
+
+    editor.name_entry.set_text("Copy selection")
+    assert not editor.details_error.get_visible()
+    assert not Gtk.test_accessible_has_state(editor.name_entry, Gtk.AccessibleState.INVALID)
+    candidate = editor._candidate()
+    assert editor._key_pressed(None, Gdk.KEY_s, 0, Gdk.ModifierType.CONTROL_MASK)
+    iterate_until(lambda: not editor.saving)
+    assert editor.store.saved == candidate
+
+
+def test_keyboard_dismissal_uses_window_close_and_waits_for_save(editor, monkeypatch):
+    closed = []
+    monkeypatch.setattr(editor, "close", lambda: closed.append(True))
+    assert not editor._key_pressed(None, Gdk.KEY_s, 0, 0)
+    editor.saving = True
+    try:
+        assert editor._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+        assert closed == []
+    finally:
+        editor.saving = False
+    assert editor._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert closed == [True]
+
+
+def test_editor_visual_preferences_follow_system_and_disconnect_when_hidden(editor):
+    scheme = editor.style.get_color_scheme()
+    animations = editor.settings.get_property("gtk-enable-animations")
+    editor._connect_visual_preferences()
+    style_handler, motion_handler = editor.style_handler, editor.motion_handler
+    try:
+        editor._connect_visual_preferences()
+        assert (editor.style_handler, editor.motion_handler) == (style_handler, motion_handler)
+        editor.style.set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
+        assert editor.has_css_class("mx4-light")
+        editor.style.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+        assert not editor.has_css_class("mx4-light")
+        editor.settings.set_property("gtk-enable-animations", False)
+        assert editor.stack.get_transition_duration() == 0
+        assert editor.has_css_class("reduced-motion")
+        editor.settings.set_property("gtk-enable-animations", True)
+        assert editor.stack.get_transition_duration() > 0
+        editor._disconnect_visual_preferences()
+        assert not GObject.signal_handler_is_connected(editor.style, style_handler)
+        assert not GObject.signal_handler_is_connected(editor.settings, motion_handler)
+        assert editor.style_handler == editor.motion_handler == 0
+        editor._disconnect_visual_preferences()
+    finally:
+        editor._disconnect_visual_preferences()
+        editor.style.set_color_scheme(scheme)
+        editor.settings.set_property("gtk-enable-animations", animations)
+
+
 def test_clearing_group_entry_compacts_the_visible_order_to_match_shortcuts(editor):
     _row, choices = editor.group_choices[2]
     choices[0].set_selected(editor.choice_ids.index("copy") + 1)
@@ -345,3 +408,161 @@ def test_utility_steps_and_toggle_metadata_remain_lossless_without_execution(edi
     candidate = editor._candidate()
     assert candidate['actions']['copy'] == {**action, 'label': 'New label'}
     validate_config(candidate)
+
+
+def test_adding_application_assigns_selected_slot_and_preserves_other_drafts(editor, monkeypatch):
+    import mx4_linux.actions as actions
+    monkeypatch.setattr(actions, "launch_application", lambda *_: pytest.fail("Editing must not launch applications"))
+    select(editor, "copy")
+    editor.name_entry.set_text("Copy selection")
+    editor.config["ring_groups"] = {"2": ["copy", "paste"], "5": ["paste"]}
+    editor._add_application({"name": "Editor", "desktop_id": "org.example.Editor.desktop"}, ring_index=2)
+    action_id = editor.selected_id
+    candidate = validate_config(editor._candidate())
+    assert candidate["ring"][2] == action_id
+    assert candidate["actions"][action_id] == {
+        "label": "Editor", "steps": [{"type": "application", "desktop_id": "org.example.Editor.desktop"}]}
+    assert candidate["actions"]["copy"]["label"] == "Copy selection"
+    assert candidate["ring_groups"] == {"5": ["paste"]}
+    assert editor.application_notice.get_visible()
+    assert editor.store.saved is None
+    editor._save()
+    iterate_until(lambda: not editor.saving)
+    assert editor.store.saved == candidate
+
+
+def test_application_picker_search_and_selection_are_read_only(editor, monkeypatch):
+    import mx4_linux.desktop_editor as module
+    applications = [
+        {"name": "Browser", "desktop_id": "browser.desktop", "description": "Visit the web", "icon": None},
+        {"name": "Editor", "desktop_id": "org.editor.desktop", "description": "Edit code", "icon": None},
+    ]
+    monkeypatch.setattr(module, "installed_applications", lambda: applications)
+    selected = []
+    picker = ApplicationPicker(selected.append, lambda: None)
+    picker.search.set_text("edit CODE")
+    picker._search_changed()
+    assert not picker.empty.get_visible()
+    assert not picker.rows[0].get_child_visible() and picker.rows[1].get_child_visible()
+    picker.list.emit("row-activated", picker.rows[1])
+    assert selected == [applications[1]]
+    assert not editor.dirty and editor.store.saved is None
+    picker.search.set_text("unavailable")
+    picker._search_changed()
+    assert picker.empty.get_visible() and not picker.scroll.get_visible()
+
+
+def test_launch_template_waits_for_selection_and_cancel_keeps_draft(editor, monkeypatch):
+    import mx4_linux.desktop_editor as module
+    monkeypatch.setattr(module, "installed_applications", lambda: [])
+    original = deepcopy(editor.drafts)
+    editor.template_choice.set_selected(1)
+    editor._add_routine()
+    assert editor.action_application_box.get_visible()
+    picker = editor.action_application_box.get_first_child()
+    picker.search.emit("stop-search")
+    assert not editor.action_application_box.get_visible()
+    assert editor.drafts == original and not editor.dirty
+
+
+def test_escape_dismisses_application_picker_before_leaving_editor(editor, monkeypatch):
+    import mx4_linux.desktop_editor as module
+    monkeypatch.setattr(module, "installed_applications", lambda: [])
+    closed = []
+    monkeypatch.setattr(editor, "close", lambda: closed.append(True))
+    editor._open_ring_application_picker()
+    assert editor.ring_application_box.get_visible()
+    assert editor._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert not editor.ring_application_box.get_visible() and closed == []
+    assert editor._key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert closed == [True]
+
+
+def test_choosing_application_step_preserves_invalid_command_and_other_steps(editor, monkeypatch):
+    import mx4_linux.desktop_editor as module
+    application = {"name": "Editor", "desktop_id": "editor.desktop", "description": "", "icon": None}
+    monkeypatch.setattr(module, "installed_applications", lambda: [application])
+    select(editor, "terminal")
+    entry_in(editor.steps_group, "Application and arguments").set_text('kitty "incomplete')
+    editor._choose_step_application()
+    picker = editor.step_application_box.get_first_child()
+    picker.list.emit("row-activated", picker.rows[0])
+    values = editor.drafts["terminal"]["form_values"]
+    assert values[0]["value"] == 'kitty "incomplete'
+    assert _values_step(values[1]) == {"type": "application", "desktop_id": "editor.desktop"}
+    assert editor.step_error.get_visible()
+    assert editor.store.saved is None
+
+
+def test_stale_application_picker_does_not_edit_another_routine(editor, monkeypatch):
+    import mx4_linux.desktop_editor as module
+    application = {"name": "Editor", "desktop_id": "editor.desktop", "description": "", "icon": None}
+    monkeypatch.setattr(module, "installed_applications", lambda: [application])
+    select(editor, "terminal")
+    editor._choose_step_application(0)
+    picker = editor.step_application_box.get_first_child()
+    select(editor, "copy")
+    before = deepcopy(editor.drafts)
+    picker.list.emit("row-activated", picker.rows[0])
+    assert editor.drafts == before and not editor.dirty
+
+
+def test_application_picker_is_cancelled_when_json_replaces_the_step_draft(editor, monkeypatch):
+    import mx4_linux.desktop_editor as module
+    application = {"name": "Editor", "desktop_id": "editor.desktop", "description": "", "icon": None}
+    monkeypatch.setattr(module, "installed_applications", lambda: [application])
+    select(editor, "copy")
+    editor._choose_step_application()
+    picker = editor.step_application_box.get_first_child()
+    editor.json_toggle.set_active(True)
+    assert not editor.step_application_box.get_visible()
+    editor.json_toggle.set_active(False)
+    before = deepcopy(editor.drafts)
+    picker.list.emit("row-activated", picker.rows[0])
+    assert editor.drafts == before and not editor.dirty
+
+
+@pytest.mark.parametrize("running,busy,online,enabled", [(False, False, True, True),
+                                                         (True, True, False, True),
+                                                         (False, True, True, False),
+                                                         (False, False, False, False)])
+def test_integration_retry_remains_available_after_error_and_disable_while_busy(editor, running, busy, online, enabled):
+    from types import SimpleNamespace
+    editor.integration = SimpleNamespace(
+        message="Disconnected; wake the mouse and retry", error="Read failed", starting=False,
+        session=SimpleNamespace(running=running, stopping=False),
+        window=SimpleNamespace(demo=False, busy=busy, pending_hardware=False, current={"online": online}))
+    editor.integration_status = Adw.ActionRow()
+    editor.integration_toggle = Gtk.Button()
+    editor.update_integration_status()
+    assert editor.integration_toggle.get_sensitive() is enabled
+    assert editor.integration_toggle.get_label() == ("Disable" if running else "Enable")
+
+
+def test_new_routine_can_be_assigned_to_a_button_before_first_save(editor):
+    editor._add_routine()
+    action_id = editor.selected_id
+    dict(editor.binding_choices)[83].set_selected(editor.choice_ids.index(action_id) + 2)
+    candidate = validate_config(editor._candidate())
+    assert candidate["button_bindings"]["83"] == action_id
+    assert candidate["actions"][action_id]["steps"] == [{"type": "shortcut", "keys": ["CTRL", "C"]}]
+
+
+def test_deleting_routine_makes_room_for_application_at_action_limit(editor):
+    from mx4_linux.actions import MAX_ACTIONS
+    for number in range(MAX_ACTIONS - len(editor.drafts)):
+        action_id = f"extra-{number}"
+        action = {"label": action_id, "steps": [{"type": "delay", "milliseconds": 0}]}
+        editor.config["actions"][action_id] = action
+        editor.drafts[action_id] = {"id": action_id, "label": action_id, "app_id": "",
+                                    "steps_text": json.dumps(action["steps"])}
+    editor._refresh_choices()
+    select(editor, "extra-0")
+    editor._delete_selected()
+    dialog = next(window for window in Gtk.Window.list_toplevels()
+                  if isinstance(window, Adw.MessageDialog) and window.get_transient_for() is editor)
+    dialog.response("delete")
+    editor._add_application({"name": "Editor", "desktop_id": "editor.desktop"}, ring_index=0)
+    candidate = validate_config(editor._candidate())
+    assert len(candidate["actions"]) == MAX_ACTIONS
+    assert candidate["actions"][candidate["ring"][0]]["steps"] == [{"type": "application", "desktop_id": "editor.desktop"}]
