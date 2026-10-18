@@ -26,7 +26,7 @@ try {
   const packed = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', directory]));
   const [archive] = Array.isArray(packed) ? packed : Object.values(packed);
   const files = new Set(archive.files.map(file => file.path));
-  for (const path of ['bin/mx4-linux.js', 'pyproject.toml', 'requirements.txt', 'LICENSE',
+  for (const path of ['bin/mx4-linux.js', 'pyproject.toml', 'LICENSE',
     'src/mx4_linux/__main__.py', 'src/mx4_linux/gui.py', 'src/mx4_linux/device_worker.py',
     'src/mx4_linux/icons/io.github.mx4linux.Control.svg', 'scripts/install-udev-rule.sh',
     'scripts/lib-device-access.sh', 'data/70-mx4-linux.rules', 'docs/install.md']) {

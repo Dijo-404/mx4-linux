@@ -3,7 +3,7 @@
 <div align="center">
 
 <picture>
-  <img src="docs/assets/logo.svg" alt="MX4 Linux logo" width="110" />
+  <img src="src/mx4_linux/icons/io.github.mx4linux.Control.svg" alt="MX4 Linux logo" width="110" />
 </picture>
 
 # MX4 Linux
@@ -308,7 +308,7 @@ git clone https://github.com/Dijo-404/mx4-linux.git
 cd mx4-linux
 ./scripts/setup.sh                                      # install runtime and development tools
 .venv/bin/python -m pytest -q                           # run automated checks
-.venv/bin/python -m ruff check src tests                # syntax and undefined-name checks
+.venv/bin/python -m ruff check src tests                # syntax, undefined names and unused imports
 .venv/bin/python -m compileall -q src tests              # check Python compilation
 for script in scripts/*.sh; do bash -n "$script"; done   # check shell syntax
 npm ci --ignore-scripts

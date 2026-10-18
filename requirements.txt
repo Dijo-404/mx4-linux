@@ -1,2 +1,0 @@
-# Runtime dependencies are declared once in pyproject.toml.
-.

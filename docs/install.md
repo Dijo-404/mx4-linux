@@ -42,7 +42,7 @@ To build the helper separately:
 ./scripts/setup-wtype.sh
 ```
 
-For a runtime-only Python installation after creating a virtual environment with system site packages, `python -m pip install -r requirements.txt` installs the application and its dependencies. The requirements file delegates to `pyproject.toml` so the Solaar version is declared once. For lint/build/test tools, use `python -m pip install -r requirements-dev.txt`.
+After creating a virtual environment with system site packages, `python -m pip install .` installs the application and its runtime dependencies. For an editable checkout with lint/build/test tools, use `python -m pip install -e '.[test,dev]'`. Dependencies and optional development tools are declared in `pyproject.toml`.
 
 ## npm package
 
