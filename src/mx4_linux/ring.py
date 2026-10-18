@@ -15,6 +15,7 @@ except (ImportError, ValueError):
     GdkWayland = None
 from .motion import Transition
 from .ring_icons import action_icon
+from .ring_motion import OrbitMotion
 from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, HorizontalDrag, RingGeometry, RingState, button_at, button_center
 
 
@@ -24,6 +25,9 @@ CHILD_RADIUS = 23
 
 
 class ActionsRing(Gtk.Window):
+    # One provider per display, shared by all recreated editor/popup instances.
+    _style_providers = {}
+
     def __init__(self, application, selected, dismissed, hovered=None, adjusted=None):
         super().__init__(application=application, title="MX4 Actions Ring", decorated=False,
                          resizable=False, default_width=WIDTH, default_height=HEIGHT)
@@ -41,14 +45,19 @@ class ActionsRing(Gtk.Window):
         self.config = None
         self.preview = False
         self.tick_id = 0
-        self.reveal = Transition(1, duration=0.18)
+        self._last_frame = 0.0
+        self.reveal = Transition(1, duration=0.22)
         self.group_reveal = Transition(0, duration=0.16)
         self.label_reveal = Transition(1, duration=0.10)
+        self.selection_reveal = Transition(1, duration=0.14)
+        self.orbit = OrbitMotion()
+        self._selection_target = None
         self.spread = 1.0
         self.group_slot = self.child_selected = None
         self.children = []
         self.child_positions = []
         self.settings = Gtk.Settings.get_default()
+        self._settings_handler = 0
         display = Gdk.Display.get_default()
         self.overlay_supported = bool(Layer and display.__gtype__.name == "GdkWaylandDisplay" and Layer.is_supported())
         if self.overlay_supported:
@@ -59,28 +68,54 @@ class ActionsRing(Gtk.Window):
             Layer.set_exclusive_zone(self, 0)
         self.connect_after("map", self.identify_popup)
         self.add_css_class("mx4-ring")
-        css = Gtk.CssProvider()
-        css.load_from_string("""
-            window.mx4-ring { background: transparent; box-shadow: none; }
-            .mx4-ring button.ring-action, .mx4-ring button.ring-close {
-                background: #eef2f4; color: #15181d; border: 1px solid alpha(black, 0.15);
-                border-radius: 9999px; padding: 0; box-shadow: 0 2px 5px alpha(black, 0.16);
-                min-width: 0; min-height: 0;
-            }
-            .mx4-ring button.ring-action.selected { background: #15181d; color: white; border-color: #eef2f4; }
-            .mx4-ring button.ring-close { background: #d9e1e5; }
-            .mx4-ring button:focus-visible { outline: 3px solid #3584e4; outline-offset: 3px; }
-            .mx4-ring .ring-callout {
-                background: #f8fafb; color: #15181d; border: 1px solid alpha(black, 0.12);
-                border-radius: 12px; padding: 7px 10px; box-shadow: 0 2px 5px alpha(black, 0.12);
-            }
-            .mx4-ring .ring-shortcut { color: #53616b; font-size: 11px; }
-            .mx4-ring .ring-hint {
-                background: #20242b; color: #f0f3f6; border-radius: 12px;
-                padding: 6px 12px; font-size: 12px;
-            }
-        """)
-        Gtk.StyleContext.add_provider_for_display(display, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        if display not in self._style_providers:
+            css = Gtk.CssProvider()
+            css.load_from_string("""
+                window.mx4-ring {
+                    background: transparent; box-shadow: none;
+                    font-family: "Berkeley Mono", "JetBrains Mono", "IBM Plex Mono", "Adwaita Mono", monospace;
+                }
+                .mx4-ring button.ring-action, .mx4-ring button.ring-close {
+                    background: #201d1d; color: #fdfcfc;
+                    border: 1px solid #787474;
+                    border-radius: 9999px; padding: 0;
+                    box-shadow: none;
+                    min-width: 0; min-height: 0;
+                    transition: background-color 120ms ease-out, color 120ms ease-out, border-color 140ms ease-out;
+                }
+                .mx4-ring button.ring-action.selected {
+                    background: #dce7f3; color: #243d59; border-color: #7f9ebc;
+                }
+                /* The circular face stays aligned with pointer hit geometry. */
+                .mx4-ring button > image {
+                    transform: scale(1);
+                    transition: transform 160ms cubic-bezier(.2,.8,.2,1);
+                }
+                .mx4-ring button.ring-action.selected > image,
+                .mx4-ring button.ring-close:hover > image { transform: scale(1.12); }
+                .mx4-ring button.ring-action.pressed {
+                    background: #b6cbdf; color: #243d59; border-color: #7494b3;
+                }
+                .mx4-ring button.ring-action.pressed > image,
+                .mx4-ring button.ring-close.pressed > image { transform: scale(.88); }
+                .mx4-ring button.ring-close { background: #302c2c; color: #d9d5d5; }
+                .mx4-ring button.ring-close:hover { background: #424040; color: #fdfcfc; }
+                .mx4-ring button:focus-visible { outline: 2px solid #8cabca; outline-offset: 4px; }
+                .mx4-ring.reduced-motion button, .mx4-ring.reduced-motion image { transition: none; }
+                .mx4-ring.reduced-motion button.ring-action > image,
+                .mx4-ring.reduced-motion button.ring-close > image { transform: none; }
+                .mx4-ring .ring-callout {
+                    background: #fdfcfc; color: #201d1d; border: 1px solid #aaa5a5;
+                    border-radius: 4px; padding: 7px 10px; box-shadow: none;
+                }
+                .mx4-ring .ring-shortcut { color: #536d8a; font-size: 11px; font-weight: 700; }
+                .mx4-ring .ring-hint {
+                    background: #201d1d; color: #d9d5d5; border: 1px solid #787474; border-radius: 4px;
+                    padding: 6px 12px; font-size: 12px;
+                }
+            """)
+            Gtk.StyleContext.add_provider_for_display(display, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            self._style_providers[display] = css
         self.scale_css = Gtk.CssProvider()
         self.canvas = Gtk.DrawingArea(content_width=WIDTH, content_height=HEIGHT, focusable=True)
         self.canvas.update_property([Gtk.AccessibleProperty.LABEL],
@@ -165,8 +200,21 @@ class ActionsRing(Gtk.Window):
         keys.connect("key-pressed", self.key_pressed)
         self.add_controller(keys)
         self.connect("close-request", lambda *_: self.dismiss() or True)
-        self.connect("unmap", lambda *_: (self.cancel_pointer(), self.stop_animation()))
-        self.settings.connect("notify::gtk-enable-animations", self.motion_preference_changed)
+        self.connect("map", self.mapped)
+        self.connect("unmap", self.unmapped)
+        self.motion_preference_changed()
+
+    def mapped(self, *_):
+        if not self._settings_handler:
+            self._settings_handler = self.settings.connect("notify::gtk-enable-animations", self.motion_preference_changed)
+        self.motion_preference_changed()
+
+    def unmapped(self, *_):
+        self.cancel_pointer()
+        self.stop_animation()
+        if self._settings_handler:
+            self.settings.disconnect(self._settings_handler)
+            self._settings_handler = 0
 
     @staticmethod
     def make_button(radius):
@@ -180,6 +228,7 @@ class ActionsRing(Gtk.Window):
         return self.config.get("ring_groups", {}) if self.config else {}
 
     def show_ring(self, config, held=False, preview=False):
+        self.motion_preference_changed()
         geometry = RingGeometry(config.get("ring_scale", 100))
         state = RingState(config.get("ring_motion_gain", .45), config.get("ring_deadzone", 24))
         self.cancel_pointer()
@@ -201,11 +250,11 @@ class ActionsRing(Gtk.Window):
         self.close_button.get_child().set_pixel_size(geometry.size(16))
         scale = geometry.scale
         self.scale_css.load_from_string(f"""
-            .ring-callout {{ padding: {7 * scale}px {10 * scale}px; border-radius: {12 * scale}px; }}
+            .ring-callout {{ padding: {7 * scale}px {10 * scale}px; border-radius: {4 * scale}px; }}
             .ring-callout label {{ font-size: {13 * scale}px; }}
             .ring-shortcut {{ font-size: {11 * scale}px; }}
             .ring-hint {{ font-size: {12 * scale}px; padding: {6 * scale}px {12 * scale}px;
-                         border-radius: {12 * scale}px; }}
+                         border-radius: {4 * scale}px; }}
         """)
         self.callout.set_spacing(geometry.size(8))
         self._move(self.close_button, CENTER_X - CENTER_RADIUS, CENTER_Y - CENTER_RADIUS)
@@ -213,6 +262,9 @@ class ActionsRing(Gtk.Window):
         self._move(self.instructions, 30, HEIGHT - 28)
         self.close_group()
         self.state.open(held)
+        self._selection_target = None
+        self.orbit.reset()
+        self.selection_reveal.move(1, animate=False)
         for index, action_id in enumerate(config["ring"]):
             action = config["actions"][action_id]
             grouped = str(index) in self.groups()
@@ -236,6 +288,7 @@ class ActionsRing(Gtk.Window):
         self.cancel_pointer()
         self._adjusted_in_hold = False
         self.state.cancel()
+        self.orbit.reset()
         self.close_group()
         self.stop_animation()
         self.set_visible(False)
@@ -359,6 +412,16 @@ class ActionsRing(Gtk.Window):
             self.on_selected(action_id, self.preview)
 
     def update_labels(self):
+        target = (("child", self.child_selected) if self.child_selected is not None else
+                  ("root", self.state.selected) if self.state.selected is not None else None)
+        self.orbit.select(self.group_slot if self.group_slot is not None else self.state.selected,
+                          animate=self.animations_enabled())
+        if target != self._selection_target:
+            self._selection_target = target
+            self.selection_reveal.move(0, animate=False)
+            self.selection_reveal.move(1, animate=self.animations_enabled())
+            self.canvas.queue_draw()
+        self.animate()
         for index, button in enumerate(self.buttons):
             self.selected_style(button, index == self.state.selected or index == self.group_slot)
         for index, button in enumerate(self.child_buttons):
@@ -428,18 +491,26 @@ class ActionsRing(Gtk.Window):
     def animations_enabled(self):
         return self.settings.get_property("gtk-enable-animations")
 
+    def transitions(self):
+        return (self.reveal, self.group_reveal, self.label_reveal, self.selection_reveal,
+                *self.orbit.transitions())
+
     def animate(self):
-        if self.state.visible and self.animations_enabled() and not self.tick_id:
+        if (self.state.visible and self.animations_enabled() and not self.tick_id
+                and any(t.active() for t in self.transitions())):
+            self._last_frame = 0.0
             self.tick_id = self.canvas.add_tick_callback(self.tick)
 
     def apply_frame(self, now):
         reveal = self.reveal.value(now)
-        self.spread = 0.78 + 0.22 * reveal
-        self.surface.set_opacity(reveal)
+        # The orbit is assembled in paint. Every root face is already visible
+        # at its final location, so a quick click never chases a moving target.
+        self.spread = 1.0
+        self.surface.set_opacity(1)
         for index, button in enumerate(self.buttons):
             dx, dy = button_center(index)
-            self._move(button, CENTER_X + dx * self.spread - BUTTON_RADIUS,
-                             CENTER_Y + dy * self.spread - BUTTON_RADIUS)
+            self._move(button, CENTER_X + dx - BUTTON_RADIUS, CENTER_Y + dy - BUTTON_RADIUS)
+            button.set_opacity(.72 + .28 * reveal)
         self.callout.set_opacity(self.label_reveal.value(now))
         if self.group_slot is not None:
             progress = self.group_reveal.value(now)
@@ -459,9 +530,12 @@ class ActionsRing(Gtk.Window):
 
     def tick(self, _widget, _clock):
         now = monotonic()
+        active = self.state.visible and any(t.active(now) for t in self.transitions())
+        if active and now - self._last_frame < 1 / 60:
+            return True
+        self._last_frame = now
         self.apply_frame(now)
         self.canvas.queue_draw()
-        active = self.state.visible and any(t.active(now) for t in (self.reveal, self.group_reveal, self.label_reveal))
         if not active:
             self.tick_id = 0
         return active
@@ -472,9 +546,13 @@ class ActionsRing(Gtk.Window):
             self.tick_id = 0
 
     def motion_preference_changed(self, *_):
+        if self.animations_enabled():
+            self.remove_css_class("reduced-motion")
+        else:
+            self.add_css_class("reduced-motion")
         if not self.animations_enabled():
             self.stop_animation()
-            for transition in (self.reveal, self.group_reveal, self.label_reveal):
+            for transition in self.transitions():
                 transition.move(transition.target, animate=False)
             self.apply_frame(monotonic())
             self.canvas.queue_draw()
@@ -538,6 +616,7 @@ class ActionsRing(Gtk.Window):
         self._suppress_native = True
         self._primary_start = (x, y)
         self._press_target = self.pointer_target(x, y)
+        self.press_style(self._press_target, True)
         action = self.adjustment_at(x, y)
         self._drag = (HorizontalDrag(*self.geometry.logical(x, y)), action) if action else None
 
@@ -561,6 +640,7 @@ class ActionsRing(Gtk.Window):
             self.pointer_click(gesture, 1, x + dx, y + dy)
 
     def cancel_pointer(self):
+        self.press_style(self._press_target, False)
         self._primary_start = self._drag = self._press_target = None
         token = self._pointer_token = self._pointer_token + 1
         def unblock():
@@ -568,6 +648,17 @@ class ActionsRing(Gtk.Window):
                 self._suppress_native = False
             return GLib.SOURCE_REMOVE
         GLib.idle_add(unblock)
+
+    def press_style(self, target, pressed):
+        if target is None:
+            return
+        kind, index = target
+        button = (self.close_button if kind == "center" else
+                  self.child_buttons[index] if kind == "child" else self.buttons[index])
+        if pressed:
+            button.add_css_class("pressed")
+        else:
+            button.remove_css_class("pressed")
 
     def native_commit(self, index, child=False):
         if not self._suppress_native and self._primary_start is None:
@@ -644,10 +735,60 @@ class ActionsRing(Gtk.Window):
         return True
 
     def draw(self, _area, cr, width, height):
-        if self.state.visible and self.state.held:
-            cr.scale(self.geometry.scale, self.geometry.scale)
-            cr.arc(CENTER_X + self.state.x, CENTER_Y + self.state.y, 3, 0, math.tau)
-            cr.set_source_rgb(0.2, 0.52, 0.92)
+        if not self.state.visible:
+            return
+        cr.scale(self.geometry.scale, self.geometry.scale)
+        # These light accents are paint only; the actionable circles never move
+        # or grow in response to selection, including during a captured drag.
+        now = monotonic()
+        reveal = self.reveal.value(now)
+        cr.set_source_rgba(.63, .60, .60, .35)
+        cr.set_line_width(1)
+        # Two traces join at six o'clock. No widget or hit region is displaced.
+        cr.arc(CENTER_X, CENTER_Y, 116, -math.pi / 2, -math.pi / 2 + math.pi * reveal)
+        cr.stroke()
+        cr.arc_negative(CENTER_X, CENTER_Y, 116, -math.pi / 2, -math.pi / 2 - math.pi * reveal)
+        cr.stroke()
+        orbit_alpha = self.orbit.opacity.value(now)
+        if orbit_alpha > .001:
+            angle = self.orbit.angle.value(now) - math.pi / 2
+            cr.set_source_rgba(.55, .69, .83, .95 * orbit_alpha)
+            cr.set_line_width(3)
+            cr.set_line_cap(1)  # Cairo's round cap; no additional dependency.
+            cr.arc(CENTER_X, CENTER_Y, 79, angle - .15, angle + .15)
+            cr.stroke()
+            # The short outward tick points from the traveling arc to its face.
+            cr.set_line_width(2)
+            cr.move_to(CENTER_X + math.cos(angle) * 79, CENTER_Y + math.sin(angle) * 79)
+            cr.line_to(CENTER_X + math.cos(angle) * 86, CENTER_Y + math.sin(angle) * 86)
+            cr.stroke()
+        target = self._selection_target
+        if target is not None:
+            kind, index = target
+            if kind == "child" and index < len(self.child_positions):
+                x, y = self.child_positions[index]
+                radius = CHILD_RADIUS
+            else:
+                dx, dy = button_center(index)
+                x, y = CENTER_X + dx * self.spread, CENTER_Y + dy * self.spread
+                radius = BUTTON_RADIUS
+            progress = self.selection_reveal.value(now)
+            cr.set_source_rgba(.55, .69, .83, .45 + .25 * progress)
+            cr.set_line_width(1.5)
+            # Resolve the selected outline in place; the orbit carries travel.
+            cr.arc(x, y, radius + 4, -math.pi / 2, -math.pi / 2 + math.tau * progress)
+            cr.stroke()
+        if self.state.held:
+            x, y = self.state.x, self.state.y
+            length = math.hypot(x, y)
+            if length > CENTER_RADIUS + 7:
+                cr.set_source_rgba(.55, .69, .83, .65 if self.state.selected is not None else .35)
+                cr.set_line_width(1.5)
+                cr.move_to(CENTER_X + x / length * 23, CENTER_Y + y / length * 23)
+                cr.line_to(CENTER_X + x, CENTER_Y + y)
+                cr.stroke()
+            cr.arc(CENTER_X + x, CENTER_Y + y, 4 if self.state.selected is not None else 3, 0, math.tau)
+            cr.set_source_rgb(.65, .77, .89)
             cr.fill()
 
     def identify_popup(self, *_args):
