@@ -299,6 +299,24 @@ def test_native_overlay_dismissal_returns_to_overview_state(window):
     assert window.shell.sidebar.get_reveal_child()
 
 
+@pytest.mark.parametrize('narrow', [False, True])
+def test_easy_switch_turn_stays_visible_until_computers_are_requested(window, narrow):
+    shell = window.shell
+    shell.set_narrow(narrow)
+    window.navigate('easy-switch')
+    assert shell.art.picture.view_name == 'underside'
+    assert not shell.inspector.get_show_sidebar()
+    assert 'hosts' in shell.art.callouts
+    shell.art.callouts['hosts'].emit('clicked')
+    assert window.selected_target == 'hosts'
+    assert shell.inspector_stack.get_visible_child_name() == 'hosts'
+    assert shell.inspector.get_show_sidebar()
+    shell.inspector.set_show_sidebar(False)
+    assert window.route == 'easy-switch' and window.selected_target is None
+    assert shell.art.picture.view_name == 'underside'
+    window.backend.scan.assert_not_called()
+
+
 def test_home_utilities_and_crosslinks_preserve_editor_destination(window):
     window.desktop.configure = Mock()
     def find(widget, predicate):
@@ -416,8 +434,67 @@ def test_local_configuration_destination_is_reachable_and_truthful(window):
     assert window.route == 'configuration'
     assert window.shell.stack.get_visible_child_name() == 'configuration'
     assert str(window.desktop.store.path) in window.shell.configuration_paths.get_text()
-    assert 'not yet available' in window.shell.configuration_status.get_text()
+    assert 'copy these locations' in window.shell.configuration_status.get_text()
     window.backend.scan.assert_not_called()
+
+
+def test_background_preference_is_explicit_without_enabling_integration(window, monkeypatch):
+    assert window.shell.preference_widgets[('background', None)][0].get_active()
+    assert 'background' not in window.desktop.config
+    monkeypatch.setattr(window.desktop, 'start', Mock())
+    window.shell.preference_widgets[('background', None)][0].set_active(False)
+    settle(window)
+    assert window.desktop.store.read()['background'] is False
+    assert not window.desktop.requested_enabled
+    window.desktop.start.assert_not_called()
+    window.backend.scan.assert_not_called()
+
+
+def test_quit_is_available_in_application_menu_at_every_width(window):
+    for narrow in (False, True):
+        window.shell.set_narrow(narrow)
+        assert window.shell.utility_menu.get_visible()
+        assert window.shell.quit_button.get_label() == 'Quit MX4 Linux'
+
+
+def test_compact_navigation_keeps_every_device_page_reachable(window):
+    from mx4_linux.reference_shell import DEVICE_ROUTES
+    window.navigate('buttons')
+    shell = window.shell
+    shell.set_narrow(True)
+    assert shell.compact_nav.get_visible()
+    assert not shell.sidebar.get_reveal_child()
+    assert shell.utility_menu.get_visible()
+    assert shell.home_note.get_visible()
+    for index, route in enumerate(DEVICE_ROUTES):
+        shell.compact_nav.set_selected(index)
+        assert window.route == route
+    window.navigate('buttons')
+    shell.set_narrow(False)
+    assert shell.sidebar.get_reveal_child()
+    assert not shell.compact_nav.get_visible()
+    window.backend.scan.assert_not_called()
+
+
+def test_paused_mouse_previews_stay_paused_across_workspace_rebuild(window):
+    shell = window.shell
+    shell.motion_button.set_active(True)
+    assert not shell.home_picture.motion_enabled
+    assert not shell.art.picture.motion_enabled
+    window.render_workspace()
+    assert not shell.art.picture.motion_enabled
+    shell.motion_button.set_active(False)
+    assert shell.home_picture.motion_enabled
+    assert shell.art.picture.motion_enabled
+    settings = Gtk.Settings.get_default()
+    original = settings.get_property('gtk-enable-animations')
+    try:
+        settings.set_property('gtk-enable-animations', False)
+        assert window.has_css_class('reduced-motion')
+        assert not shell.motion_button.get_sensitive()
+        assert shell.home_picture.ambient_tick_id == shell.art.picture.ambient_tick_id == 0
+    finally:
+        settings.set_property('gtk-enable-animations', original)
 
 
 def test_existing_editor_opens_requested_routine_tab(window, monkeypatch):

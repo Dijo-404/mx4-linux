@@ -17,7 +17,7 @@ TITLES = {'home': 'MX4 Linux', **DEVICE_ROUTES, 'actions': 'Actions Ring & Smart
           'profiles': 'Mouse profiles', 'application': 'Application Settings', 'guide': 'Meet your MX Master 4'}
 TARGET_TITLES = {**{f'button:{cid}': item[0] for cid, item in BUTTONS.items()},
                  'wheel': 'Scroll wheel', 'thumb': 'Thumb wheel', 'pointer': 'Pointer speed',
-                 'pressure': 'Button press sensitivity', 'haptics': 'Haptic feedback'}
+                 'pressure': 'Button press sensitivity', 'haptics': 'Haptic feedback', 'hosts': 'Easy-Switch'}
 
 
 def label(text, style=None):
@@ -28,7 +28,8 @@ def label(text, style=None):
 
 
 def button(text, callback, *, icon=None):
-    widget = Gtk.Button(label=text)
+    widget = Gtk.Button(label=text, valign=Gtk.Align.CENTER)
+    widget.update_property([Gtk.AccessibleProperty.LABEL], [text])
     if icon:
         widget.set_icon_name(icon)
         widget.set_tooltip_text(text)
@@ -46,15 +47,24 @@ def scroll(child):
 
 
 def bounded_dropdown(strings, *, accessible_name, max_chars=18):
-    """Keep closed controls small without changing exact model identities."""
+    """Bound closed controls while giving the popup room for readable names."""
     choice = Gtk.DropDown.new_from_strings(strings)
+    choice.set_valign(Gtk.Align.CENTER)
+    choice.add_css_class('mx4-choice')
     choice.set_enable_search(True)
     choice.update_property([Gtk.AccessibleProperty.LABEL], [accessible_name])
-    def factory(chars):
+    def factory(chars, popup=False):
         value = Gtk.SignalListItemFactory()
         def setup(_factory, item):
-            item.set_child(Gtk.Label(xalign=0, ellipsize=Pango.EllipsizeMode.END,
-                                     max_width_chars=chars, single_line_mode=True))
+            child = Gtk.Label(xalign=0, hexpand=True, max_width_chars=chars)
+            if popup:
+                child.set_width_chars(24)
+                child.set_wrap(True)
+                child.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            else:
+                child.set_ellipsize(Pango.EllipsizeMode.END)
+                child.set_single_line_mode(True)
+            item.set_child(child)
         def bind(_factory, item):
             text = item.get_item().get_string()
             child = item.get_child()
@@ -65,7 +75,7 @@ def bounded_dropdown(strings, *, accessible_name, max_chars=18):
         value.connect('bind', bind)
         return value
     choice.set_factory(factory(max_chars))
-    choice.set_list_factory(factory(48))
+    choice.set_list_factory(factory(42, popup=True))
     def selected(widget, _property):
         item = widget.get_selected_item()
         widget.set_tooltip_text(item.get_string() if item else '')
@@ -107,6 +117,7 @@ class ReferenceShell:
         self.art = None
         self.targets = {}
         self.preference_widgets = {}
+        self.motion_enabled = True
         self.provider = Gtk.CssProvider()
         self.provider.load_from_path(str(Path(__file__).parent / 'assets' / 'reference.css'))
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), self.provider,
@@ -123,12 +134,34 @@ class ReferenceShell:
         self.heading = label('MX4 Linux', 'mx4-heading')
         self.heading.set_wrap(False)
         self.heading.set_single_line_mode(True)
+        self.heading.set_ellipsize(Pango.EllipsizeMode.END)
+        self.heading.set_max_width_chars(22)
         self.header.pack_start(self.heading)
         self.utilities = Gtk.Box(spacing=4)
+        self.motion_button = Gtk.ToggleButton(icon_name='media-playback-pause-symbolic')
+        self.motion_button.set_tooltip_text('Pause mouse animation')
+        self.motion_button.update_property([Gtk.AccessibleProperty.LABEL], ['Pause mouse animation'])
+        self.motion_button.connect('toggled', self.toggle_motion)
+        self.utilities.append(self.motion_button)
+        self.utility_buttons = []
+        menu_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                               margin_start=8, margin_end=8, margin_top=8, margin_bottom=8)
         for text, route, icon in [('Smart Actions', 'smart-actions', 'emblem-ok-symbolic'),
                                   ('Actions Ring', 'ring', 'view-grid-symbolic'),
                                   ('Application Settings', 'application', 'emblem-system-symbolic')]:
-            self.utilities.append(button(text, lambda route=route: window.navigate(route), icon=icon))
+            item = button(text, lambda route=route: window.navigate(route), icon=icon)
+            self.utility_buttons.append(item)
+            self.utilities.append(item)
+            menu_content.append(button(text, lambda route=route: self.menu_navigate(route)))
+        menu_content.append(Gtk.Separator())
+        self.quit_button = button('Quit MX4 Linux', window.request_quit)
+        self.quit_button.set_tooltip_text('Stop mouse integration and quit · Ctrl+Q')
+        menu_content.append(self.quit_button)
+        self.utility_menu = Gtk.MenuButton(icon_name='open-menu-symbolic',
+                                          tooltip_text='Application menu')
+        self.utility_menu.update_property([Gtk.AccessibleProperty.LABEL], ['Application menu'])
+        self.utility_menu.set_popover(Gtk.Popover(child=menu_content))
+        self.utilities.append(self.utility_menu)
         self.header.pack_end(self.utilities)
         self.toolbar.add_top_bar(self.header)
         self.stack = Gtk.Stack(vexpand=True, transition_type=Gtk.StackTransitionType.CROSSFADE,
@@ -196,9 +229,13 @@ class ReferenceShell:
         self.build_configuration()
         self.build_guide()
         self.update_context()
+        self.animation_settings = Gtk.Settings.get_default()
+        self.animation_handler = self.animation_settings.connect('notify::gtk-enable-animations', self.sync_motion)
+        self.sync_motion()
 
     def build_home(self):
         home = page_box()
+        home.add_css_class('mx4-home')
         self.add_device_button = button('Add device', self.window.add_device)
         self.header.pack_end(self.add_device_button)
         self.updating_devices = False
@@ -210,39 +247,77 @@ class ReferenceShell:
         self.device_chooser_row.append(self.device_selector)
         home.append(self.device_chooser_row)
         if self.window.demo:
-            home.append(label('PREVIEW · All device controls are simulated. No hardware is accessed.', 'mx4-subtle'))
-        grid = Gtk.Box(spacing=32, vexpand=True, valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER, margin_start=60)
-        self.device_card = Gtk.Button()
+            preview = label('[preview]  Simulated device controls', 'mx4-preview-badge')
+            preview.set_halign(Gtk.Align.START)
+            home.append(preview)
+        grid = Gtk.Box(spacing=32, vexpand=True, valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER)
+        self.device_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.device_card.add_css_class('device-card')
-        self.device_card.connect('clicked', lambda *_: self.window.navigate('buttons'))
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        image = ModelPicture()
+        self.device_card.update_property([Gtk.AccessibleProperty.LABEL], ['MX Master 4'])
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        image = ModelPicture(interactive=True)
+        self.home_picture = image
         image.set_filename(str(ASSETS / 'overview.png'))
-        image.set_size_request(240, 240)
+        image.set_size_request(320, 320)
         self.home_name = label('MX Master 4', 'title-3')
         self.home_name.set_halign(Gtk.Align.CENTER)
         card.append(self.home_name)
         card.append(image)
+        model_hint = label('Drag to rotate · Scroll to zoom', 'mx4-subtle')
+        model_hint.set_halign(Gtk.Align.CENTER)
+        card.append(model_hint)
+        reset = button('Reset view', image.reset_view)
+        reset.add_css_class('flat')
+        reset.set_halign(Gtk.Align.CENTER)
+        card.append(reset)
         self.home_battery = label('Reading battery…', 'battery-chip')
         self.home_battery.set_halign(Gtk.Align.CENTER)
         card.append(self.home_battery)
         self.home_integration = label('', 'mx4-subtle')
         self.home_integration.set_halign(Gtk.Align.CENTER)
         card.append(self.home_integration)
-        self.device_card.set_child(card)
+        hint = button('Customize mouse ->', lambda: self.window.navigate('buttons'))
+        hint.add_css_class('mx4-card-link')
+        hint.add_css_class('flat')
+        hint.set_halign(Gtk.Align.CENTER)
+        card.append(hint)
+        self.device_card.append(card)
         grid.append(self.device_card)
-        note = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, valign=Gtk.Align.CENTER)
+        note = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER)
         note.add_css_class('mx4-home-note')
-        note.append(label('Make it yours', 'title-2'))
-        note.append(label('Tune your pointer, scrolling and feedback.\nKeep your favorite actions close.', 'mx4-subtle'))
-        note.append(button('Explore your mouse', lambda: self.window.navigate('guide')))
+        note.append(label('[ your setup ]', 'mx4-eyebrow'))
+        note.append(label('Make every\nmove yours.', 'mx4-hero-title'))
+        detail = label('Fine-tune the feel. Personalize each button.\nBring your everyday actions closer.', 'mx4-subtle')
+        detail.set_max_width_chars(34)
+        note.append(detail)
+        start = button('Explore your mouse', lambda: self.window.navigate('guide'))
+        start.add_css_class('suggested-action')
+        start.set_halign(Gtk.Align.START)
+        note.append(start)
+        shortcuts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        for title, detail, route in [
+            ('Actions Ring', 'Your shortcuts, one gesture away', 'ring'),
+            ('Smart Actions', 'Make a routine out of repeat tasks', 'smart-actions'),
+        ]:
+            shortcut = button(title, lambda route=route: self.window.navigate(route))
+            shortcut.add_css_class('mx4-quick-link')
+            content = Gtk.Box(spacing=12)
+            content.append(label('[+]', 'mx4-nav-marker'))
+            copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, hexpand=True)
+            copy.append(label(title, 'heading'))
+            copy.append(label(detail, 'mx4-subtle'))
+            content.append(copy)
+            content.append(label('->', 'mx4-nav-marker'))
+            shortcut.set_child(content)
+            shortcuts.append(shortcut)
+        note.append(shortcuts)
         self.home_note = note
         grid.append(note)
         home.append(grid)
         self.home_grid = grid
         self.home_empty = label('Connect with Bluetooth or a Logi Bolt receiver, wake the mouse, then Add device to check again.', 'mx4-subtle')
         home.append(self.home_empty)
-        self.stack.add_named(scroll(home), 'home')
+        self.stack.add_named(scroll(Adw.Clamp(child=home, maximum_size=1000)), 'home')
 
     def build_application(self):
         body = page_box()
@@ -264,6 +339,15 @@ class ReferenceShell:
         self.preference_widgets[('adapt_to_app', None)] = (adapt, handler, adapt.set_active)
         assignments.add(adapt)
         body.append(assignments)
+        behavior = Adw.PreferencesGroup(title='Window behavior')
+        background = Adw.SwitchRow(title='Keep integration running when the window closes',
+                                   subtitle='Enabled mouse shortcuts stay available. Reopen MX4 Linux to change settings; choose Quit from the menu to stop it.',
+                                   active=(self.window.desktop.config or {}).get('background', True),
+                                   sensitive=self.window.desktop.config is not None)
+        handler = background.connect('notify::active', lambda widget, _p: self.window.save_local_preference('background', widget.get_active()))
+        self.preference_widgets[('background', None)] = (background, handler, background.set_active)
+        behavior.add(background)
+        body.append(behavior)
         help_group = Adw.PreferencesGroup(title='Help')
         row = Adw.ActionRow(title='Learn your mouse', subtitle='An optional guide to controls and local actions.')
         row.add_suffix(button('Open guide', lambda: self.window.navigate('guide')))
@@ -274,7 +358,7 @@ class ReferenceShell:
         body.append(help_group)
         body.append(label('Local assignments and mouse settings work without a vendor account.', 'mx4-subtle'))
         local = Adw.PreferencesGroup(title='Local configuration')
-        row = Adw.ActionRow(title='Backup and reset', subtitle='Local action, preference and mouse profile files.')
+        row = Adw.ActionRow(title='Configuration files', subtitle='Find your saved actions, preferences and mouse profiles.')
         row.add_suffix(button('Open', lambda: self.window.navigate('configuration')))
         local.add(row)
         body.append(local)
@@ -282,7 +366,8 @@ class ReferenceShell:
 
     def build_configuration(self):
         body = page_box()
-        self.configuration_status = label('Actions and preferences are stored locally. Backup and reset controls are not yet available here.', 'mx4-subtle')
+        body.append(label('Your settings stay on this computer', 'mx4-heading'))
+        self.configuration_status = label('Find your saved actions, preferences and mouse profiles below. You can copy these locations for your own backups.', 'mx4-subtle')
         body.append(self.configuration_status)
         self.configuration_paths = label(f'Actions and preferences: {self.window.desktop.store.path}\n\nMouse profiles: {self.window.store.path}\n\nRemembered mouse settings: {self.window.remembered.path}')
         self.configuration_paths.set_selectable(True)
@@ -413,7 +498,8 @@ class ReferenceShell:
         window = self.window
         if self.art:
             self.art.dispose_art()
-        self.preference_widgets = {key: value for key, value in self.preference_widgets.items() if key[0] == 'appearance'}
+        self.preference_widgets = {key: value for key, value in self.preference_widgets.items()
+                                   if key[0] in ('appearance', 'adapt_to_app', 'background')}
         self.inspector_stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE, transition_duration=200)
         inspector_body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         inspector_body.add_css_class('mx4-inspector')
@@ -437,12 +523,12 @@ class ReferenceShell:
         nav.add_css_class('mx4-sidebar')
         nav.set_size_request(200, -1)
         self.nav_buttons = {}
-        icons = {'buttons': 'input-mouse-symbolic', 'point': 'preferences-desktop-mouse-symbolic',
-                 'haptics': 'audio-volume-high-symbolic', 'easy-switch': 'computer-symbolic', 'settings': 'emblem-system-symbolic'}
-        for route, title in DEVICE_ROUTES.items():
+        for number, (route, title) in enumerate(DEVICE_ROUTES.items(), 1):
             item = button(title, lambda route=route: window.navigate(route))
             content = Gtk.Box(spacing=9)
-            content.append(Gtk.Image(icon_name=icons[route]))
+            marker = label(f'[{number}]', 'mx4-nav-marker')
+            marker.update_state([Gtk.AccessibleState.HIDDEN], [True])
+            content.append(marker)
             content.append(label(title))
             item.set_child(content)
             item.set_halign(Gtk.Align.FILL)
@@ -456,10 +542,20 @@ class ReferenceShell:
         self.sidebar.set_child(nav)
         workspace.append(self.sidebar)
         art_column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True, vexpand=True)
+        art_column.add_css_class('mx4-stage')
+        self.compact_nav = bounded_dropdown(list(DEVICE_ROUTES.values()), accessible_name='Mouse settings page', max_chars=25)
+        self.compact_nav.set_halign(Gtk.Align.FILL)
+        self.compact_nav.set_margin_start(18)
+        self.compact_nav.set_margin_end(18)
+        self.compact_nav.set_margin_top(8)
+        self.compact_nav.set_visible(self.narrow)
+        self.compact_nav_handler = self.compact_nav.connect('notify::selected', self.compact_navigate)
+        art_column.append(self.compact_nav)
         self.art_notice = label('', 'mx4-subtle')
         self.art_notice.set_halign(Gtk.Align.CENTER)
         art_column.append(self.art_notice)
         self.art = MouseView(window.select_target)
+        self.art.set_motion_enabled(self.motion_enabled)
         window.wheel = self.art
         art_column.append(self.art)
         foot = Gtk.Box(spacing=10, margin_start=18, margin_end=18, margin_bottom=14)
@@ -483,7 +579,7 @@ class ReferenceShell:
         self.host_body = page_box()
         self.host_scroll = scroll(self.host_body)
         self.inspector_stack.add_named(self.host_scroll, 'hosts')
-        self.targets = {}
+        self.targets = {'hosts': self.host_body}
         self.force_buttons = {}
         self.force_state = None
         self.build_setting_targets()
@@ -496,7 +592,7 @@ class ReferenceShell:
     def inspector_visibility_changed(self, split, _property):
         # Backdrop/Escape dismissal in narrow mode must update semantic state
         # immediately, just like the explicit inspector Back button.
-        if not split.get_show_sidebar() and (self.window.selected_target or self.window.route in ('settings', 'easy-switch')):
+        if not split.get_show_sidebar() and (self.window.selected_target or self.window.route == 'settings'):
             self.window.close_inspector()
 
     def target_page(self, target, description=''):
@@ -559,7 +655,6 @@ class ReferenceShell:
             group.add(Adw.ActionRow(title='Configuration unavailable', subtitle='Fix or import a valid local action configuration before assigning shortcuts.'))
             body.append(group)
             return
-        row = Adw.ActionRow(title='Local action', subtitle='Default keeps the built-in mouse function.')
         keys = [None, SHOW_RING, *config['actions']]
         dropdown = bounded_dropdown(['Default', 'Show Actions Ring', *[action['label'] for action in config['actions'].values()]],
                                     accessible_name=f'Local assignment for {BUTTONS[cid][0]}', max_chars=16)
@@ -569,7 +664,7 @@ class ReferenceShell:
             if not getattr(self, 'updating_bindings', False) and widget.get_selected() < len(keys):
                 self.window.save_button_assignment(cid, keys[widget.get_selected()], self.context_app)
         dropdown.connect('notify::selected', changed)
-        row.add_suffix(dropdown)
+        row = choice_row('Local action', 'Default keeps the built-in mouse function.', dropdown)
         self.binding_widgets[cid] = (dropdown, keys)
         group.add(row)
         body.append(group)
@@ -643,7 +738,7 @@ class ReferenceShell:
         row = Adw.ActionRow(title='Local hardware profiles', subtitle='Save and apply confirmed settings for this mouse.')
         row.add_suffix(button('Open', lambda: self.window.navigate('profiles')))
         group.add(row)
-        row = Adw.ActionRow(title='Backup and reset', subtitle='Local configuration files.')
+        row = Adw.ActionRow(title='Configuration files', subtitle='Find your saved actions, preferences and mouse profiles.')
         row.add_suffix(button('Open', lambda: self.window.navigate('configuration')))
         group.add(row)
         row = Adw.ActionRow(title='Feature guide')
@@ -691,6 +786,8 @@ class ReferenceShell:
         if route == 'haptics' and 'haptics' in self.targets:
             value = settings.get('haptic-level', {}).get('value')
             specs['haptics'] = (f'Haptic feedback · {value if value is not None else "—"}', 'haptic_panel', (-165, 30))
+        if route == 'easy-switch':
+            specs['hosts'] = ('Switch computer', 'easy_switch', (25, 35))
         return specs
 
     def update_route(self):
@@ -706,14 +803,21 @@ class ReferenceShell:
             return
         for key, item in self.nav_buttons.items():
             item.add_css_class('active') if key == route else item.remove_css_class('active')
-        special = route in ('settings', 'easy-switch')
+            item.update_property([Gtk.AccessibleProperty.LABEL], [f'{DEVICE_ROUTES[key]}, current page' if key == route else DEVICE_ROUTES[key]])
+        if route in DEVICE_ROUTES:
+            self.compact_nav.handler_block(self.compact_nav_handler)
+            self.compact_nav.set_selected(list(DEVICE_ROUTES).index(route))
+            self.compact_nav.handler_unblock(self.compact_nav_handler)
+        special = route == 'settings'
         specs = self.callout_specs()
         self.art_notice.set_visible(route in ('buttons', 'point', 'haptics') and not specs)
         self.art_notice.set_text('This mouse did not report controls for this page. Wake it and refresh.')
-        self.art.set_targets(specs, window.selected_target, underside=route == 'easy-switch')
+        self.art.set_targets(specs, window.selected_target, underside=route == 'easy-switch',
+                             view='haptic' if route == 'haptics' else None)
         self.art.set_indicators(window.current.get('easy_switch', {}).get('current'), window.current.get('online'))
         self.art_preview.set_visible(route in ('point', 'haptics'))
         self.art_preview.set_label('Preview feedback' if route == 'haptics' else 'Preview wheel')
+        self.art_preview.update_property([Gtk.AccessibleProperty.LABEL], [self.art_preview.get_label()])
         self.art_preview.set_tooltip_text('Animate the illustration without changing the mouse')
         self.update_battery()
         target = window.selected_target
@@ -728,9 +832,9 @@ class ReferenceShell:
             self.inspector.set_visible(visible)
         else:
             self.inspector.set_show_sidebar(show)
-        self.sidebar.set_reveal_child(not bool(target))
+        self.sidebar.set_reveal_child(not self.narrow and not bool(target))
         if special:
-            target = 'hosts' if route == 'easy-switch' else 'device-settings'
+            target = 'device-settings'
         if target:
             self.inspector_stack.set_visible_child_name(target)
             self.inspector_title.set_text(TARGET_TITLES.get(target, DEVICE_ROUTES.get(route, 'Settings')))
@@ -759,26 +863,64 @@ class ReferenceShell:
 
     def set_narrow(self, narrow):
         self.narrow = narrow
+        self.window.add_css_class('mx4-compact') if narrow else self.window.remove_css_class('mx4-compact')
+        self.heading.set_max_width_chars(12 if narrow else 22)
         if hasattr(self, 'add_device_button'):
             if narrow:
                 self.add_device_button.set_icon_name('list-add-symbolic')
                 self.add_device_button.set_tooltip_text('Add device')
             else:
-                self.add_device_button.set_icon_name(None)
                 self.add_device_button.set_label('Add device')
         if hasattr(self, "home_grid"):
-            self.home_grid.set_margin_start(0 if narrow else 60)
+            self.home_grid.set_orientation(Gtk.Orientation.VERTICAL if narrow else Gtk.Orientation.HORIZONTAL)
+            self.home_grid.set_spacing(20 if narrow else 32)
+            self.home_picture.set_size_request(260 if narrow else 320, 260 if narrow else 320)
         if hasattr(self, "home_note"):
-            self.home_note.set_visible(not narrow)
+            self.home_note.set_visible(True)
+        for item in self.utility_buttons:
+            item.set_visible(not narrow)
+        self.utility_menu.set_visible(True)
+        if hasattr(self, 'compact_nav'):
+            self.compact_nav.set_visible(narrow)
+            self.sidebar.set_reveal_child(not narrow and not bool(self.window.selected_target))
         if hasattr(self, 'compact_context'):
             self.context_reveal.set_reveal_child(narrow and self.window.route in ('buttons', 'point', 'haptics'))
             self.header_context_reveal.set_reveal_child(not narrow and self.window.route in ('buttons', 'point', 'haptics'))
+
+    def compact_navigate(self, dropdown, _property):
+        index = dropdown.get_selected()
+        if index < len(DEVICE_ROUTES):
+            self.window.navigate(list(DEVICE_ROUTES)[index])
+
+    def menu_navigate(self, route):
+        self.utility_menu.popdown()
+        self.window.navigate(route)
+
+    def toggle_motion(self, button):
+        self.motion_enabled = not button.get_active()
+        self.sync_motion()
+
+    def sync_motion(self, *_):
+        enabled = Gtk.Settings.get_default().get_property('gtk-enable-animations')
+        if enabled:
+            self.window.remove_css_class('reduced-motion')
+        else:
+            self.window.add_css_class('reduced-motion')
+        self.motion_button.set_sensitive(enabled)
+        text = ('Pause mouse animation' if self.motion_enabled else 'Resume mouse animation') if enabled else 'Animations disabled by system preference'
+        self.motion_button.set_tooltip_text(text)
+        self.motion_button.update_property([Gtk.AccessibleProperty.LABEL], [text])
+        self.motion_button.set_icon_name('media-playback-pause-symbolic' if self.motion_enabled else 'media-playback-start-symbolic')
+        self.home_picture.set_motion_enabled(self.motion_enabled)
+        if self.art:
+            self.art.set_motion_enabled(self.motion_enabled)
 
     def sync_local_preferences(self):
         if self.window.desktop.config is None:
             return
         config = self.window.desktop.config
-        defaults = {'appearance': 'dark', 'haptic_feedback': True, 'haptic_power_save': False, 'adapt_to_app': True}
+        defaults = {'appearance': 'dark', 'haptic_feedback': True, 'haptic_power_save': False,
+                    'adapt_to_app': True, 'background': True}
         for (name, subkey), (widget, handler, setter) in self.preference_widgets.items():
             value = config.get(name, defaults.get(name)) if subkey is None else config.get(name, {}).get(subkey, subkey == 'hover')
             widget.handler_block(handler)
@@ -799,7 +941,9 @@ class ReferenceShell:
             self.window.add_css_class('mx4-light')
 
     def close(self):
+        self.home_picture.dispose_art()
         if self.art:
             self.art.dispose_art()
+        self.animation_settings.disconnect(self.animation_handler)
         self.style.disconnect(self.style_handler)
         Gtk.StyleContext.remove_provider_for_display(Gdk.Display.get_default(), self.provider)
