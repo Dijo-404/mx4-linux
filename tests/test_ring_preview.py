@@ -69,3 +69,17 @@ def test_preview_refresh_keeps_draft_labels_and_group_icons(preview):
     assert widget.buttons[0].get_tooltip_text() == "1. My actions. Action group"
     assert widget.buttons[0].has_css_class("selected")
     assert not selected
+
+@pytest.mark.parametrize('scale', [75, 100, 150])
+def test_preview_fits_620_pixels_and_keeps_saved_scale(preview, scale):
+    widget, selected = preview
+    config = deepcopy(widget.config) | {'ring_scale': scale}
+    widget.update_config(config)
+    widget.allocate(620, 390, -1, None)
+    assert widget.config['ring_scale'] == scale
+    assert widget.measure(Gtk.Orientation.HORIZONTAL, -1).minimum <= 620
+    for child in widget.buttons + widget.labels + [widget.center]:
+        x, _ = widget.get_child_position(child)
+        assert x >= 0
+        assert x + child.get_width() <= 620
+    assert not selected

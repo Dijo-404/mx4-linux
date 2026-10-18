@@ -530,3 +530,155 @@ def test_fatal_integration_error_requests_restoration_and_stops_observation(runt
     observer.stop.assert_called_once()
     assert runtime.error == 'Device did not acknowledge haptic playback'
     assert runtime._context_token == 1
+
+@pytest.fixture
+def wheel_runtime(runtime, monkeypatch):
+    from concurrent.futures import Future
+    from copy import deepcopy
+    runtime.execute = DesktopController.execute.__get__(runtime)
+    runtime._adjustment_pending = runtime._adjustment_yield = runtime._selection_pending = None
+    runtime._adjustment_active = runtime._adjustment_running = False
+    runtime._adjustment_token = 0
+    runtime._ring_config = deepcopy(runtime.config)
+    runtime._ring_config['actions']['copy']['adjustment'] = {
+        'increase': [{'type': 'text', 'text': '+'}], 'decrease': [{'type': 'text', 'text': '-'}]}
+    runtime.target = {'app_id': 'editor', 'window_id': 7}
+    runtime.ring.state.visible = True
+    runtime.ring.yield_keyboard, runtime.ring.resume_keyboard = Mock(), Mock()
+    runtime.ring.dismiss = lambda: (setattr(runtime.ring.state, 'visible', False), runtime.dismissed())
+    queued, idle, timers, calls = [], [], [], []
+    def submit(fn):
+        future = Future()
+        queued.append((fn, future))
+        return future
+    def runner(config, **kw):
+        return SimpleNamespace(execute=lambda action, **args: calls.append((deepcopy(config), action, args))
+            or {'ok': True, 'label': 'Copy', 'completed': 1}, close=Mock())
+    runtime.executor = SimpleNamespace(submit=submit)
+    monkeypatch.setattr('mx4_linux.desktop.DesktopActions', runner)
+    monkeypatch.setattr('mx4_linux.desktop.restore_focus', lambda _wid: {'app_id': 'editor', 'window_id': 7})
+    monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: idle.append(fn))
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda _ms, fn: timers.append(fn))
+    def finish():
+        fn, future = queued.pop(0)
+        try:
+            future.set_result(fn())
+        except Exception as exc:
+            future.set_exception(exc)
+        idle.pop(0)()
+    return SimpleNamespace(controller=runtime, queued=queued, idle=idle, timers=timers, calls=calls, finish=finish)
+
+
+def test_wheel_burst_is_bounded_coalesces_and_pins_document_target(wheel_runtime):
+    proof = wheel_runtime
+    runtime = proof.controller
+    assert runtime.adjusted('copy', 'increase')
+    runtime.ring.yield_keyboard.assert_called_once()
+    proof.timers.pop()()
+    for _ in range(1000):
+        assert runtime.adjusted('copy', 'increase')
+    assert len(proof.queued) == 1
+    assert runtime._adjustment_pending['count'] == 4
+    for _ in range(4):
+        runtime.adjusted('copy', 'decrease')
+    assert runtime._adjustment_pending is None
+    runtime.target = {'app_id': 'other', 'window_id': 99}
+    runtime._ring_config['actions']['copy']['label'] = 'Edited later'
+    proof.finish()
+    assert proof.calls[0][0]['actions']['copy']['label'] == 'Copy'
+    assert proof.calls[0][2]['adjustment'] == 'increase'
+    runtime.ring.resume_keyboard.assert_called_once()
+
+
+@pytest.mark.parametrize('context', [None, {'app_id': 'io.github.mx4linux.Control', 'window_id': 7}])
+def test_wheel_selected_branch_checks_keyboard_guard_even_when_main_is_command(wheel_runtime, monkeypatch, context):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime._ring_config['actions']['copy']['steps'] = [{'type': 'command', 'argv': ['true']}]
+    monkeypatch.setattr('mx4_linux.desktop.restore_focus', lambda _wid: context)
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    proof.finish()
+    assert not proof.calls
+    assert 'another application' in runtime.notify.call_args.args[0]
+
+
+def test_main_selection_waits_for_cancelled_adjustment_then_runs_exactly_once(wheel_runtime):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    runtime.ring.state.visible = False
+    runtime.selected('copy', False)
+    proof.timers.pop()()  # Ordinary 80ms elapsed while old future is still active.
+    assert len(proof.queued) == 1
+    proof.finish()
+    assert len(proof.queued) == 1
+    proof.finish()
+    assert len(proof.calls) == 1
+    assert 'adjustment' not in proof.calls[0][2]
+    runtime.ring.resume_keyboard.assert_not_called()
+
+
+def test_dismissal_cancels_pending_and_active_and_stale_completion_cannot_reopen(wheel_runtime):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    runtime.adjusted('copy', 'increase')
+    runtime.ring.dismiss()
+    assert runtime._adjustment_pending is None
+    proof.finish()
+    assert not proof.calls
+    runtime.ring.resume_keyboard.assert_not_called()
+    assert not runtime.ring.state.visible
+
+
+def test_external_focus_cancels_wheel_but_pinned_source_and_overlay_do_not(wheel_runtime):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.adjusted('copy', 'increase')
+    runtime.event({'type': 'context', 'context': runtime.target, 'context_token': 0})
+    assert runtime._adjustment_active
+    runtime.event({'type': 'context', 'context': {'app_id': 'io.github.mx4linux.ring'}, 'context_token': 0})
+    assert runtime._adjustment_active
+    runtime.event({'type': 'context', 'context': {'app_id': 'other', 'window_id': 8}, 'context_token': 0})
+    assert not runtime._adjustment_active
+    proof.timers.pop()()
+    assert not proof.queued
+    runtime.ring.resume_keyboard.assert_not_called()
+
+def test_main_selection_still_waits_for_unmap_delay_when_adjustment_finishes_first(wheel_runtime):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    runtime.ring.state.visible = False
+    runtime.selected('copy', False)
+    proof.finish()
+    assert not proof.queued  # The layer-unmap timeout has not fired yet.
+    proof.timers.pop()()
+    assert len(proof.queued) == 1
+    proof.finish()
+    assert len(proof.calls) == 1
+
+def test_ordinary_binding_during_wheel_yield_gap_cannot_steal_single_future(wheel_runtime):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.adjusted('copy', 'increase')
+    runtime.execute('paste', target=runtime.target, config=runtime.config)
+    assert not proof.queued
+    proof.timers.pop()()
+    proof.finish()
+    assert [call[1] for call in proof.calls] == ['copy']
+
+
+def test_unknown_pinned_target_cannot_type_into_later_focused_application(wheel_runtime, monkeypatch):
+    proof = wheel_runtime
+    runtime = proof.controller
+    runtime.target = None
+    monkeypatch.setattr('mx4_linux.desktop.focused_context', lambda: {'app_id': 'editor', 'window_id': 7})
+    runtime.adjusted('copy', 'increase')
+    proof.timers.pop()()
+    proof.finish()
+    assert not proof.calls

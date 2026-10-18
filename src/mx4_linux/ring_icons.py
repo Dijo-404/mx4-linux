@@ -6,6 +6,8 @@ from pathlib import PurePath
 def action_icon(action, grouped=False):
     if grouped:
         return "view-app-grid-symbolic"
+    if action.get("icon"):
+        return action["icon"]
     steps = action.get("steps", [])
     if not steps:
         return "system-run-symbolic"

@@ -34,8 +34,30 @@ def sector(x, y, deadzone=24):
     return int((math.atan2(x, -y) + math.pi / 8) % (2 * math.pi) / (math.pi / 4))
 
 
+class RingGeometry:
+    """One logical layout; scale only when crossing the native widget boundary."""
+
+    def __init__(self, scale=100):
+        if type(scale) is not int or not 75 <= scale <= 150:
+            raise ValueError("Ring scale must be an integer from 75 through 150.")
+        self.scale = scale / 100
+
+    def point(self, x, y):
+        return x * self.scale, y * self.scale
+
+    def logical(self, x, y):
+        return x / self.scale, y / self.scale
+
+    def size(self, value):
+        return round(value * self.scale)
+
+
 class RingState:
-    def __init__(self):
+    def __init__(self, motion_gain=.45, deadzone=24):
+        for name, value, low, high in (("motion gain", motion_gain, .1, 2), ("deadzone", deadzone, 8, 80)):
+            if type(value) not in (int, float) or not math.isfinite(value) or not low <= value <= high:
+                raise ValueError(f"Ring {name} must be finite and between {low} and {high}.")
+        self.motion_gain, self.deadzone = motion_gain, deadzone
         self.visible = False
         self.held = False
         self.selected = None
@@ -56,13 +78,17 @@ class RingState:
     def motion(self, dx, dy):
         if not self.visible or not self.held:
             return self.selected
-        self.x += dx * 0.45
-        self.y += dy * 0.45
+        if (type(dx) not in (int, float) or type(dy) not in (int, float)
+                or not math.isfinite(dx) or not math.isfinite(dy)):
+            return self.selected
+        # Raw motion stays logical so visual size never multiplies sensitivity.
+        self.x += max(-1e12, min(1e12, dx)) * self.motion_gain
+        self.y += max(-1e12, min(1e12, dy)) * self.motion_gain
         radius = math.hypot(self.x, self.y)
         if radius > 155:
             self.x *= 155 / radius
             self.y *= 155 / radius
-        self.selected = sector(self.x, self.y)
+        self.selected = sector(self.x, self.y, self.deadzone)
         return self.selected
 
     def point(self, x, y, *, spread=1.0):

@@ -295,3 +295,112 @@ def test_finite_group_animation_stops_after_all_transitions_finish(preview, monk
     assert window.tick_id == 0
     assert window.group_reveal.value(deadline) == 1
     assert window.child_positions[0] != window.child_positions[1]
+
+@pytest.mark.parametrize('scale', [75, 100, 150])
+def test_scaled_faces_hit_geometry_and_motion_share_logical_space(preview, scale):
+    window = preview.window
+    config = default_config() | {'ring_scale': scale, 'ring_motion_gain': 1, 'ring_deadzone': 50}
+    window.show_ring(config, preview=True)
+    settle(window)
+    window.allocate(round(ring.WIDTH * scale / 100), round(ring.HEIGHT * scale / 100), -1, None)
+    for button in window.buttons:
+        assert button.get_allocated_width() == round(52 * scale / 100)
+    x, y = window.geometry.point(ring.CENTER_X, ring.CENTER_Y - 116)
+    window.pointer_motion(None, x, y)
+    assert window.state.selected == 0
+    window.pointer_click(None, 1, x, y)
+    assert preview.selected == [('overview', True)]
+
+
+def adjustment_config():
+    config = default_config()
+    config['actions']['copy']['adjustment'] = {
+        'increase': [{'type': 'text', 'text': '+'}], 'decrease': [{'type': 'text', 'text': '-'}]}
+    config['ring'][0] = 'copy'
+    return config
+
+
+def test_scroll_uses_fresh_circle_hit_and_keeps_ring_open(preview):
+    window = preview.window
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    window.show_ring(adjustment_config(), preview=False)
+    settle(window)
+    x, y = main_position(window, 0)
+    assert window.adjust_at(x, y, 0, -1)
+    assert adjusted == [('copy', 'increase', False)]
+    assert window.state.visible and not preview.selected
+    assert not window.adjust_at(x + 26, y + 26, 0, 1)
+    assert not window.adjust_at(0, 0, 0, 1)
+    assert not window.adjust_at(x, y, 0, float('nan'))
+    assert not window.adjust_at(x, y, 0, 0)
+    assert 'Scroll to adjust' in window.buttons[0].get_tooltip_text()
+
+
+def test_scroll_child_requires_revealed_nonoverlap_and_preview_is_inert(preview):
+    window = preview.window
+    adjusted = []
+    window.on_adjusted = lambda *args: adjusted.append(args) or True
+    config = adjustment_config()
+    config['ring_groups'] = {'2': ['copy', 'paste']}
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(2)
+    window.group_reveal.move(0, animate=False)
+    window.apply_frame(monotonic())
+    assert not window.adjust_at(*window.child_positions[0], 0, -1)
+    window.group_reveal.move(1, animate=False)
+    settle(window)
+    assert window.adjust_at(*window.child_positions[0], 1, 0)
+    assert adjusted == [('copy', 'increase', False)]
+    window.show_ring(config, preview=True)
+    settle(window)
+    assert not window.adjust_at(*main_position(window, 0), 0, -1)
+    assert len(adjusted) == 1
+
+
+def test_adjusted_hold_release_latches_and_next_open_restores_normal_release(preview):
+    window = preview.window
+    window.on_adjusted = lambda *_: True
+    window.show_ring(adjustment_config(), held=True, preview=False)
+    settle(window)
+    window.motion(0, -100)
+    assert window.adjust_at(*main_position(window, 0), 0, -1)
+    window.release_button()
+    assert window.state.visible and not window.state.held
+    assert not preview.selected
+    window.show_ring(adjustment_config(), held=True, preview=False)
+    window.motion(0, -100)
+    window.release_button()
+    assert preview.selected == [('copy', False)]
+
+@pytest.mark.parametrize('scale', [75, 150])
+def test_scaled_group_heading_footer_and_faces_fit_allocation(preview, scale):
+    window = preview.window
+    config = default_config() | {'ring_scale': scale, 'ring_groups': {'2': list(default_config()['actions'])[:6]}}
+    window.show_ring(config, preview=True)
+    settle(window)
+    window.commit(2)
+    settle(window)
+    window.update_labels()
+    width, height = window.geometry.size(ring.WIDTH), window.geometry.size(ring.HEIGHT)
+    window.allocate(width, height, -1, None)
+    for child in [window.callout, window.instructions, window.close_button] + window.child_buttons:
+        allocation = child.get_allocation()
+        assert allocation.x >= 0 and allocation.y >= 0
+        assert allocation.x + allocation.width <= width
+        assert allocation.y + allocation.height <= height
+
+def test_emerging_child_face_cannot_scroll_an_underlying_root(preview):
+    window = preview.window
+    config = adjustment_config()
+    config['ring'][2] = 'copy'
+    config['ring_groups'] = {'0': ['paste']}
+    window.on_adjusted = lambda *_: pytest.fail('Overlapping painted child must remain inert')
+    window.show_ring(config, preview=False)
+    settle(window)
+    window.commit(0)
+    position = main_position(window, 2)
+    window.child_positions = [position]
+    assert window.child_at(*position) is None
+    assert not window.adjust_at(*position, 0, -1)

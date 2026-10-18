@@ -46,6 +46,11 @@ class DesktopController:
         self.effective_config = None
         self._pending_configs = {}
         self._ring_config = None
+        self._adjustment_pending = None
+        self._adjustment_active = self._adjustment_running = False
+        self._adjustment_token = 0
+        self._adjustment_yield = None
+        self._selection_pending = None
         self.reload_config()
 
     def queue_event(self, event):
@@ -69,6 +74,10 @@ class DesktopController:
         return GLib.SOURCE_REMOVE
 
     def reload_config(self):
+        self._cancel_adjustments()
+        self._dispatch_token += 1
+        if self.ring and self.ring.state.visible:
+            self.ring.dismiss()
         try:
             self.config = self.store.read()
             if self.actions:
@@ -136,6 +145,7 @@ class DesktopController:
         future.add_done_callback(lambda _: GLib.idle_add(begin))
 
     def stop(self):
+        self._cancel_adjustments()
         self._open_token += 1
         self._dispatch_token += 1
         self.opening = False
@@ -180,6 +190,9 @@ class DesktopController:
             self.context_available = True
         if context == self.context and event["type"] != "context-unavailable":
             return
+        if (self.ring and self.ring.state.visible and context != self.target):
+            self._cancel_adjustments()
+            self.ring.dismiss()
         self.context = deepcopy(context)
         self._context_revision += 1
         self._configure_context()
@@ -206,6 +219,7 @@ class DesktopController:
                 self.notify(self.message + " Application profiles unavailable; General assignments remain active.")
             self._configure_context()
         elif kind == "error":
+            self._cancel_adjustments()
             self._open_token += 1
             self._dispatch_token += 1
             self.opening = False
@@ -221,6 +235,7 @@ class DesktopController:
         elif kind == "warning":
             self.notify(event.get("message", "Mouse feedback is unavailable."))
         elif kind == "stopped":
+            self._cancel_adjustments()
             self._open_token += 1
             self._dispatch_token += 1
             self.opening = False
@@ -229,6 +244,7 @@ class DesktopController:
                 self.ring.dismiss()
             self.notify(self.error or "Mouse integration disabled. Previous button behavior restored.")
         elif kind == "button" and event.get("cancelled"):
+            self._cancel_adjustments()
             self._open_token += 1
             self._dispatch_token += 1
             self.opening = False
@@ -300,7 +316,7 @@ class DesktopController:
                 self._ring_config = resolve_config(document, self.target.get("app_id") if self.target else None)
                 if self.ring is None:
                     from .ring import ActionsRing
-                    self.ring = ActionsRing(self.window.get_application(), self.selected, self.dismissed, self.hovered)
+                    self.ring = ActionsRing(self.window.get_application(), self.selected, self.dismissed, self.hovered, self.adjusted)
                 self.ring.show_ring(self._ring_config, held=held, preview=preview or self.window.demo)
                 self.feedback("open", config=self._ring_config, preview=preview or self.window.demo)
                 if held:
@@ -335,25 +351,109 @@ class DesktopController:
         self.session.feedback(config.get("haptic_waveforms", {}).get(source, 0))
 
     def dismissed(self):
-        # The compositor normally returns focus after a layer surface unmaps.
-        # Explicit restoration is done before running any selected action.
-        pass
+        self._cancel_adjustments()
+        self._dispatch_token += 1
 
     def selected(self, action_id, preview):
         target = deepcopy(self.target)
         config = deepcopy(self._ring_config or self.effective_config or self.config)
+        self._cancel_adjustments()
         self.feedback("select", config=config, preview=preview)
         token = self._dispatch_token
+        self._selection_pending = (token, action_id, target, preview, config)
+        self._selection_ready = False
         def dispatch():
             if not self.closed and token == self._dispatch_token:
-                self.execute(action_id, target=target, preview=preview, config=config)
+                self._selection_ready = True
+                self._dispatch_selection()
             return GLib.SOURCE_REMOVE
         GLib.timeout_add(80, dispatch)  # Allow the layer surface to unmap first.
 
-    def execute(self, action_id, target=None, preview=False, config=None):
+    def _dispatch_selection(self):
+        selection = getattr(self, "_selection_pending", None)
+        if (selection is None or not self._selection_ready
+                or getattr(self, "_adjustment_running", False)):
+            return
+        self._selection_pending = None
+        token, action_id, target, preview, config = selection
+        if not self.closed and token == self._dispatch_token:
+            self.execute(action_id, target=target, preview=preview, config=config)
+
+    def _cancel_adjustments(self):
+        self._adjustment_token = getattr(self, "_adjustment_token", 0) + 1
+        self._adjustment_pending = None
+        self._selection_pending = None
+        self._adjustment_active = False
+        self._adjustment_yield = None
+        if getattr(self, "_adjustment_running", False):
+            self.cancelled.set()
+
+    def adjusted(self, action_id, direction, preview=False):
+        """Keep one running future and at most four coalesced pending wheel steps."""
+        if (self.closed or preview or self.window.demo or self.opening or self.error
+                or not self.ring or not self.ring.state.visible or direction not in ("increase", "decrease")
+                or (self.action_busy and not getattr(self, "_adjustment_running", False))):
+            return False
+        config = self._ring_config or self.effective_config or self.config
+        if not config.get("actions", {}).get(action_id, {}).get("adjustment"):
+            return False
+        delta = 1 if direction == "increase" else -1
+        pending = getattr(self, "_adjustment_pending", None)
+        key = (action_id, self.target, self._open_token, self._dispatch_token, self.session.session_id)
+        if pending is not None and pending["key"] == key:
+            pending["count"] = max(-4, min(4, pending["count"] + delta))
+            if not pending["count"]:
+                self._adjustment_pending = None
+        else:
+            self._adjustment_pending = {"key": deepcopy(key), "action": action_id, "target": deepcopy(self.target),
+                "config": deepcopy(config), "count": delta}
+        if not getattr(self, "_adjustment_active", False):
+            self._adjustment_active = True
+            token = self._adjustment_token
+            self._adjustment_yield = (self.ring, self._open_token, token)
+            self.ring.yield_keyboard()
+            GLib.timeout_add(80, lambda: self._drain_adjustment(token))
+        return True
+
+    def _drain_adjustment(self, token):
+        if token != self._adjustment_token or not self._adjustment_active:
+            return GLib.SOURCE_REMOVE
+        pending = self._adjustment_pending
+        if (self.closed or not self.ring or not self.ring.state.visible
+                or (pending and pending["key"][2:] != (self._open_token, self._dispatch_token, self.session.session_id))):
+            self._cancel_adjustments()
+            return GLib.SOURCE_REMOVE
+        if self._adjustment_running:
+            return GLib.SOURCE_REMOVE
+        if pending is None:
+            self._adjustment_active = False
+            yielded = self._adjustment_yield
+            self._adjustment_yield = None
+            if yielded and yielded == (self.ring, self._open_token, token):
+                self.ring.resume_keyboard()
+            return GLib.SOURCE_REMOVE
+        direction = "increase" if pending["count"] > 0 else "decrease"
+        pending["count"] += -1 if pending["count"] > 0 else 1
+        if not pending["count"]:
+            self._adjustment_pending = None
+        self._adjustment_running = True
+        self.execute(pending["action"], target=pending["target"], config=pending["config"],
+                     adjustment=direction, completed=lambda success: self._adjustment_finished(token, success))
+        return GLib.SOURCE_REMOVE
+
+    def _adjustment_finished(self, token, success):
+        self._adjustment_running = False
+        if not success:
+            self._adjustment_pending = None
+        if token == self._adjustment_token:
+            self._drain_adjustment(token)
+        self._dispatch_selection()
+
+    def execute(self, action_id, target=None, preview=False, config=None, adjustment=None, completed=None):
         if self.closed:
             return
-        if self.action_busy or self.opening:
+        if (self.action_busy or self.opening
+                or (adjustment is None and getattr(self, "_adjustment_active", False))):
             self.notify("A Smart Action is already running; this trigger was skipped.")
             return
         if self.error or not self.actions:
@@ -372,19 +472,28 @@ class DesktopController:
                 action = snapshot["actions"][action_id]
                 if not preview:
                     context = restore_focus(target["window_id"]) if target else focused_context()
-                    if any(step["type"] in ("shortcut", "text") for step in action["steps"]):
-                        if not context or context["app_id"].startswith("io.github.mx4linux"):
+                    steps = action["adjustment"][adjustment] if adjustment else action["steps"]
+                    if any(step["type"] in ("shortcut", "text") for step in steps):
+                        if (not context or context["app_id"].startswith("io.github.mx4linux")
+                                or (adjustment and not target)):
                             raise RuntimeError("Open the ring from another application using the haptic panel or mx4-linux ring before sending shortcuts or text.")
-                return runner.execute(action_id, cancelled=self.cancelled.is_set)
+                if self.cancelled.is_set() or dispatch_token != self._dispatch_token:
+                    raise RuntimeError("Action cancelled before execution.")
+                kwargs = {"adjustment": adjustment} if adjustment else {}
+                return runner.execute(action_id, cancelled=self.cancelled.is_set, **kwargs)
             finally:
                 runner.close()
         future = self.executor.submit(run)
         def finished():
             self.action_busy = False
             if self.closed:
+                if completed:
+                    completed(False)
                 return GLib.SOURCE_REMOVE
+            success = False
             try:
                 result = future.result()
+                success = bool(result.get("ok", True) and not result.get("skipped") and not self.cancelled.is_set())
                 if result.get("skipped"):
                     self.notify(result["reason"])
                 elif preview:
@@ -396,6 +505,9 @@ class DesktopController:
                         self.feedback("complete", config=snapshot)
             except Exception as exc:
                 self.notify(str(exc))
+            finally:
+                if completed:
+                    completed(success)
             return GLib.SOURCE_REMOVE
         future.add_done_callback(lambda _: GLib.idle_add(finished))
 
@@ -415,6 +527,7 @@ class DesktopController:
         self.notify(self.error or "Configuration saved. Enable mouse integration to use the new assignments.")
 
     def close(self):
+        self._cancel_adjustments()
         self.closed = True
         with self._event_lock:
             self._event_queue.clear()
