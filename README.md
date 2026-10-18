@@ -98,6 +98,7 @@ Close MX4 Linux, then remove its environment and optional launcher from the chec
 ```bash
 rm -rf -- .venv .tools
 rm -f -- "${XDG_DATA_HOME:-$HOME/.local/share}/applications/io.github.mx4linux.Control.desktop"
+rm -f -- "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps/io.github.mx4linux.Control.svg"
 ```
 
 Saved settings remain in `${XDG_CONFIG_HOME:-$HOME/.config}/mx4-linux/`. See [complete removal](docs/install.md#uninstalling) for optional configuration and installed udev rule removal.
@@ -222,6 +223,7 @@ Without a saved desktop file, defaults provide Overview, Screenshot, Terminal, N
 | `$XDG_CONFIG_HOME/mx4-linux/profiles.json` | Manually saved hardware profiles. |
 | `$XDG_CONFIG_HOME/mx4-linux/*.json.lock` | Locks for configuration/profile writes. |
 | `$XDG_DATA_HOME/applications/io.github.mx4linux.Control.desktop` | Optional launcher pointing to this checkout. |
+| `$XDG_DATA_HOME/icons/hicolor/scalable/apps/io.github.mx4linux.Control.svg` | Application icon installed with the launcher. |
 | `/etc/udev/rules.d/70-mx4-linux.rules` | Optional active-seat access rule for Bolt and MX4 Bluetooth hidraw interfaces. |
 | `/etc/udev/rules.d/71-mx4-input.rules` | Optional active-seat access rule for the uinput fallback. |
 

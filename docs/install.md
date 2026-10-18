@@ -74,7 +74,7 @@ The installer loads `uinput`, installs `/etc/udev/rules.d/71-mx4-input.rules`, r
 ./scripts/install-desktop.sh
 ```
 
-This writes `$XDG_DATA_HOME/applications/io.github.mx4linux.Control.desktop`, defaulting to `~/.local/share/applications/`. It points directly to this checkout's `.venv/bin/mx4-linux`. Keep the checkout in place, or rerun the script after moving it. The script overwrites this named launcher without a backup. It does not add login autostart.
+This writes `$XDG_DATA_HOME/applications/io.github.mx4linux.Control.desktop`, defaulting to `~/.local/share/applications/`, and installs the application SVG under `$XDG_DATA_HOME/icons/hicolor/scalable/apps/`. It refreshes an existing icon cache when `gtk-update-icon-cache` is available. The launcher points directly to this checkout's `.venv/bin/mx4-linux`. Keep the checkout in place, or rerun the script after moving it. The script overwrites its named launcher and icon without backups. It does not add login autostart.
 
 ## Updating
 
@@ -101,6 +101,7 @@ Close the application first so an active listener can restore the mouse's previo
 ```bash
 rm -rf -- .venv .tools
 rm -f -- "${XDG_DATA_HOME:-$HOME/.local/share}/applications/io.github.mx4linux.Control.desktop"
+rm -f -- "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps/io.github.mx4linux.Control.svg"
 ```
 
 To also discard saved routines and hardware profiles:

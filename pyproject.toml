@@ -19,5 +19,8 @@ mx4-linux = "mx4_linux.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+mx4_linux = ["icons/*.svg"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
