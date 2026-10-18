@@ -1,0 +1,7 @@
+include CHANGELOG.md CONTRIBUTING.md SECURITY.md requirements*.txt package*.json .editorconfig
+recursive-include bin *.js
+recursive-include scripts *.sh *.py *.js
+recursive-include data *.rules
+recursive-include docs *.md *.svg *.png
+recursive-include tests *.py *.js
+recursive-include .github *.yml *.md

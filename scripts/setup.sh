@@ -8,17 +8,18 @@ try:
     import gi
     gi.require_version('Gtk', '4.0')
     gi.require_version('Adw', '1')
+    gi.require_foreign('cairo')
     from gi.repository import Gtk, Adw
 except (ImportError, ValueError) as exc:
-    raise SystemExit(f'Install Python GObject, GTK 4 and Libadwaita first (see README): {exc}')
+    raise SystemExit(f'Install Python GObject with Cairo support, GTK 4 and Libadwaita first (see README): {exc}')
 PY
 if [[ ! -x .venv/bin/python ]]; then
     "$python_bin" -m venv --system-site-packages .venv
 fi
 if command -v uv >/dev/null 2>&1; then
-    uv pip install --python .venv/bin/python -e '.[test]'
+    uv pip install --python .venv/bin/python -e '.[test,dev]'
 else
-    .venv/bin/python -m pip install -e '.[test]'
+    .venv/bin/python -m pip install -e '.[test,dev]'
 fi
 if [[ -n "${WAYLAND_DISPLAY:-}" ]] && ! command -v wtype >/dev/null 2>&1; then
     if ! "$project_dir/scripts/setup-wtype.sh"; then
