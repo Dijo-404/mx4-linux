@@ -102,6 +102,27 @@ def transform_clipboard(operation, payload):
     return _text_bytes(result)
 
 
+def _stop_failed_clipboard_group(process):
+    # A successful wl-copy owner is intentionally left alive; failed groups are bounded.
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(process.pid, sig)
+        except ProcessLookupError:
+            break
+        finish = time.monotonic() + 0.2
+        while time.monotonic() < finish:
+            process.poll()  # Reap the direct child even if a descendant retains its pipes.
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.01)
+        else:
+            continue
+        break
+    process.wait()
+
+
 def clipboard_process(argv, check, *, payload=None, limit=0):
     """Bound pipes, elapsed time and cancellation; never expose helper output in errors."""
     process = None
@@ -154,19 +175,9 @@ def clipboard_process(argv, check, *, payload=None, limit=0):
         selector.close()
         if process is not None:
             if not completed:
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-            if process.poll() is None:
-                try:
-                    process.wait(timeout=0.2)
-                except subprocess.TimeoutExpired:
-                    try:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                    process.wait()
+                _stop_failed_clipboard_group(process)
+            else:
+                process.wait()
             for stream in (process.stdin, process.stdout):
                 if stream is not None:
                     stream.close()
