@@ -1,0 +1,16 @@
+{
+  "observed_at": "2026-10-18T18:03:30.134221+00:00",
+  "reviewed_core_commit": "49dc6f418b35a146eface4d2f5033f14e14b4f27",
+  "method": "Backend.scan capability check followed by Backend.write haptic-play 0 with expected stable identity and remember=False",
+  "waveform": 0,
+  "device_acknowledged": true,
+  "strength_setting_writes": 0,
+  "persistent_settings_written": 0,
+  "host_switches": 0,
+  "physical_feel": "User confirmed: Yes, felt it",
+  "limits": [
+    "Device ACK establishes request acceptance; physical sensation requires user confirmation.",
+    "No personal device identity, host names or raw scan retained."
+  ],
+  "user_confirmation_at": "2026-10-18T18:07:20.214315+00:00"
+}
