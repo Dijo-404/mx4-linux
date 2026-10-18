@@ -540,6 +540,9 @@ class ControlWindow(Adw.ApplicationWindow):
         return GLib.SOURCE_CONTINUE
 
     def recover_current(self, replay=False, automatic=False):
+        if automatic and self.desktop.reacquire_blocked:
+            self.status.set_text("Another application changed button reporting. Use Recover or enable integration explicitly to continue.")
+            return GLib.SOURCE_REMOVE
         if (automatic and self.desktop.session.process is not None
                 and self.desktop.restoration_confirmed is not True):
             self.status.set_text("Previous reporting restoration was not confirmed. Use Recover for this mouse before resuming integration.")
@@ -566,6 +569,7 @@ class ControlWindow(Adw.ApplicationWindow):
             if cancelled():
                 return
             self.desktop.restoration_confirmed = True
+            self.desktop.reacquire_blocked = False
             self.status.set_text("Previous button reporting restored." + (f" Remembered settings applied · {result['changes']} changes." if result.get('changes') else ""))
             if result.get("changes"):
                 self.reload()

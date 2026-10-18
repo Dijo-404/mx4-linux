@@ -64,6 +64,7 @@ class DesktopController:
         self._reconnect_busy = False
         self._stop_waiters = []
         self.restoration_confirmed = None
+        self.reacquire_blocked = False
         self.reload_config()
 
     def queue_event(self, event):
@@ -130,9 +131,10 @@ class DesktopController:
         if not valid_identity(identity) or identity.startswith("demo:"):
             self.notify("Wake and refresh this mouse to read its identity before enabling integration.")
             return
-        if automatic and (not self.requested_enabled or identity != self.target_identity):
+        if automatic and (self.reacquire_blocked or not self.requested_enabled or identity != self.target_identity):
             return
         if not automatic:
+            self.reacquire_blocked = False
             self.window.replay_suppressed_identity = None
             self._cancel_reconnect()
             self._intent_generation += 1
@@ -265,6 +267,9 @@ class DesktopController:
                 self.notify(self.message + " Application profiles unavailable; General assignments remain active.")
             self._configure_context()
         elif kind == "error":
+            if event.get("reason") == "ownership-conflict":
+                self.reacquire_blocked = True
+                self._cancel_reconnect()
             self._cancel_adjustments()
             self._open_token += 1
             self._dispatch_token += 1
@@ -359,7 +364,7 @@ class DesktopController:
 
     def _schedule_reconnect(self):
         if (self.closed or not getattr(self, "requested_enabled", False)
-                or self.restoration_confirmed is not True
+                or self.restoration_confirmed is not True or self.reacquire_blocked
                 or not self.config.get("resume_integration", False)
                 or getattr(self, "hardware_paused", False) or self.reconnect_source or self._reconnect_busy):
             return
@@ -374,7 +379,7 @@ class DesktopController:
     def _reconnect(self, generation):
         self.reconnect_source = 0
         if (self.closed or generation != self._intent_generation or not self.requested_enabled
-                or self.restoration_confirmed is not True):
+                or self.restoration_confirmed is not True or self.reacquire_blocked):
             return GLib.SOURCE_REMOVE
         if self.session.running and not self.session.stopping:
             return GLib.SOURCE_REMOVE
@@ -386,7 +391,7 @@ class DesktopController:
         identity = self.target_identity
         def cancelled():
             return (self.closed or generation != self._intent_generation or not self.requested_enabled
-                    or self.restoration_confirmed is not True)
+                    or self.restoration_confirmed is not True or self.reacquire_blocked)
         def work():
             from .profiles import replay_remembered
             result = self.window.backend.scan()

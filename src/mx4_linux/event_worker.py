@@ -21,7 +21,7 @@ import threading
 import time
 
 from .device_worker import _device_id, _devices, _isolated_solaar, _load_solaar
-from .reporting_state import Ownership, configuration_lock, require_identity
+from .reporting_state import Ownership, OwnershipConflict, configuration_lock, require_identity
 
 
 ALLOWED_CONTROLS = frozenset((82, 83, 86, 195, 196, 416))
@@ -213,16 +213,16 @@ def recover_reporting(dev, api, ownership):
     for item in record["controls"]:
         key, _flags, mapping = selected[item["cid"]]
         if mapping != item["mapping"]:
-            raise RuntimeError("Previous reporting mapping conflicts with the current mouse; recovery remains pending.")
+            raise OwnershipConflict("Previous reporting mapping conflicts with the current mouse; recovery remains pending.")
         if item["touched"] & 16 and api.hidpp20.KeyFlag.RAW_XY not in key.flags:
-            raise RuntimeError("Previous raw reporting capability is unavailable; recovery remains pending.")
+            raise OwnershipConflict("Previous raw reporting capability is unavailable; recovery remains pending.")
     failures = []
     for item in reversed(record["controls"]):
         key = selected[item["cid"]][0]
         try:
             flags, mapping = _reporting(dev, api, key)
             if mapping != item["mapping"]:
-                raise RuntimeError("Mapping changed during reporting restoration")
+                raise OwnershipConflict("Mapping changed during reporting restoration")
             write_errors = []
             for bit, setter in ((16, key.set_rawXY_reporting), (1, key.set_diverted)):
                 if item["touched"] & bit and flags & bit != item["flags"] & bit:
@@ -272,9 +272,9 @@ def _listen(dev, api, controls, ring, raw_xy, commands, emit, stop_event, owners
             live[cid] = (key, flags, mapping)
         for cid, (key, flags, mapping) in live.items():
             if cid in snapshots and mapping != snapshots[cid][2]:
-                raise RuntimeError(f"Control {cid} mapping changed during mouse integration")
+                raise OwnershipConflict(f"Control {cid} mapping changed during mouse integration")
             if cid in expected_owned and flags & (diversion | raw) != expected_owned[cid]:
-                raise RuntimeError(f"Control {cid} reporting changed outside this integration; stopping without reasserting it")
+                raise OwnershipConflict(f"Control {cid} reporting changed outside this integration; use Recover or enable integration explicitly to continue")
             snapshots.setdefault(cid, [key, flags, mapping, 0])
         relevant = active | set(selected)
         if decoder.active and decoder.pressed & relevant:
@@ -417,7 +417,10 @@ def run(request, api=None, commands=None, emit=None, stop_event=None):
         return True
     except Exception as error:
         _LOG.debug("Event listener stopped", exc_info=True)
-        send({"type": "error", "message": str(error) or type(error).__name__})
+        event = {"type": "error", "message": str(error) or type(error).__name__}
+        if isinstance(error, OwnershipConflict):
+            event["reason"] = "ownership-conflict"
+        send(event)
         return False
     finally:
         send({"type": "stopped", "restored": outcome[0]})
