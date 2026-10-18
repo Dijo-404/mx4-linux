@@ -49,19 +49,19 @@ R-prefixed entries below are actual REA Evidence records from version 6.7.0. L1 
 
 | Ref | File | Identity |
 | --- | --- | --- |
-| R1 | [rea-artifact.json](../evidence/installer/rea-artifact.json) | Inspection `ev_a458ebcb5cfa2b290aae048a1370d4b84f2dd725b06959221be61274711cfac4`; embedded inventory `ev_fdfe8f918415b78fb5d8c453e365d717ddb2aff349034007f9ca644f3c14affc` |
-| R2 | [rea-apple-graph.json](../evidence/installer/rea-apple-graph.json) | `ev_0f06ae230e91d98f2a5d5fe16e0b380a6a4409f7b7c5fc3ebe7d06d55fc1b014` |
-| R3 | [rea-extraction.json](../evidence/installer/rea-extraction.json) | `ev_b524d96264bb91f49ab18e6c98a536a2588d32b81e8ed09b7033ce516b2a71ea` |
-| L1 | [static-observations.json](../evidence/installer/static-observations.json) | `local_sha256_aae3f58937b3b9fa452afa4b8add785b487179f584a1f019d27b4b4079a390e4` |
+| R1 | [rea-artifact.json](https://github.com/Dijo-404/mx4-linux/blob/main/evidence/installer/rea-artifact.json) | Inspection `ev_a458ebcb5cfa2b290aae048a1370d4b84f2dd725b06959221be61274711cfac4`; embedded inventory `ev_fdfe8f918415b78fb5d8c453e365d717ddb2aff349034007f9ca644f3c14affc` |
+| R2 | [rea-apple-graph.json](https://github.com/Dijo-404/mx4-linux/blob/main/evidence/installer/rea-apple-graph.json) | `ev_0f06ae230e91d98f2a5d5fe16e0b380a6a4409f7b7c5fc3ebe7d06d55fc1b014` |
+| R3 | [rea-extraction.json](https://github.com/Dijo-404/mx4-linux/blob/main/evidence/installer/rea-extraction.json) | `ev_b524d96264bb91f49ab18e6c98a536a2588d32b81e8ed09b7033ce516b2a71ea` |
+| L1 | [static-observations.json](https://github.com/Dijo-404/mx4-linux/blob/main/evidence/installer/static-observations.json) | `local_sha256_aae3f58937b3b9fa452afa4b8add785b487179f584a1f019d27b4b4079a390e4` |
 
 R1/R2/R3 bind to graph manifest `agm_170c0e8ef3e979ca2dcc2db5a4b24daa3ac25d5bb922707c97482db22a4bfdd7`, graph digest `91e576e7fde24933493a0b8368709064476693a11213840ba8a02c71bf623ead`. R3 reports successful containment verification. The extracted binary and plist digests agree between R2 and L1.
 
 REA's Codex registration was aligned after setup, but REA tools were not connected in the active agent session. Analysis therefore used the version-pinned CLI. Archive inspection, safe extraction, and Apple graph projection succeeded. The following REA native operations returned explicit `capability_unavailable` errors because their `native-macos` utilities require macOS:
 
-- [rea-macho.json](../evidence/installer/rea-macho.json): `inspect_macho`.
-- [rea-plist.json](../evidence/installer/rea-plist.json): `inspect_plist`.
+- [rea-macho.json](https://github.com/Dijo-404/mx4-linux/blob/main/evidence/installer/rea-macho.json): `inspect_macho`.
+- [rea-plist.json](https://github.com/Dijo-404/mx4-linux/blob/main/evidence/installer/rea-plist.json): `inspect_plist`.
 
-These two files are error records and have no REA Evidence IDs. No analysis engine was installed. The fallback [inspect_static.py](../evidence/installer/inspect_static.py) uses Python's standard library to parse the supplied ZIP/plist and this Mach-O's declared headers, sections, dependencies and symbol names. It performs no disassembly or semantic recovery. Complete limitations are retained in each record.
+These two files are error records and have no REA Evidence IDs. No analysis engine was installed. The fallback [inspect_static.py](https://github.com/Dijo-404/mx4-linux/blob/main/evidence/installer/inspect_static.py) uses Python's standard library to parse the supplied ZIP/plist and this Mach-O's declared headers, sections, dependencies and symbol names. It performs no disassembly or semantic recovery. Complete limitations are retained in each record.
 
 ## Reproduction
 

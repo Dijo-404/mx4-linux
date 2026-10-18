@@ -22,7 +22,7 @@
 <br/>
 
 <p align="center">
-  <img src="docs/assets/actions-ring.png" alt="MX4 Linux Actions Ring preview with eight action positions" width="440" />
+  <img src="docs/assets/actions-ring.png" alt="MX4 Linux compact Actions Ring with eight circular icon buttons" width="440" />
 </p>
 
 > [!NOTE]
@@ -35,8 +35,10 @@ MX4 Linux is a GTK 4 / Libadwaita application and CLI for MX Master 4 owners on 
 ### Features
 
 - **Control supported mouse settings.** Adjust DPI, wheel modes and direction, SmartShift, haptic strength, panel force and built-in button assignments when reported by the device.
-- **Choose from eight ring actions.** Hold the haptic panel, move and release, or select with a click or keyboard.
+- **Choose from eight ring actions.** Use compact icon buttons, outward labels and a center close control. Hold the haptic panel, move and release, or select with a click or keyboard.
+- **Group related actions.** Turn a position into a side menu of up to six existing routines. The editor shows a live ring preview and keeps labels and assignments together.
 - **Build Smart Actions.** Combine shortcuts, application launches, text, delays and Niri commands, with optional exact application conditions.
+- **Find controls quickly.** Mouse, Actions and Profiles have separate views; the wheel preview and ring respond with finite animations and respect the desktop animation preference.
 - **Reuse manual profiles.** Save current hardware settings and apply them by name; haptic playback is excluded.
 - **Inspect before changing.** JSON discovery, access diagnostics, simulated GUI preview and action dry runs are available from the CLI.
 
@@ -70,6 +72,28 @@ cd mx4-linux
 ```
 
 Setup creates `.venv` with system site packages, installs MX4 Linux and pinned Solaar 1.1.20, and attempts to build the optional Wayland keyboard helper when needed. It installs no system service or autostart entry.
+
+### Launch with npm
+
+The npm package launches the same native GTK application. Install the system dependencies above and Node.js 22+, then either run from this checkout:
+
+```bash
+npm ci --ignore-scripts
+npm run setup
+npm start
+npm start -- gui --demo
+```
+
+Or build and install the self-contained local package:
+
+```bash
+npm pack
+npm install --global --prefix "$HOME/.local" ./mx4-linux-0.2.0.tgz
+~/.local/bin/mx4-linux setup
+~/.local/bin/mx4-linux
+```
+
+Add `~/.local/bin` to your `PATH` to use `mx4-linux` directly. No npm registry release has been published by this change. npm installation runs no setup hooks; the explicit `setup` command downloads Python dependencies into a versioned user environment, without sudo. GTK libraries and Python GObject remain system dependencies. See [npm installation](docs/install.md#npm-package) for runtime locations, updates and removal.
 
 If `doctor` reports denied device access, install the device rule:
 
@@ -114,7 +138,7 @@ Saved settings remain in `${XDG_CONFIG_HOME:-$HOME/.config}/mx4-linux/`. See [co
 .venv/bin/mx4-linux                 # open the control panel
 ```
 
-In **Actions Ring and Smart Actions**, click **Enable**, then use the haptic panel from the application you want to control. **Configure** edits routines, eight ring assignments and optional extra-button bindings. Keep MX4 Linux running while using mouse integration; **Disable** or closing the app restores the selected buttons' prior reporting flags.
+Open the **Actions** tab and click **Enable**, then use the haptic panel from the application you want to control. **Try the ring** previews selection; **Edit actions** opens native forms for routines, eight ring assignments and optional extra-button bindings. Keep MX4 Linux running while using mouse integration; **Disable** or closing the app restores the selected buttons' prior reporting flags.
 
 ## Usage
 
@@ -148,8 +172,8 @@ These keys apply while the Actions Ring is open:
 | :--- | :--- |
 | `1`–`8` | Select and run the corresponding position, clockwise from the top. |
 | Arrow keys | Move the selection. |
-| `Enter` | Run the selected action. |
-| `Escape` | Cancel the ring. |
+| `Enter` | Run the selected action or open its group. |
+| `Escape` | Return from an action group, or close the ring. |
 
 ### Examples
 
@@ -210,7 +234,8 @@ Without a saved desktop file, defaults provide Overview, Screenshot, Terminal, N
 | `XDG_CONFIG_HOME` | Overrides the configuration root; defaults to `~/.config`. |
 | `XDG_DATA_HOME` | Overrides the desktop launcher's data root; defaults to `~/.local/share`. |
 | `TERMINAL` | Preferred terminal command for the default Terminal action, if executable. |
-| `PYTHON` | Python executable used by `scripts/setup.sh`; defaults to `python3`. |
+| `PYTHON` | System Python used by source setup or `mx4-linux setup`; defaults to `python3`. |
+| `MX4_LINUX_PYTHON` | npm launcher override for an existing Python environment with the runtime dependencies installed. |
 | `WAYLAND_DISPLAY` | Identifies the active Wayland session for native input and optional helper setup. |
 | `XDG_SESSION_TYPE`, `XDG_CURRENT_DESKTOP` | Included in `doctor` diagnostics. |
 
@@ -281,10 +306,13 @@ Read [docs/architecture.md](docs/architecture.md) and [CONTRIBUTING.md](CONTRIBU
 ```bash
 git clone https://github.com/Dijo-404/mx4-linux.git
 cd mx4-linux
-./scripts/setup.sh                                      # install runtime and test dependencies
+./scripts/setup.sh                                      # install runtime and development tools
 .venv/bin/python -m pytest -q                           # run automated checks
+.venv/bin/python -m ruff check src tests                # syntax and undefined-name checks
 .venv/bin/python -m compileall -q src tests              # check Python compilation
 for script in scripts/*.sh; do bash -n "$script"; done   # check shell syntax
+npm ci --ignore-scripts
+npm test && npm run check && npm run test:package       # launcher and packed install
 ```
 
 The recorded validation includes simulated hardware tests, live Bolt discovery, event reporting restoration, a GTK ring preview and controlled native input. These checks do not establish physical setting behavior or real panel selection; see [validation notes](docs/validation.md).
@@ -358,6 +386,7 @@ The optional shortcut fallback rule is installed with `./scripts/install-input-a
 | [Validation](docs/validation.md) | Recorded checks and remaining hardware work |
 | [Linux support research](docs/linux-support-research.md) | Protocol sources and implementation constraints |
 | [Installer analysis](docs/installer-analysis.md) | Static artifact investigation and evidence limits |
+| [Changelog](CHANGELOG.md) | User-visible changes and release history |
 
 ## Contributing
 
