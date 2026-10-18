@@ -6,7 +6,7 @@ import time
 import pytest
 
 from mx4_linux.backend import BackendError, DemoBackend
-from mx4_linux.profiles import ProfileStore, apply_profile, settings_snapshot
+from mx4_linux.profiles import ProfileStore, apply_profile
 
 
 def test_round_trip_snapshot_excludes_haptic_playback(tmp_path):

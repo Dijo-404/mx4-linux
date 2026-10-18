@@ -2,6 +2,8 @@
 
 from ctypes import CDLL, RTLD_GLOBAL
 
+__all__ = ["Adw", "Gdk", "Gio", "GLib", "Gtk", "Layer"]
+
 try:
     CDLL("libgtk4-layer-shell.so.0", mode=RTLD_GLOBAL)
 except OSError:
