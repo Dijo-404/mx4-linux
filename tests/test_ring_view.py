@@ -75,6 +75,149 @@ def show_group(preview, *, held=False):
     return preview.window
 
 
+def output_bounds(window, widget):
+    """Read allocated surface coordinates, including the translated ring origin."""
+    ok, bounds = widget.compute_bounds(window.surface)
+    assert ok
+    return bounds
+
+
+def place_on_output(window, monkeypatch, scale, pointer, *, groups=False):
+    config = default_config() | {"ring_scale": scale}
+    if groups:
+        config["ring_groups"] = {str(slot): list(config["actions"])[:6] for slot in range(8)}
+    window.show_ring(config, preview=True)
+    monitors, anchors, margins = [], [], []
+    monkeypatch.setattr(ring, "Layer", SimpleNamespace(
+        set_keyboard_mode=lambda *_: None, set_monitor=lambda _window, monitor: monitors.append(monitor),
+        set_anchor=lambda _window, edge, value: anchors.append((edge, value)),
+        set_margin=lambda _window, edge, value: margins.append((edge, value)),
+        KeyboardMode=SimpleNamespace(EXCLUSIVE=1, NONE=0),
+        Edge=SimpleNamespace(LEFT=0, TOP=1, RIGHT=2, BOTTOM=3)))
+    # Monitor geometry is global; pointer enter and child allocations are local.
+    monitor = SimpleNamespace(get_geometry=lambda: SimpleNamespace(x=1920, y=-300, width=1440, height=900))
+    window.overlay_supported = True
+    window.present_at_pointer(monitor, *pointer)
+    settle(window)
+    window.allocate(1440, 900, -1, None)
+    return SimpleNamespace(monitor=monitor, monitors=monitors, anchors=anchors, margins=margins)
+
+
+OUTPUT_CORNERS = [(0, 0), (1439, 0), (0, 899), (1439, 899)]
+
+
+@pytest.mark.parametrize("scale", [75, 100, 150])
+@pytest.mark.parametrize("pointer", OUTPUT_CORNERS)
+def test_corner_placement_clamps_visible_faces_and_hits_their_allocated_centers(preview, monkeypatch, scale, pointer):
+    window = preview.window
+    placed_output = place_on_output(window, monkeypatch, scale, pointer)
+    assert placed_output.monitors == [placed_output.monitor]
+    assert sorted(placed_output.anchors) == [(edge, True) for edge in range(4)]
+    assert sorted(placed_output.margins) == [(edge, 0) for edge in range(4)]
+    assert window.get_resizable()
+    assert (window.get_width(), window.get_height()) == (1440, 900)
+    center = output_bounds(window, window.close_button)
+    radius = 96 * scale / 100
+    expected = (radius if pointer[0] == 0 else 1440 - radius,
+                radius if pointer[1] == 0 else 900 - radius)
+    assert (center.get_x() + center.get_width() / 2,
+            center.get_y() + center.get_height() / 2) == pytest.approx(expected, abs=1)
+    for index, button in enumerate(window.buttons):
+        bounds = output_bounds(window, button)
+        assert 0 <= bounds.get_x() <= 1440 - bounds.get_width()
+        assert 0 <= bounds.get_y() <= 900 - bounds.get_height()
+        x = bounds.get_x() + bounds.get_width() / 2
+        y = bounds.get_y() + bounds.get_height() / 2
+        assert window.pointer_target(x, y) == ("root", index)
+        window.pointer_motion(None, x, y)
+        assert window.state.selected == index
+        settle(window)
+        window.allocate(1440, 900, -1, None)
+        callout = output_bounds(window, window.callout)
+        # Fractional CSS padding at 75%/150% rounds by up to half a pixel.
+        assert -1 <= callout.get_x() <= 1440 - callout.get_width() + 1
+        assert -1 <= callout.get_y() <= 900 - callout.get_height() + 1
+    window.pointer_click(None, 1, x, y)
+    assert preview.selected == [(window.config["ring"][7], True)]
+    assert not preview.dismissed
+
+
+@pytest.mark.parametrize("pointer", OUTPUT_CORNERS)
+def test_full_output_background_right_click_closes_beyond_the_old_popup(preview, monkeypatch, pointer):
+    window = preview.window
+    place_on_output(window, monkeypatch, 100, pointer)
+    # Each location lies beyond the previous 780 x 440 input surface.
+    coordinate = (800, 500)
+    assert window.pointer_target(*coordinate) is None
+    gestures = [gesture for gesture in controllers(window.surface, Gtk.GestureClick) if gesture.get_button() == 3]
+    gestures[0].emit("pressed", 1, *coordinate)
+    assert preview.dismissed == [True]
+    assert not preview.selected
+
+
+@pytest.mark.parametrize("scale", [75, 100, 150])
+@pytest.mark.parametrize("pointer", OUTPUT_CORNERS)
+def test_every_six_action_group_stays_visible_and_clickable_at_output_corners(preview, monkeypatch, scale, pointer):
+    window = preview.window
+    place_on_output(window, monkeypatch, scale, pointer, groups=True)
+    for slot in range(8):
+        window.commit(slot)
+        settle(window)
+        window.allocate(1440, 900, -1, None)
+        assert len(window.children) == 6
+        for index, button in enumerate(window.child_buttons):
+            bounds = output_bounds(window, button)
+            assert 0 <= bounds.get_x() <= 1440 - bounds.get_width()
+            assert 0 <= bounds.get_y() <= 900 - bounds.get_height()
+            x = bounds.get_x() + bounds.get_width() / 2
+            y = bounds.get_y() + bounds.get_height() / 2
+            assert window.pointer_target(x, y) == ("child", index)
+            window.pointer_motion(None, x, y)
+            assert window.child_selected == index
+            settle(window)
+            window.allocate(1440, 900, -1, None)
+            callout = output_bounds(window, window.callout)
+            assert -1 <= callout.get_x() <= 1440 - callout.get_width() + 1
+            assert -1 <= callout.get_y() <= 900 - callout.get_height() + 1
+            window.secondary_press(None, 1, x, y)
+            assert window.state.visible and not preview.dismissed
+    window.pointer_click(None, 1, x, y)
+    assert preview.selected == [(window.config["ring_groups"]["7"][5], True)]
+    assert not preview.dismissed
+
+
+def test_pointer_timeout_replaces_previous_corner_origin_with_centered_fallback(preview, monkeypatch):
+    window = preview.window
+    placed_output = place_on_output(window, monkeypatch, 150, (0, 0))
+    display = Gdk.Display.get_default()
+    monkeypatch.setattr(ring.Gdk.Display, "get_default", lambda: SimpleNamespace(
+        get_monitors=lambda: SimpleNamespace(get_item=lambda _index: placed_output.monitor), flush=display.flush))
+    window.present_at_pointer()
+    settle(window)
+    window.allocate(1440, 900, -1, None)
+    bounds = output_bounds(window, window.close_button)
+    assert (bounds.get_x() + bounds.get_width() / 2,
+            bounds.get_y() + bounds.get_height() / 2) == pytest.approx((720, 450), abs=1)
+    assert window.pointer_target(720, 450) == ("center", None)
+
+
+def test_reopening_as_toplevel_resets_previous_output_origin_and_scale(preview, monkeypatch):
+    window = preview.window
+    place_on_output(window, monkeypatch, 150, (1439, 899))
+    window.overlay_supported = False
+    window.show_ring(default_config() | {"ring_scale": 75}, preview=True)
+    settle(window)
+    window.allocate(window.geometry.size(ring.WIDTH), window.geometry.size(ring.HEIGHT), -1, None)
+    assert window._layout_origin == (0, 0)
+    assert window._layout_size is None
+    for index, button in enumerate(window.buttons):
+        bounds = output_bounds(window, button)
+        x = bounds.get_x() + bounds.get_width() / 2
+        y = bounds.get_y() + bounds.get_height() / 2
+        assert (x, y) == pytest.approx(window.geometry.point(*main_position(window, index)), abs=1)
+        assert window.pointer_target(x, y) == ("root", index)
+
+
 def test_pointer_capture_selects_only_the_painted_circular_button(preview):
     window = preview.window
     gestures = [gesture for gesture in controllers(window.surface, Gtk.GestureClick) if gesture.get_button() == 1]
@@ -178,6 +321,47 @@ def test_ring_has_no_bottom_instruction_bar(preview):
     assert not hasattr(window, "instructions")
     assert window.key_pressed(None, Gdk.KEY_Escape, 0, 0)
     assert preview.dismissed == [True]
+
+
+def test_repeated_show_cancels_old_pointer_placement_before_presenting(preview, monkeypatch):
+    window = preview.window
+    locators, presented = [], []
+
+    def locate(locator):
+        locator.active = True
+        locators.append(locator)
+
+    monkeypatch.setattr(ring.PointerLocator, "locate", locate)
+    monkeypatch.setattr(ring, "Layer", SimpleNamespace(
+        set_keyboard_mode=lambda *_: None, set_monitor=lambda *_: None,
+        set_anchor=lambda *_: None, set_margin=lambda *_: None,
+        KeyboardMode=SimpleNamespace(EXCLUSIVE=1), Edge=SimpleNamespace(LEFT=0, TOP=1, RIGHT=2, BOTTOM=3)))
+    monkeypatch.setattr(window, "present", lambda: presented.append(True))
+    window.overlay_supported = True
+    window.show_ring(default_config(), preview=True)
+    window.show_ring(default_config(), preview=True)
+    assert not locators[0].active and locators[1].active
+    locators[0]._entered(None, 1, 2, object())
+    assert not presented
+    assert window._pointer_locator is locators[1]
+    locators[1]._expired()
+    assert presented == [True]
+    assert window._pointer_locator is None
+
+
+def test_dismissing_pending_pointer_placement_cannot_reopen_ring(preview, monkeypatch):
+    window = preview.window
+    locator = ring.PointerLocator(window.present_at_pointer)
+    locator.active = True
+    window._pointer_locator = locator
+    presented = []
+    monkeypatch.setattr(window, "present", lambda: presented.append(True))
+    window.dismiss()
+    locator._entered(None, 1, 2, object())
+    locator._expired()
+    assert not presented
+    assert preview.dismissed == [True]
+    assert window._pointer_locator is None
 
 
 def test_native_action_button_runs_once_in_preview(preview):

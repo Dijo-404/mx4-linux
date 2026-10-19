@@ -18,7 +18,8 @@ except (ImportError, ValueError):
     GdkWayland = None
 from .motion import Transition
 from .ring_icons import action_icon
-from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, HorizontalDrag, RingGeometry, RingState, button_at, button_center
+from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, ORBIT_RADIUS, HorizontalDrag, RingGeometry, RingState, button_at, button_center
+from .ring_position import PointerLocator, ring_origin
 
 
 WIDTH, HEIGHT = 780, 440
@@ -93,6 +94,9 @@ class ActionsRing(Gtk.Window):
         self._adjusted_in_hold = False
         self._keyboard_yielded = False
         self._saved_focus = None
+        self._pointer_locator = None
+        self._layout_origin = (0, 0)
+        self._layout_size = None
         self.on_selected, self.on_dismissed, self.on_hover = selected, dismissed, hovered
         self.config = None
         self.preview = False
@@ -119,7 +123,7 @@ class ActionsRing(Gtk.Window):
             Layer.set_namespace(self, "mx4-actions-ring")
             Layer.set_layer(self, Layer.Layer.OVERLAY)
             Layer.set_keyboard_mode(self, Layer.KeyboardMode.EXCLUSIVE)
-            Layer.set_exclusive_zone(self, 0)
+            Layer.set_exclusive_zone(self, -1)
         self.connect_after("map", self.identify_popup)
         self.add_css_class("mx4-ring")
         if display not in self._style_providers:
@@ -277,6 +281,7 @@ class ActionsRing(Gtk.Window):
         return self.config.get("ring_groups", {}) if self.config else {}
 
     def show_ring(self, config, held=False, preview=False):
+        self.cancel_placement()
         if self._exiting:
             self.cancel_exit()
         self.motion_preference_changed()
@@ -285,6 +290,8 @@ class ActionsRing(Gtk.Window):
         self.cancel_pointer()
         self._suppress_native = False
         self.geometry, self.state = geometry, state
+        self._layout_origin = (0, 0)
+        self._layout_size = None
         self.config, self.preview = config, preview
         self._adjusted_in_hold = False
         self._keyboard_yielded = False
@@ -324,6 +331,48 @@ class ActionsRing(Gtk.Window):
                 self.buttons[index].reset_state(Gtk.AccessibleState.EXPANDED)
         self.start_entrance()
         self.update_labels()
+        if self.overlay_supported:
+            self._pointer_locator = PointerLocator(self.present_at_pointer)
+            self._pointer_locator.locate()
+        else:
+            self.present_at_pointer()
+
+    def cancel_placement(self):
+        if self._pointer_locator:
+            self._pointer_locator.cancel()
+            self._pointer_locator = None
+
+    def present_at_pointer(self, monitor=None, x=None, y=None):
+        self._pointer_locator = None
+        if not self.state.visible:
+            return
+        if self.overlay_supported:
+            # Stretch the transparent input surface across the output. Only
+            # visible faces constrain the ring's position near screen edges.
+            if monitor is None:
+                monitor = Gdk.Display.get_default().get_monitors().get_item(0)
+            Layer.set_monitor(self, monitor)
+            positioned = monitor is not None
+            self.set_resizable(positioned)
+            for edge in (Layer.Edge.LEFT, Layer.Edge.TOP, Layer.Edge.RIGHT, Layer.Edge.BOTTOM):
+                Layer.set_anchor(self, edge, positioned)
+                Layer.set_margin(self, edge, 0)
+            if positioned:
+                bounds = monitor.get_geometry()
+                self._layout_size = (bounds.width, bounds.height)
+                pointer = (x, y) if x is not None and y is not None else (bounds.width / 2, bounds.height / 2)
+                self._layout_origin = ring_origin(pointer, self.geometry.point(CENTER_X, CENTER_Y),
+                                                  (ORBIT_RADIUS + BUTTON_RADIUS + 4) * self.geometry.scale,
+                                                  self._layout_size)
+                self.set_default_size(*self._layout_size)
+                # Opposite anchors determine the size, with no large minimum
+                # inherited from the old transparent popup padding.
+                self.canvas.set_content_width(0)
+                self.canvas.set_content_height(0)
+                self.position_faces()
+        # Start the entrance when placement completes, rather than consuming
+        # its first frames while the invisible location surfaces are mapping.
+        self.start_entrance()
         self.present()
         self._presented = True
         self.canvas.grab_focus()
@@ -339,6 +388,7 @@ class ActionsRing(Gtk.Window):
     def hide_ring(self, animate=False):
         """End the ring now. With ``animate`` the faces collapse into the center
         afterwards, with keyboard and pointer input already released."""
+        self.cancel_placement()
         self.cancel_pointer()
         self._adjusted_in_hold = False
         self.state.cancel()
@@ -480,7 +530,21 @@ class ActionsRing(Gtk.Window):
             angles = (angle + (i - (count - 1) / 2) * CHILD_SPACING for i in range(count))
             return [(CENTER_X + CHILD_ORBIT * math.sin(a), CENTER_Y - CHILD_ORBIT * math.cos(a)) for a in angles]
 
-        return positions(slot * math.pi / 4)
+        angle = slot * math.pi / 4
+        layout = positions(angle)
+        if self._layout_size is not None:
+            left, top, right, bottom = self.layout_bounds()
+            def overflow(points):
+                return sum(max(0, left + CHILD_RADIUS + 4 - x) + max(0, x + CHILD_RADIUS + 4 - right)
+                           + max(0, top + CHILD_RADIUS + 4 - y) + max(0, y + CHILD_RADIUS + 4 - bottom)
+                           for x, y in points)
+            if overflow(layout):
+                # Turn an outward-facing group inward at the edge, preserving
+                # the arc, spacing and distance from root action circles.
+                candidates = [positions(angle + sign * math.radians(step))
+                              for step in range(1, 181) for sign in (1, -1)]
+                layout = min([layout, *candidates], key=overflow)
+        return layout
 
     def child_growth(self, index, now):
         """Children grow from dots in place, the one in the parent's direction first."""
@@ -585,7 +649,41 @@ class ActionsRing(Gtk.Window):
             left, top, self._callout_side = x + radius + LABEL_GAP, y - height / 2, (1, 0)
         else:
             left, top, self._callout_side = x - radius - LABEL_GAP - width, y - height / 2, (-1, 0)
-        self._move(self.callout, max(0, min(left, WIDTH - width)), max(0, min(top, HEIGHT - height)))
+        x0, y0, x1, y1 = self.layout_bounds()
+        if self._layout_size is not None:
+            # Leave room for the shadow and fractional GTK allocation rounding.
+            x0, y0, x1, y1 = x0 + 4, y0 + 4, x1 - 4, y1 - 4
+            faces = [(CENTER_X + dx, CENTER_Y + dy, BUTTON_RADIUS)
+                     for dx, dy in (button_center(i) for i in range(8))]
+            faces += [(cx, cy, CHILD_RADIUS) for cx, cy in self.child_positions]
+            faces.append((CENTER_X, CENTER_Y, CENTER_RADIUS))
+
+            def clamp(px, py):
+                return max(x0, min(px, x1 - width)), max(y0, min(py, y1 - height))
+
+            def collisions(position):
+                px, py = position
+                return sum(math.hypot(cx - max(px, min(cx, px + width)),
+                                      cy - max(py, min(cy, py + height))) < r + 2
+                           for cx, cy, r in faces)
+
+            # Clamping an outward label alone can cover its own action face.
+            # Try the other sides, then the outside of the whole open group.
+            outer = (min(cx - r for cx, cy, r in faces), min(cy - r for cx, cy, r in faces),
+                     max(cx + r for cx, cy, r in faces), max(cy + r for cx, cy, r in faces))
+            candidates = [(left, top), (x + radius + LABEL_GAP, y - height / 2),
+                          (x - radius - LABEL_GAP - width, y - height / 2),
+                          (x - width / 2, y - radius - LABEL_GAP - height),
+                          (x - width / 2, y + radius + LABEL_GAP),
+                          (outer[0] - LABEL_GAP - width, y - height / 2),
+                          (outer[2] + LABEL_GAP, y - height / 2),
+                          (x - width / 2, outer[1] - LABEL_GAP - height),
+                          (x - width / 2, outer[3] + LABEL_GAP)]
+            left, top = min((clamp(*p) for p in candidates),
+                            key=lambda p: (collisions(p), math.hypot(p[0] - left, p[1] - top)))
+            dx, dy = left + width / 2 - x, top + height / 2 - y
+            self._callout_side = ((1 if dx > 0 else -1), 0) if abs(dx) > abs(dy) else (0, 1 if dy > 0 else -1)
+        self._move(self.callout, max(x0, min(left, x1 - width)), max(y0, min(top, y1 - height)))
 
     @staticmethod
     def expanded_state(button, expanded):
@@ -694,7 +792,7 @@ class ActionsRing(Gtk.Window):
         return None
 
     def pointer_motion(self, _controller, x, y):
-        x, y = self.geometry.logical(x, y)
+        x, y = self.logical_point(x, y)
         if not self.state.visible or self.state.held or self._primary_start is not None:
             return
         if self.group_slot is not None:
@@ -736,7 +834,7 @@ class ActionsRing(Gtk.Window):
         self._press_target = self.pointer_target(x, y)
         self.press_style(self._press_target, True)
         action = self.adjustment_at(x, y)
-        self._drag = (HorizontalDrag(*self.geometry.logical(x, y)), action) if action else None
+        self._drag = (HorizontalDrag(*self.logical_point(x, y)), action) if action else None
 
     def secondary_press(self, gesture, _count, x, y):
         """Right-clicking the background closes without activating a face."""
@@ -755,7 +853,7 @@ class ActionsRing(Gtk.Window):
             return
         model, action = self._drag
         x, y = self._primary_start
-        delta = model.move(*self.geometry.logical(x + dx, y + dy))
+        delta = model.move(*self.logical_point(x + dx, y + dy))
         if model.recognized and self.state.held:
             self._adjusted_in_hold = True
         for _ in range(abs(delta)):
@@ -809,7 +907,7 @@ class ActionsRing(Gtk.Window):
             return  # Grouped drag/click release has already been handled or cancelled.
         if any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y)):
             return
-        x, y = self.geometry.logical(x, y)
+        x, y = self.logical_point(x, y)
         if self.state.held or not self.state.visible:
             return
         if math.hypot(x - CENTER_X, y - CENTER_Y) <= CENTER_RADIUS:
@@ -871,7 +969,18 @@ class ActionsRing(Gtk.Window):
             surface.set_application_id(self.context_app_id)
 
     def _move(self, widget, x, y):
-        self.labels.move(widget, *self.geometry.point(x, y))
+        px, py = self.geometry.point(x, y)
+        ox, oy = self._layout_origin
+        self.labels.move(widget, px + ox, py + oy)
+
+    def logical_point(self, x, y):
+        ox, oy = self._layout_origin
+        return self.geometry.logical(x - ox, y - oy)
+
+    def layout_bounds(self):
+        if self._layout_size is None:
+            return 0, 0, WIDTH, HEIGHT
+        return (*self.logical_point(0, 0), *self.logical_point(*self._layout_size))
 
     def position_faces(self):
         self._move(self.close_button, CENTER_X - CENTER_RADIUS, CENTER_Y - CENTER_RADIUS)
@@ -913,7 +1022,7 @@ class ActionsRing(Gtk.Window):
         if (not self.state.visible
                 or any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y))):
             return None
-        x, y = self.geometry.logical(x, y)
+        x, y = self.logical_point(x, y)
         if math.hypot(x - CENTER_X, y - CENTER_Y) <= CENTER_RADIUS:
             return ("center", None)
         child = self.child_at(x, y) if self.group_slot is not None else None
