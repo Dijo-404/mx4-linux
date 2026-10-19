@@ -20,10 +20,10 @@ The supplied OpenCode design reference informs the typography, palette and spaci
 | Wheel preview | 140 ms camera settle, 450 ms finite wheel sequence, 140 ms camera return | Completion, route change, hidden, paused or reduced motion |
 | Haptic illustration | Three expanding, fading outlines over 800 ms | Completion, route change, hidden, paused or reduced motion |
 | Page and inspector changes | Native 180–250 ms fades/slides | Native transition completion; system reduced motion snaps |
-| Ring | 220 ms orbit trace, fixed root targets, 180 ms shortest-path selection marker, 160 ms group reveal, 100 ms callout fade, 140 ms selected outline; direct held-direction tether and press feedback | Completion or dismissal; paint updates capped at 60 fps; execution is immediate after hiding |
+| Ring | Matches the Logitech Options+ ring: a 110 ms ease-out burst of all faces from the center; group children grow from dots on an outer arc over 120 ms, staggered 25 ms from the middle, and shrink away over 90 ms; labels fade in over 110 ms after a 120 ms pause and slide 4 px outward; choosing flashes the face light blue, then everything collapses into the center over 120 ms and fades in its last 40% | Transitions complete or the collapse ends; frame callbacks follow the display refresh rate and stop at rest; reduced motion snaps; the chosen action is handed over before the collapse |
 | Assignment preview | Finite entry and selection transitions; arrows retain keyboard focus | Completion, hidden or reduced motion |
 | Buttons and fields | 160 ms color/border easing; button contents grow to 1.035× on hover with unchanged layout and hit regions | Transition completes or pointer leaves; reduced motion disables scaling |
-| Ring action icons | 160 ms easing to 1.12× on hover or popup selection; native circular faces and hit regions remain fixed | Transition completes or selection leaves; reduced motion disables scaling |
+| Ring action faces | White faces with dark icons; the hovered or selected face turns dark over 90 ms; the center dot is red while nothing would be chosen and lavender-blue otherwise; native circular faces and hit regions never move | Transition completes or selection leaves; reduced motion removes the easing |
 
 Ring pointer and keyboard selection share an interruptible marker that takes the shortest arc. Buttons remain in their final positions during entry; pressing changes only their tint and icon scale. Reduced motion shows the final selection state directly and keeps the held-direction cue.
 
