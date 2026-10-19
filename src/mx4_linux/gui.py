@@ -840,21 +840,6 @@ class ControlWindow(Adw.ApplicationWindow):
                  lambda _result: self.status.set_text("Settings will be remembered for this mouse." if enabled else "Remembered settings disabled."),
                  "Updating remembered settings…", failed=lambda error: self.reload(error))
 
-    def set_resume_integration(self, enabled):
-        if self.desktop.config is None:
-            self.status.set_text(self.desktop.error or "Local action configuration is unavailable.")
-            return
-        if self.closed or self.busy:
-            return
-        document = deepcopy(self.desktop.config)
-        document["resume_integration"] = bool(enabled)
-        def saved(_result):
-            self.desktop.config["resume_integration"] = bool(enabled)
-            if not enabled:
-                self.desktop._cancel_reconnect()
-            self.status.set_text("Reconnect preference saved.")
-        self.job(lambda: self.desktop.store.save(document), saved, "Saving reconnect preference…")
-
     def request_host_switch(self, index):
         if self.closed or self.busy or self.pending_hardware or not self.current:
             return
@@ -895,9 +880,8 @@ class ControlWindow(Adw.ApplicationWindow):
         row = Adw.SwitchRow(title="Remember settings for this mouse", subtitle="Reapply confirmed hardware settings when the same mouse reconnects.", active=remembered, sensitive=valid)
         row.connect("notify::active", lambda switch, _p: self.remember_current(switch.get_active()))
         group.add(row)
-        resume = Adw.SwitchRow(title="Resume integration on reconnect", subtitle="Resume only for this mouse after a confirmed recovery.", active=(self.desktop.config or {}).get("resume_integration", False), sensitive=not self.demo and valid and self.desktop.config is not None)
-        resume.connect("notify::active", lambda switch, _p: self.set_resume_integration(switch.get_active()))
-        group.add(resume)
+        group.add(Adw.ActionRow(title="Automatic reconnect", use_markup=False,
+            subtitle="Enabled mouse integration recovers when this mouse reconnects. Disable integration to stop."))
         row = Adw.ActionRow(use_markup=False, title="Restore previous button reporting", subtitle="Recover this app's temporary reporting after a disconnect or unexpected exit.")
         button = Gtk.Button(label="Recover", valign=Gtk.Align.CENTER, sensitive=valid)
         button.connect("clicked", lambda *_: self.recover_current())
