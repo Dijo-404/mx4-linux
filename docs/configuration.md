@@ -29,6 +29,8 @@ The required top-level fields are `version`, `ring`, `actions`, `button_bindings
 
 `button_bindings` cannot assign the selected `ring_button`. Supported IDs are a configuration allowlist; the listener also verifies that the connected device supports each selected control. Primary left/right click and scrolling are excluded from diversion.
 
+The ring trigger opens with a single press and stays open for pointer or keyboard selection. Release never commits an action. A second press closes the ring. Enabled integration automatically recovers the same mouse after disconnecting; Disable or Quit cancels retries. The optional legacy `resume_integration` boolean is accepted for existing files but no longer controls recovery of enabled integration.
+
 ### Application assignments and ring trigger
 
 Optional `assignment_profiles` maps profile IDs to objects with `label`, exact `app_id` (or `"*"` for General), eight-position `ring`, and `button_bindings`. `ring_groups` and `ring_button` are optional in each profile. `active_profiles` maps exact app IDs and/or `"*"` to an existing profile with the same app ID. Up to 64 profiles are allowed; all profiles, including inactive ones, are validated before saving.
