@@ -17,6 +17,11 @@ User-visible changes are recorded here. This project follows semantic versioning
 
 ### Improved
 
+- The Actions Ring now looks and moves like the Logitech Options+ ring: a compact ring of white faces with dark icons that bursts from the center, a hovered face that turns dark, a center dot that is red while nothing would be chosen, white pill labels that fade in after a short pause, group children that grow from dots along an outer arc, and a collapse into the center after choosing or cancelling. The duplicate native tooltip beside the ring label is gone.
+- Enabled mouse integration recovers automatically after reconnecting the same mouse, including interrupted reporting cleanup, with retries capped at 30-second intervals.
+- One panel press opens the Actions Ring for click selection; releasing the panel never runs an action. The bottom instruction bar is removed.
+- Place the Wayland Actions Ring at the current pointer on its monitor. Near screen edges and corners only the visible circles are kept on screen, so the ring stays close to the pointer, and groups turn inward.
+- Right-clicking outside the Actions Ring circles, or on its center, closes the ring without choosing an action.
 - Keep Python dependencies in `pyproject.toml` and share the packaged SVG icon with the README.
 - Detect unused imports in development and CI checks.
 - Setting changes update the confirmed value without a complete follow-up discovery scan; saving profiles keeps existing device data.
