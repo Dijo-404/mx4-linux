@@ -1,8 +1,9 @@
-"""Finite 3D pose transitions and unrestricted direct manipulation.
+"""Finite 3D pose transitions, direct manipulation and home-card presentation.
 
 Quaternions use ``(w, x, y, z)`` and rotate model coordinates into the scene.
 Scene X points right, Y points up, and Z points toward the viewer. This module
-does not depend on GTK or a renderer and never advances an idle animation.
+does not depend on GTK or a renderer. Only an enabled ``Showcase`` sway runs
+without an end; every other motion settles and stops.
 """
 
 from math import acos, cos, exp, hypot, isfinite, pi, sin, tau
@@ -12,6 +13,15 @@ IDENTITY = (1.0, 0.0, 0.0, 0.0)
 DRAG_RADIANS_PER_PIXEL = .008
 MIN_ZOOM = .7
 MAX_ZOOM = 1.6
+FRICTION = 3.2       # 1/s; a released flick coasts for about a second
+MIN_SPIN = .08       # rad/s; slower coasting stops
+MAX_SPIN = 14.0      # rad/s
+REVEAL_SECONDS = 1.3
+SWAY_PERIOD = 12.0
+SWAY_DELAY = 2.5     # idle seconds before the sway blends back in
+SWAY_RAMP = 1.6      # seconds to blend the sway in or out
+TILT = (.20, .14)    # pointer lean in radians at the viewport edge (yaw, pitch)
+TILT_RATE = 8.0      # 1/s; how quickly the lean follows the pointer
 
 
 def normalize_quaternion(value):
@@ -119,6 +129,7 @@ class ModelMotion:
         self.duration = float(duration) if _finite(duration) and duration > 0 else .65
         self.active = False
         self.dragging = False
+        self.spin = None
         self._source = self._target = self.orientation
         self._controls = None
         self._drag_source = self.orientation
@@ -141,6 +152,7 @@ class ModelMotion:
         if now is not None:
             self.advance(now)
         self.dragging = False
+        self.spin = None
         self._source = self.orientation
         self._target = target
         self._controls = _backward_controls(self.orientation, target) if backward else None
@@ -153,18 +165,44 @@ class ModelMotion:
             self._updated = None
         return changed
 
+    @property
+    def moving(self):
+        return self.active or self.spin is not None
+
+    def fling(self, yaw_rate, pitch_rate):
+        """Coast after a released drag; rates are scene-axis radians per second."""
+        if self.dragging or self.active or not (_finite(yaw_rate) and _finite(pitch_rate)):
+            return False
+        speed = hypot(yaw_rate, pitch_rate)
+        if speed < MIN_SPIN * 4:
+            return False
+        limit = min(1.0, MAX_SPIN / speed)
+        self.spin = (yaw_rate * limit, pitch_rate * limit)
+        self._updated = None
+        return True
+
     def advance(self, now):
-        """Update one finite transition and report whether it needs more frames."""
-        if not self.active or not _finite(now):
-            return self.active
+        """Update a finite transition or coast; report whether more frames are needed."""
+        if not self.moving or not _finite(now):
+            return self.moving
         now = float(now)
         if self._updated is None:
             self._updated = now
             return True
         if now <= self._updated:
             return True
-        self._elapsed += now - self._updated
+        delta = now - self._updated
         self._updated = now
+        if not self.active:
+            yaw, pitch = self.spin
+            self.orientation = quaternion_multiply(quaternion_multiply(
+                axis_quaternion('y', yaw * delta), axis_quaternion('x', pitch * delta)), self.orientation)
+            decay = exp(-FRICTION * delta)
+            self.spin = (yaw * decay, pitch * decay) if hypot(yaw, pitch) * decay >= MIN_SPIN else None
+            if self.spin is None:
+                self._updated = None
+            return self.spin is not None
+        self._elapsed += delta
         progress = min(1.0, self._elapsed / self.duration)
         if self._elapsed >= self.duration - 1e-9:
             progress = 1.0
@@ -184,8 +222,9 @@ class ModelMotion:
         self.dragging = False
 
     def stop(self):
-        """Cancel a transition at its current displayed orientation."""
+        """Cancel a transition or coast at its current displayed orientation."""
         self.active = False
+        self.spin = None
         self._source = self._target = self.orientation
         self._controls = None
         self._updated = None
@@ -235,3 +274,89 @@ class ModelMotion:
         self.zoom = 1.0
         changed = self.transition_to(self.home, animate=animate, now=now)
         return changed or zoom_changed
+
+
+class Showcase:
+    """Home-card presentation layered over the user's orientation.
+
+    An entrance turn and pointer lean settle and stop; the slow sway runs only
+    while ``sway`` is enabled and the viewer has been idle. ``offset()`` never
+    changes ``ModelMotion``, so drag, keyboard rotation and reset keep their
+    meaning. ``bake()`` hands the visible offset to the direct pose before a
+    manipulation, so taking hold of the model never makes it jump.
+    """
+
+    def __init__(self):
+        self.sway = False
+        self.reveal = REVEAL_SECONDS
+        self.phase = 0.0
+        self.weight = 0.0
+        self.idle = SWAY_DELAY
+        self.tilt = self.target = (0.0, 0.0)
+        self._updated = None
+
+    @property
+    def active(self):
+        return (self.sway or self.reveal < REVEAL_SECONDS or self.weight > 0
+                or self.tilt != self.target)
+
+    @property
+    def steady(self):
+        """Only the slow sway is moving; hosts may update it at a lower rate."""
+        return self.weight == 1 and self.reveal >= REVEAL_SECONDS and self.tilt == self.target
+
+    def start_reveal(self):
+        self.reveal = 0.0
+
+    def point(self, x, y):
+        """Lean toward a pointer at normalized viewport coordinates in [-1, 1]."""
+        if _finite(x) and _finite(y):
+            self.target = (max(-1.0, min(1.0, x)) * TILT[0], max(-1.0, min(1.0, y)) * TILT[1])
+
+    def suspend(self):
+        self._updated = None
+
+    def advance(self, now):
+        if not _finite(now) or not self.active:
+            return self.active
+        if self._updated is None or now <= self._updated:
+            self._updated = max(float(now), self._updated or 0.0)
+            return True
+        # A stalled frame never throws the sway or lean forward in one jump.
+        delta = min(float(now) - self._updated, .1)
+        self._updated = float(now)
+        self.reveal = min(REVEAL_SECONDS, self.reveal + delta)
+        self.idle += delta
+        goal = 1.0 if self.sway and self.idle >= SWAY_DELAY and self.reveal >= REVEAL_SECONDS else 0.0
+        step = delta / SWAY_RAMP
+        self.weight = min(goal, self.weight + step) if goal > self.weight else max(goal, self.weight - step)
+        if self.weight:
+            self.phase = (self.phase + delta * tau / SWAY_PERIOD) % tau
+        follow = 1 - exp(-TILT_RATE * delta)
+        self.tilt = tuple(b if abs(b - a) < 1e-4 else a + (b - a) * follow
+                          for a, b in zip(self.tilt, self.target))
+        return self.active
+
+    def _remaining(self):
+        # Ease-out-back: the entrance turn overshoots by a few degrees, then settles.
+        p = self.reveal / REVEAL_SECONDS - 1
+        return -(1.9 * p ** 3 + .9 * p ** 2)
+
+    def offset(self):
+        turn = self._remaining()
+        w = self.weight * self.weight * (3 - 2 * self.weight)
+        yaw = -1.1 * turn + w * .30 * sin(self.phase) + self.tilt[0]
+        pitch = .35 * turn + w * .06 * sin(2 * self.phase) + self.tilt[1]
+        return quaternion_multiply(axis_quaternion('y', yaw), axis_quaternion('x', pitch))
+
+    def scale(self):
+        p = min(1.0, self.reveal / REVEAL_SECONDS)
+        return 1 - .12 * (1 - p) ** 3
+
+    def bake(self):
+        """Return the visible offset and clear it, before direct manipulation."""
+        offset = self.offset()
+        self.reveal = REVEAL_SECONDS
+        self.weight = self.phase = self.idle = 0.0
+        self.tilt = self.target = (0.0, 0.0)
+        return offset

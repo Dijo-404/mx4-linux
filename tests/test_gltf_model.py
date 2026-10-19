@@ -9,7 +9,7 @@ from time import monotonic, sleep
 import pytest
 
 from mx4_linux.gltf_model import (
-    ASSETS, BAKED_UNDERSIDE, EXTENT, MODEL_PATH, ModelData, POSES, load_model,
+    ASSETS, BAKED_UNDERSIDE, EXTENT, MODEL_PATH, ModelData, POSES, contact_shadow, load_model,
     project_point, rotation_matrix, transform,
 )
 
@@ -45,6 +45,22 @@ def test_three_dimensional_rotation_and_zoom_keep_surface_registration():
         assert projected == pytest.approx((.5+rotated[0]*1.15/(EXTENT*1.5), .5-rotated[1]*1.15/EXTENT))
     assert model.project_anchor('haptic_panel', POSES['overview']) != model.project_anchor('haptic_panel', POSES['haptic'])
     assert project_point((0., 0., 0.), (0., 0., 0.), POSES['overview'], 1.7, .6) == (.5, .5)
+
+
+@pytest.mark.parametrize('pose', [POSES['overview'], POSES['haptic'], BAKED_UNDERSIDE, (0., 0., 0., 1.)])
+def test_contact_shadow_sits_under_the_true_silhouette_for_any_pose(pose):
+    model = load_model()
+    assert 500 < len(model.samples) < 1500  # Sparse enough to evaluate every frame.
+    rotation = rotation_matrix(pose)
+    ys = [transform(rotation, p, 0.)[1] for p in model.samples]
+    xs = [transform(rotation, p, 0.)[0] for p in model.samples]
+    scale = 2 / EXTENT
+    cx, cy, rx, ry = contact_shadow(model.samples, pose)
+    assert cy == pytest.approx(min(ys) * scale)
+    assert min(xs) * scale <= cx <= max(xs) * scale
+    assert 0 < ry < rx <= (max(xs) - min(xs)) * scale
+    wide = contact_shadow(model.samples, pose, 1.4, 2.)
+    assert wide == pytest.approx((cx * .7, cy * 1.4, rx * .7, ry * 1.4))
 
 
 def test_nonfinite_or_empty_rotations_are_rejected():

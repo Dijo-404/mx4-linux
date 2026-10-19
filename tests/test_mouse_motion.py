@@ -250,7 +250,8 @@ def test_native_home_drag_zoom_keyboard_and_reset_keep_navigation_independent(na
     picture._drag_update(None, 230, -290)
     assert picture.motion.orientation == dragged  # Gesture offsets are cumulative.
     picture._drag_end(None, 230, -290)
-    assert not picture.motion.dragging and picture.ambient_tick_id == 0
+    assert not picture.motion.dragging and picture.motion.spin is None  # An instant release does not coast.
+    assert picture.showcase.sway and picture.ambient_tick_id  # The idle presentation resumes.
     assert picture.get_cursor().get_name() == 'grab'
     assert picture._scroll(None, 0, -1000) and picture.motion.zoom == MAX_ZOOM
     assert picture._scroll(None, 0, 1000) and picture.motion.zoom == MIN_ZOOM
@@ -296,4 +297,39 @@ def test_native_dispose_disconnects_motion_preferences_and_callbacks(native_pict
     assert picture.renderer.on_ready is None and picture.renderer.on_failure is None
     settings.set_property('gtk-enable-animations', False)
     settings.set_property('gtk-enable-animations', True)
+    assert picture.ambient_tick_id == 0
+
+
+def test_native_home_presents_leans_coasts_and_pause_freezes_visible_pose(native_picture):
+    from mx4_linux.model_motion import REVEAL_SECONDS
+    picture, _window, settings = native_picture
+    require_live_model(picture)
+    assert picture.showcase.sway and picture.ambient_tick_id
+    assert picture.showcase.reveal < REVEAL_SECONDS  # The card turns into place when shown.
+    pump_until(lambda: picture.showcase.reveal >= REVEAL_SECONDS, seconds=3)
+    picture._hover(None, picture.get_width(), 0)
+    assert picture.showcase.target[0] > 0 > picture.showcase.target[1]
+    picture._hover(None, None, None)
+    assert picture.showcase.target == (0, 0)
+    picture._drag_begin(None, 100, 100)
+    for offset in (0, 30, 60):
+        picture._drag_update(None, offset, 0)
+        sleep(.015)
+    picture._drag_end(None, 60, 0)
+    assert picture.motion.spin and picture.motion.spin[0] > 0 and picture.ambient_tick_id
+    pump_until(lambda: picture.motion.spin is None, seconds=3)
+    picture._hover(None, 0, picture.get_height())
+    pump_until(lambda: picture.showcase.tilt != (0, 0))
+    shown = picture.renderer.orientation
+    picture.set_motion_enabled(False)
+    assert picture.ambient_tick_id == 0 and not picture.showcase.active
+    assert picture.renderer.orientation == pytest.approx(shown)  # Pausing never snaps the model.
+    picture._hover(None, 0, 0)
+    assert picture.showcase.target == (0, 0) and picture.ambient_tick_id == 0
+    picture.set_motion_enabled(True)
+    assert picture.ambient_tick_id
+    settings.set_property('gtk-enable-animations', False)
+    assert picture.ambient_tick_id == 0 and not picture.showcase.sway
+    settings.set_property('gtk-enable-animations', True)
+    picture.set_visible(False)
     assert picture.ambient_tick_id == 0

@@ -122,6 +122,54 @@ def test_empty_device_state_keeps_home_and_help_available(window):
     assert window.route == 'home'
 
 
+def _texts(widget):
+    found = [widget.get_text()] if isinstance(widget, Gtk.Label) else []
+    child = widget.get_first_child()
+    while child:
+        found += _texts(child)
+        child = child.get_next_sibling()
+    return found
+
+
+@pytest.mark.parametrize('kind, heading, step', [('missing', 'Connect your\nMX Master 4', 'Pair it'),
+                                                 ('denied', 'Allow access to\nyour mouse', './scripts/install-udev-rule.sh'),
+                                                 ('offline', 'Wake your\nmouse', 'Charge it')])
+def test_disconnected_states_explain_next_steps_and_hide_device_context(window, kind, heading, step):
+    shell = window.shell
+    diagnostics = ([{'path': '/dev/hidraw3', 'message': 'Permission denied', 'permission_denied': True}]
+                   if kind == 'denied' else [])
+    window.devices = [dict(window.current, online=False)] if kind == 'offline' else []
+    window.navigate('buttons')
+    window.reload = Mock()
+    window.render({'ok': True, 'devices': window.devices, 'diagnostics': diagnostics})
+    page = window.controls.get_first_child()
+    texts = _texts(page)
+    assert heading in texts and step in texts
+    details = [label for label in texts if label == 'Details']
+    assert bool(details) == (kind == 'denied')  # Diagnostics stay collapsed and appear only when reported.
+    if details:
+        assert 'Device access denied' in texts
+    assert not shell.header_context_reveal.get_reveal_child() and not shell.context_reveal.get_reveal_child()
+    first = shell.connect_picture
+    assert first.interactive and first.motion_enabled == shell.motion_enabled
+    shell.motion_button.set_active(True)
+    assert not first.motion_enabled
+    retry = next(b for b in _buttons(page) if b.get_label() == 'Check again')
+    retry.emit('clicked')
+    window.reload.assert_called_once_with()
+    window.render({'ok': True, 'devices': window.devices, 'diagnostics': diagnostics})
+    assert first.disposed and shell.connect_picture is not first
+
+
+def _buttons(widget):
+    found = [widget] if isinstance(widget, Gtk.Button) else []
+    child = widget.get_first_child()
+    while child:
+        found += _buttons(child)
+        child = child.get_next_sibling()
+    return found
+
+
 def test_native_choice_names_and_round_trip_use_real_cid_values(window):
     window.navigate('buttons')
     window.select_target('button:83')

@@ -7,7 +7,7 @@ import weakref
 
 from .gtk_support import Adw, Gdk, GLib, Gtk
 from .mouse_motion import OrbitMotion, anchor_position, sample_pose
-from .model_motion import ModelMotion
+from .model_motion import DRAG_RADIANS_PER_PIXEL, ModelMotion, Showcase, quaternion_multiply
 from .model_renderer import ModelRenderer, POSES
 from gi.repository import Graphene, Pango
 
@@ -189,6 +189,9 @@ class ModelPicture(Gtk.Overlay):
         self.add_overlay(self.renderer)
         self.set_measure_overlay(self.renderer, False)
         self.motion = ModelMotion(orientation=POSES['overview'])
+        # Only the home card presents the product; page views stay still for their callouts.
+        self.showcase = Showcase() if interactive else None
+        self.drag_samples = []
         self.view_name = 'overview'
         self.motion_enabled = True
         self.interactive = interactive
@@ -205,7 +208,7 @@ class ModelPicture(Gtk.Overlay):
         reference = weakref.ref(self)
         self.settings_handler = self.settings.connect(
             'notify::gtk-enable-animations', lambda *_: reference() and reference()._motion_changed())
-        self.connect('map', lambda *_: self._sync_playback())
+        self.connect('map', lambda *_: self._present())
         self.connect('unmap', lambda *_: self._stop_ambient())
         self.add_css_class('mouse-model')
         self.set_focusable(interactive)
@@ -227,6 +230,10 @@ class ModelPicture(Gtk.Overlay):
             keys = Gtk.EventControllerKey()
             keys.connect('key-pressed', self._key_pressed)
             self.add_controller(keys)
+            hover = Gtk.EventControllerMotion()
+            hover.connect('motion', self._hover)
+            hover.connect('leave', lambda *_: self._hover(None, None, None))
+            self.add_controller(hover)
 
     @property
     def scene(self):
@@ -251,8 +258,28 @@ class ModelPicture(Gtk.Overlay):
             return GLib.SOURCE_REMOVE
         self.renderer.set_visible(True)
         self.fallback.set_opacity(0 if not self.camera_hold else 1)
-        self._update_pose()
+        self._present()
         return GLib.SOURCE_REMOVE
+
+    def _present(self):
+        """Turn the home model into place whenever its card is shown."""
+        if self.showcase and self.ready and self._animations():
+            self.showcase.start_reveal()
+        self._update_pose()
+        self._sync_playback()
+
+    def _bake(self):
+        if self.showcase:
+            self.motion.orientation = quaternion_multiply(self.showcase.bake(), self.motion.orientation)
+
+    def _hover(self, _controller, x, y):
+        if not self.showcase or not self.ready or self.motion.dragging or not self._animations():
+            return
+        if x is None:
+            self.showcase.point(0, 0)
+        else:
+            self.showcase.point(x / max(1, self.get_width()) * 2 - 1, y / max(1, self.get_height()) * 2 - 1)
+        self._sync_playback()
 
     def _failed(self, *_):
         self.ready = False
@@ -285,12 +312,15 @@ class ModelPicture(Gtk.Overlay):
         self._sync_playback()
 
     def _motion_changed(self):
-        if not self.settings.get_property('gtk-enable-animations') and self.motion.active:
-            self.motion.transition_to(POSES[self.view_name], animate=False)
+        if not self.settings.get_property('gtk-enable-animations'):
+            if self.motion.active:
+                self.motion.transition_to(POSES[self.view_name], animate=False)
+            self.motion.stop()
             self._update_pose()
         self._sync_playback()
 
     def reset_view(self):
+        self._bake()
         self.motion.reset(animate=self._animations())
         self._update_pose()
         self._sync_playback()
@@ -302,21 +332,44 @@ class ModelPicture(Gtk.Overlay):
         if gesture:
             gesture.set_state(Gtk.EventSequenceState.CLAIMED)
         self._stop_ambient()
+        self._bake()
+        self.drag_samples = []
         self.motion.begin_drag()
         self.set_cursor_from_name('grabbing')
 
     def _drag_update(self, _gesture, dx, dy):
         if self.ready and self.motion.dragging:
             self.motion.drag(dx, dy)
+            self.drag_samples = [*self.drag_samples[-5:], (monotonic(), dx, dy)]
             self._update_pose()
 
+    def _release_rate(self):
+        """Angular velocity over the last 100 ms of a drag, or None for a held release."""
+        now = monotonic()
+        recent = [sample for sample in self.drag_samples if now - sample[0] <= .1]
+        self.drag_samples = []
+        if len(recent) < 2 or now - recent[-1][0] > .05:
+            return None
+        span = recent[-1][0] - recent[0][0]
+        if span < .012:
+            return None
+        scale = DRAG_RADIANS_PER_PIXEL / span
+        return (recent[-1][1] - recent[0][1]) * scale, (recent[-1][2] - recent[0][2]) * scale
+
     def _drag_end(self, _gesture, _dx, _dy):
+        released = self.motion.dragging
         self.motion.end_drag()
         self.set_cursor_from_name('grab' if self.ready else 'default')
+        rate = self._release_rate() if released and self._animations() else None
+        if rate:
+            self.motion.fling(*rate)
+        if released:
+            self._sync_playback()
 
     def _scroll(self, _controller, _dx, dy):
         if not self.ready:
             return False
+        self._bake()
         self.motion.scroll(dy)
         self._update_pose()
         return True
@@ -328,6 +381,7 @@ class ModelPicture(Gtk.Overlay):
         directions = {Gdk.KEY_Left: (-.16, 0), Gdk.KEY_Right: (.16, 0),
                       Gdk.KEY_Up: (0, -.16), Gdk.KEY_Down: (0, .16)}
         if key in directions:
+            self._bake()
             self.motion.rotate(*directions[key])
             self._update_pose()
         elif key in (Gdk.KEY_Home, Gdk.KEY_0):
@@ -371,16 +425,27 @@ class ModelPicture(Gtk.Overlay):
         return not self.motion.active and (not self.ready or self.camera_hold or self.renderer.anchor_visible(name))
 
     def _update_pose(self):
-        self.renderer.set_orientation(self.motion.orientation)
-        self.renderer.set_zoom(self.motion.zoom)
+        orientation, zoom = self.motion.orientation, self.motion.zoom
+        if self.showcase:
+            orientation = quaternion_multiply(self.showcase.offset(), orientation)
+            zoom *= self.showcase.scale()
+        self.renderer.set_orientation(orientation)
+        self.renderer.set_zoom(zoom)
         if self.on_pose_changed:
             self.on_pose_changed()
 
     def _sync_playback(self):
-        active = (not self.disposed and self.get_mapped() and self.motion.active
-                  and not self.camera_hold and self._animations())
+        if self.showcase:
+            sway = self.ready and not self.disposed and self._animations()
+            if self.showcase.sway and not sway:
+                self._bake()  # Pause and reduced motion freeze the visible pose.
+            self.showcase.sway = sway
+        active = (not self.disposed and self.get_mapped() and not self.camera_hold and self._animations()
+                  and (self.motion.moving or bool(self.showcase and self.showcase.active)))
         if active and not self.ambient_tick_id:
             self.motion.suspend()
+            if self.showcase:
+                self.showcase.suspend()
             self.ambient_tick_id = self.add_tick_callback(self._tick)
         elif not active:
             self._stop_ambient()
@@ -389,8 +454,12 @@ class ModelPicture(Gtk.Overlay):
         now = clock.get_frame_time() / 1_000_000
         if now + .0001 < self.next_frame:
             return GLib.SOURCE_CONTINUE
-        self.next_frame = now + 1 / 60
         active = self.motion.advance(now)
+        if self.showcase and not self.motion.dragging:
+            active = self.showcase.advance(now) or active
+        # The slow sway alone looks identical at 30 fps and costs half the work.
+        steady = self.showcase and self.showcase.steady and not self.motion.moving
+        self.next_frame = now + (1 / 30 if steady else 1 / 60)
         self._update_pose()
         if not active:
             self.ambient_tick_id = 0
@@ -404,6 +473,8 @@ class ModelPicture(Gtk.Overlay):
             self.ambient_tick_id = 0
         self.motion.suspend()
         self.motion.end_drag()
+        if self.showcase:
+            self.showcase.suspend()
         if self.interactive:
             self.set_cursor_from_name('grab' if self.ready else 'default')
         self.next_frame = 0.0

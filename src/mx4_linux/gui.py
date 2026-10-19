@@ -79,6 +79,8 @@ class ControlWindow(Adw.ApplicationWindow):
         status_bar.append(self.spinner)
         self.status = Gtk.Label(label="Reading connected devices…", xalign=0,
                                  wrap=True, selectable=True, hexpand=True)
+        # Selectable for copying errors, but never a focus stop that highlights itself.
+        self.status.set_focusable(False)
         self.status.add_css_class("dim-label")
         status_bar.append(self.status)
         self.cancel_device = Gtk.Button(label="Cancel operation", visible=False, valign=Gtk.Align.CENTER)
@@ -420,15 +422,8 @@ class ControlWindow(Adw.ApplicationWindow):
             self.shell.inspector = None
             self.shell.targets = {}
             denied = any(d.get("permission_denied") for d in result.get("diagnostics", []))
-            title = "Allow access to your mouse" if denied else "Connect an MX Master 4"
-            detail = "Apply device access with ./scripts/install-udev-rule.sh, then click Check again." if denied else "Connect with a Logi Bolt receiver or Bluetooth, wake the mouse, then refresh."
-            empty = Adw.StatusPage(title=title, description=detail, icon_name="input-mouse-symbolic")
-            retry = Gtk.Button(label="Check again", halign=Gtk.Align.CENTER)
-            retry.add_css_class("suggested-action")
-            retry.connect("clicked", lambda *_: self.reload())
-            empty.set_child(retry)
-            self.controls.append(empty)
             diagnostics = "\n".join(f"{d.get('path', '')}: {d['message']}" for d in result.get("diagnostics", []))
+            self.controls.append(self.shell.build_connect_page("denied" if denied else "missing", diagnostics))
             self.status.set_text(diagnostics or "No accessible MX Master 4 found.")
         else:
             selected = next((d for d in self.devices if d["id"] == self.selected_id), None)
@@ -441,8 +436,8 @@ class ControlWindow(Adw.ApplicationWindow):
                 self.selected_target = None
                 self.shell.inspector = None
                 self.shell.targets = {}
-                self.controls.append(Adw.StatusPage(title="Wake your mouse", description="The mouse is asleep or offline. Wake it and refresh.", icon_name="input-mouse-symbolic"))
-                self.status.set_text("Mouse is asleep or offline. Wake it and refresh.")
+                self.controls.append(self.shell.build_connect_page("offline"))
+                self.status.set_text("Mouse is asleep or offline. Wake it, then check again.")
             else:
                 self.render_workspace()
                 self.wheel.set_visible(True)
@@ -497,7 +492,7 @@ class ControlWindow(Adw.ApplicationWindow):
             uncertain = (self.desktop.session.process is not None and not self.desktop.session.running
                          and not self.desktop.session.stopping and self.desktop.restoration_confirmed is not True)
             blocked = bool(self.desktop.error or self.desktop.reacquire_blocked or uncertain)
-            self.integration_warning.set_title(self.desktop.message)
+            self.integration_warning.set_title(f"[!]  {self.desktop.message}")
             self.integration_warning.set_revealed(blocked)
         if self.desktop_status:
             self.desktop_status.set_subtitle(self.desktop.message)
@@ -957,9 +952,16 @@ class ControlWindow(Adw.ApplicationWindow):
         while child := self.profile_controls.get_first_child():
             self.profile_controls.remove(child)
         if not self.current or not self.current.get("online"):
-            self.profile_controls.append(Adw.StatusPage(title="Connect your mouse to use profiles",
-                                                       description="Profiles save settings from a connected, awake mouse.",
-                                                       icon_name="input-mouse-symbolic"))
+            notice = Gtk.Box(spacing=12)
+            notice.add_css_class("mx4-prompt")
+            text = Gtk.Label(label="Connect and wake your mouse to save or apply profiles.", xalign=0, wrap=True, hexpand=True)
+            text.add_css_class("mx4-prompt-text")
+            notice.append(text)
+            retry = Gtk.Button(label="Check again", valign=Gtk.Align.CENTER)
+            retry.add_css_class("mx4-secondary")
+            retry.connect("clicked", lambda *_: self.reload())
+            notice.append(retry)
+            self.profile_controls.append(notice)
             return
         group = Adw.PreferencesGroup(title="Profiles", description="Save current settings and apply them manually. Haptic playback is excluded.")
         self.profile_controls.append(group)

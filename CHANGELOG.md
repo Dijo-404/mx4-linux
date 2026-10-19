@@ -13,6 +13,7 @@ User-visible changes are recorded here. This project follows semantic versioning
 - Finite ring transitions and selection feedback that honor the desktop's reduced-motion preference.
 - GitHub CI for Python 3.11/3.14, Node 22/24, package installation and native GTK smoke checks; validated release archives and checksums.
 - Development checks, contribution conventions and issue/PR templates.
+- Home mouse model presentation: an entrance turn, a slow idle sway, pointer-follow lean and coasting after a released drag; all pause with the animation toggle and honor reduced motion.
 
 ### Improved
 
@@ -21,6 +22,9 @@ User-visible changes are recorded here. This project follows semantic versioning
 - Setting changes update the confirmed value without a complete follow-up discovery scan; saving profiles keeps existing device data.
 - Ring rendering reuses native labels and controls, reducing work during animation.
 - Hardware writes and listener startup address the selected receiver slot; setting writes construct only the needed capabilities while preserving live validation and readback.
+- Product-studio rendering of the 3D mouse: environment reflections, specular occlusion, the emissive status LED and a soft contact shadow that follows the real silhouette.
+- Home card restyled as a status surface with key hints; paired primary/secondary actions, uniform 36 px controls and aligned sidebar, footer and inspector controls.
+- No-device, access-denied and asleep states show the live model, a status line, numbered next steps, Check again / Setup guide and collapsible diagnostics; device-only header controls hide while no mouse is awake.
 - Bounded optional paired-node discovery removes repeated one-second waits; event bursts share a GTK dispatch while preserving movement and release order.
 
 ## [0.2.0] — unreleased baseline

@@ -163,6 +163,7 @@ class ModelData:
         self.primitives = []
         self.nodes = {}
         points = []
+        samples = []
         visited = set()
 
         def visit(index, parent):
@@ -199,6 +200,8 @@ class ModelData:
                     low = tuple(min(p[k] for p in coordinates) for k in range(3))
                     high = tuple(max(p[k] for p in coordinates) for k in range(3))
                     points.extend(transform(matrix, p) for p in itertools.product(*zip(low, high)))
+                    # A sparse surface sample lets the renderer follow the true silhouette cheaply.
+                    samples.extend(transform(matrix, p) for p in coordinates[::max(1, len(coordinates) // 120)])
             for child in node.get('children', []):
                 visit(child, matrix)
 
@@ -210,6 +213,7 @@ class ModelData:
         high = tuple(max(p[k] for p in points) for k in range(3))
         self.center = tuple((a+b)/2 for a, b in zip(low, high))
         self.bounds = (low, high)
+        self.samples = tuple(tuple(a-b for a, b in zip(p, self.center)) for p in samples)
         for image in doc.get('images', []):
             if 'uri' in image or image.get('mimeType') not in ('image/png', 'image/jpeg'):
                 raise ValueError('Only embedded PNG/JPEG images are supported')
@@ -280,6 +284,24 @@ def project_point(point, center, orientation, zoom=1., aspect=1.):
     centered = tuple(a-b for a, b in zip(point, center))
     x, y, _ = transform(rotation_matrix(orientation), centered, 0.)
     return (.5+x*zoom/(EXTENT*max(1., aspect)), .5-y*zoom/(EXTENT*max(1., 1/aspect)))
+
+
+def contact_shadow(samples, orientation, zoom=1., aspect=1.):
+    """Clip-space (cx, cy, rx, ry) of a soft floor shadow under the posed model.
+
+    The floor stays fixed below the camera while the product turns, so the
+    ellipse follows the lowest visible part of the actual silhouette.
+    """
+    r = rotation_matrix(orientation)
+    points = [(r[0]*x + r[1]*y + r[2]*z, r[4]*x + r[5]*y + r[6]*z) for x, y, z in samples]
+    low = min(y for _, y in points)
+    high = max(y for _, y in points)
+    base = [x for x, y in points if y <= low + .3 * (high - low)]
+    left, right = min(x for x, _ in points), max(x for x, _ in points)
+    sx = 2 * zoom / (EXTENT * max(1., aspect))
+    sy = 2 * zoom / (EXTENT * max(1., 1 / aspect))
+    half = max((max(base) - min(base)) / 2, (right - left) * .3) * 1.12
+    return ((min(base) + max(base)) / 2 * sx, low * sy, half * sx, half * .2 * sy)
 
 
 @lru_cache(maxsize=1)

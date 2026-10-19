@@ -10,7 +10,7 @@ from ctypes.util import find_library
 import logging
 import math
 
-from .gltf_model import EXTENT, POSES, load_model, rotation_matrix
+from .gltf_model import EXTENT, POSES, contact_shadow, load_model, rotation_matrix
 from .gtk_support import Gdk, Gtk
 
 import gi
@@ -54,28 +54,35 @@ in vec3 vPosition;
 uniform sampler2D baseMap;
 uniform sampler2D normalMap;
 uniform sampler2D ormMap;
+uniform sampler2D emissiveMap;
 uniform vec4 baseFactor;
 uniform vec2 materialFactors;
+uniform vec3 emissiveFactor;
 uniform bool transparent;
 out vec4 color;
 const float PI = 3.14159265359;
-vec3 light(vec3 n, vec3 v, vec3 l, vec3 radiance, vec3 albedo, float metal, float rough) {
-    vec3 h = normalize(v + l);
-    float nl = max(dot(n,l),0.0);
-    float nv = max(dot(n,v),0.001);
-    float nh = max(dot(n,h),0.0);
-    float vh = max(dot(v,h),0.0);
-    // Broad studio sources retain soft reflections even on polished wheels.
-    float a = max(rough * rough, 0.12);
-    float a2 = a*a;
-    float d = a2 / max(PI * pow(nh*nh*(a2-1.0)+1.0,2.0),0.001);
-    float k = pow(rough+1.0,2.0)/8.0;
-    float g = nv/(nv*(1.0-k)+k) * nl/(nl*(1.0-k)+k);
-    vec3 f0 = mix(vec3(0.04),albedo,metal);
-    vec3 f = f0+(1.0-f0)*pow(1.0-vh,5.0);
-    vec3 spec = d*g*f/max(4.0*nv*nl,0.001);
-    vec3 diffuse = (1.0-f)*(1.0-metal)*albedo/PI;
-    return (diffuse+spec)*radiance*nl;
+const vec3 KEY = vec3(-0.42, 0.78, 0.46);
+// A Gaussian softbox that widens with roughness while keeping its energy.
+float box(vec3 r, vec3 d, float size, float rough) {
+    float w = size*size + rough*rough;
+    return exp(-2.0*(1.0-dot(r,normalize(d)))/w) * size*size/w;
+}
+// Procedural photo studio in view space: dark floor, soft ceiling, an overhead
+// key, a right strip and a rear kicker that outlines the silhouette.
+vec3 studio(vec3 r, float rough) {
+    float spread = 0.55 + rough;
+    vec3 env = mix(vec3(0.03,0.028,0.028), vec3(0.62,0.62,0.64), smoothstep(-spread, spread, r.y));
+    env += vec3(3.4,3.35,3.3) * box(r, KEY, 0.48, rough);
+    env += vec3(1.5) * box(r, vec3(0.15,0.10,1.0), 0.62, rough);
+    env += vec3(1.9,1.92,2.0) * box(r, vec3(0.95,0.18,0.05), 0.20, rough);
+    env += vec3(1.5) * box(r, vec3(-0.30,0.45,-1.0), 0.32, rough);
+    return env;
+}
+// Split-sum environment BRDF fit (Karis 2014): no lookup texture required.
+vec2 envBRDF(float rough, float nv) {
+    vec4 r = rough*vec4(-1.0,-0.0275,-0.572,0.022) + vec4(1.0,0.0425,1.04,-0.04);
+    float a = min(r.x*r.x, exp2(-9.28*nv))*r.x + r.y;
+    return vec2(-1.04,1.04)*a + r.zw;
 }
 vec3 filmic(vec3 x) {
     return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0);
@@ -87,7 +94,7 @@ void main() {
     vec4 base = texture(baseMap,vUV)*baseFactor;
     vec3 albedo = pow(base.rgb,vec3(2.2));
     vec3 orm = texture(ormMap,vUV).rgb;
-    float rough = clamp(orm.g*materialFactors.y,0.08,1.0);
+    float rough = clamp(orm.g*materialFactors.y,0.06,1.0);
     float metal = clamp(orm.b*materialFactors.x,0.0,1.0);
     vec3 n = normalize(vNormal);
     vec3 t = normalize(vTangent-n*dot(n,vTangent));
@@ -95,16 +102,42 @@ void main() {
     n = normalize(mat3(t,b,n)*(texture(normalMap,vUV).xyz*2.0-1.0));
     if (!gl_FrontFacing) n = -n;
     vec3 v = vec3(0.0,0.0,1.0);
-    // Fixed neutral studio lighting makes the shape readable throughout a turn.
-    float hemisphere = 0.60 + 0.20*max(n.y,0.0) + 0.14*max(n.z,0.0);
-    vec3 ambient = albedo*hemisphere*mix(1.0,0.85,metal)*mix(0.45,1.0,orm.r);
-    vec3 lit = ambient;
-    lit += light(n,v,normalize(vec3(-0.65,0.85,1.4)),vec3(2.6),albedo,metal,rough);
-    lit += light(n,v,normalize(vec3(1.0,0.2,0.7)),vec3(1.2),albedo,metal,rough);
-    lit += light(n,v,normalize(vec3(-0.25,-0.8,0.6)),vec3(0.65),albedo,metal,rough);
+    float nv = max(dot(n,v),1e-4);
+    vec3 f0 = mix(vec3(0.04),albedo,metal);
+    vec2 ab = envBRDF(rough, nv);
+    float ao = orm.r;
+    // Lagarde's specular occlusion keeps crevices from mirroring the studio.
+    float specAO = clamp(pow(nv+ao, exp2(-16.0*rough-1.0)) - 1.0 + ao, 0.0, 1.0);
+    vec3 lit = albedo*(1.0-metal)*studio(n,1.0)*ao;
+    lit += studio(reflect(-v,n), rough)*(f0*ab.x+ab.y)*specAO;
+    // One crisp direct highlight from the key's direction adds sparkle on gloss.
+    vec3 l = normalize(KEY);
+    vec3 h = normalize(v+l);
+    float a2 = pow(max(rough*rough,0.03),2.0);
+    float d = a2/(PI*pow(max(dot(n,h),0.0)*max(dot(n,h),0.0)*(a2-1.0)+1.0,2.0));
+    lit += vec3(0.9)*d*(f0+(1.0-f0)*pow(1.0-max(dot(v,h),0.0),5.0))*max(dot(n,l),0.0)*0.25*specAO;
+    lit += pow(texture(emissiveMap,vUV).rgb,vec3(2.2))*emissiveFactor*1.6;
     float alpha = transparent ? base.a : 1.0;
     if (alpha < 0.01) discard;
-    color = vec4(srgb(filmic(lit * 0.82))*alpha,alpha);
+    color = vec4(srgb(filmic(lit*1.3))*alpha,alpha);
+}
+'''
+SHADOW_VERTEX = '''#version 330 core
+out vec2 position;
+void main() {
+    position = vec2(gl_VertexID & 1, gl_VertexID >> 1)*2.0-1.0;
+    gl_Position = vec4(position, 0.0, 1.0);
+}
+'''
+SHADOW_FRAGMENT = '''#version 330 core
+in vec2 position;
+uniform vec4 ellipse;
+out vec4 color;
+void main() {
+    vec2 d = (position-ellipse.xy)/ellipse.zw;
+    float r = dot(d,d);
+    // Wide penumbra plus a tighter contact core, premultiplied black.
+    color = vec4(0.0,0.0,0.0, 0.16*exp(-r*1.6) + 0.30*exp(-r*7.0));
 }
 '''
 
@@ -137,7 +170,7 @@ class GL:
             'ClearColor': (None, f, f, f, f), 'Clear': (None, u),
             'Enable': (None, u), 'Disable': (None, u), 'DepthFunc': (None, u),
             'DepthMask': (None, b), 'BlendFunc': (None, u, u),
-            'DrawElements': (None, u, i, u, p), 'GetError': (u,),
+            'DrawElements': (None, u, i, u, p), 'DrawArrays': (None, u, i, i), 'GetError': (u,),
             'ReadPixels': (None, i, i, i, i, u, u, p),
             'GetIntegerv': (None, u, p), 'GenFramebuffers': (None, i, p),
             'BindFramebuffer': (None, u, u), 'DeleteFramebuffers': (None, i, p),
@@ -166,12 +199,12 @@ class GL:
             raise RuntimeError(message.value.decode(errors='replace'))
         return shader
 
-    def program(self):
+    def program(self, vertex=VERTEX_SHADER, fragment=FRAGMENT_SHADER):
         shaders = []
         program = 0
         try:
-            shaders.append(self.shader(0x8B31, VERTEX_SHADER))
-            shaders.append(self.shader(0x8B30, FRAGMENT_SHADER))
+            shaders.append(self.shader(0x8B31, vertex))
+            shaders.append(self.shader(0x8B30, fragment))
             program = self.CreateProgram()
             for shader in shaders:
                 self.AttachShader(program, shader)
@@ -212,6 +245,8 @@ class ModelRenderer(Gtk.GLArea):
         self.model = None
         self.gl = None
         self.program = 0
+        self.shadow_program = 0
+        self.shadow_vao = C.c_uint()
         self.buffer = C.c_uint()
         self.vertex_arrays = []
         self.textures = {}
@@ -272,11 +307,14 @@ class ModelRenderer(Gtk.GLArea):
             self.model = load_model()
             self.gl = gl = GL()
             self.program = gl.program()
+            self.shadow_program = gl.program(SHADOW_VERTEX, SHADOW_FRAGMENT)
+            self.locations['ellipse'] = gl.GetUniformLocation(self.shadow_program, b'ellipse')
+            gl.GenVertexArrays(1, C.byref(self.shadow_vao))
             maximum = C.c_int()
             gl.GetIntegerv(0x8D57, C.byref(maximum))
             self.samples = min(4, maximum.value)
             for name in ('node', 'rotation', 'center', 'scale', 'baseMap', 'normalMap', 'ormMap',
-                         'baseFactor', 'materialFactors', 'transparent'):
+                         'emissiveMap', 'baseFactor', 'materialFactors', 'emissiveFactor', 'transparent'):
                 self.locations[name] = gl.GetUniformLocation(self.program, name.encode())
             gl.GenBuffers(1, C.byref(self.buffer))
             gl.BindBuffer(0x8892, self.buffer.value)
@@ -303,7 +341,7 @@ class ModelRenderer(Gtk.GLArea):
                 material = self.model.materials[primitive.material]
                 pbr = material.get('pbrMetallicRoughness', {})
                 for texture in (pbr.get('baseColorTexture'), material.get('normalTexture'),
-                                pbr.get('metallicRoughnessTexture')):
+                                pbr.get('metallicRoughnessTexture'), material.get('emissiveTexture')):
                     if texture and texture['index'] not in self.textures:
                         self._upload_texture(texture['index'])
             gl.BindVertexArray(0)
@@ -403,10 +441,17 @@ class ModelRenderer(Gtk.GLArea):
             gl.Disable(0x0B44)
             gl.Enable(0x0BE2)
             gl.BlendFunc(1, 0x0303)  # Premultiplied alpha, including the GTK texture.
+            aspect = width/height
+            # The floor shadow is drawn first, beneath the product and its depth.
+            gl.Disable(0x0B71)
+            gl.UseProgram(self.shadow_program)
+            gl.Uniform4f(loc['ellipse'], *contact_shadow(self.model.samples, self.orientation, self.zoom, aspect))
+            gl.BindVertexArray(self.shadow_vao.value)
+            gl.DrawArrays(5, 0, 4)
+            gl.Enable(0x0B71)
             gl.UseProgram(self.program)
             self._matrix('rotation', rotation_matrix(self.orientation))
             gl.Uniform3f(loc['center'], *self.model.center)
-            aspect = width/height
             gl.Uniform2f(loc['scale'], 2*self.zoom/(EXTENT*max(1., aspect)),
                          2*self.zoom/(EXTENT*max(1., 1/aspect)))
             for vao, primitive in self.vertex_arrays:
@@ -419,9 +464,13 @@ class ModelRenderer(Gtk.GLArea):
                 gl.DepthMask(not transparent)
                 gl.Uniform4f(loc['baseFactor'], *pbr.get('baseColorFactor', (1., 1., 1., 1.)))
                 gl.Uniform2f(loc['materialFactors'], pbr.get('metallicFactor', 1.), pbr.get('roughnessFactor', 1.))
+                emissive = material.get('emissiveTexture')
+                gl.Uniform3f(loc['emissiveFactor'], *(material.get('emissiveFactor', (0., 0., 0.)) if emissive
+                                                      else (0., 0., 0.)))
                 for unit, (uniform, spec) in enumerate((('baseMap', pbr.get('baseColorTexture')),
                                                         ('normalMap', material.get('normalTexture')),
-                                                        ('ormMap', pbr.get('metallicRoughnessTexture')))):
+                                                        ('ormMap', pbr.get('metallicRoughnessTexture')),
+                                                        ('emissiveMap', emissive))):
                     gl.ActiveTexture(0x84C0+unit)
                     gl.BindTexture(0x0DE1, self.textures[spec['index']].value if spec else 0)
                     gl.Uniform1i(loc[uniform], unit)
@@ -464,10 +513,15 @@ class ModelRenderer(Gtk.GLArea):
             gl.DeleteBuffers(1, C.byref(self.buffer))
         if self.program:
             gl.DeleteProgram(self.program)
+        if self.shadow_program:
+            gl.DeleteProgram(self.shadow_program)
+        if self.shadow_vao.value:
+            gl.DeleteVertexArrays(1, C.byref(self.shadow_vao))
         self.textures.clear()
         self.vertex_arrays.clear()
         self.buffer = C.c_uint()
-        self.program = 0
+        self.program = self.shadow_program = 0
+        self.shadow_vao = C.c_uint()
         self.ready = False
         self.gl = None
 
@@ -484,7 +538,8 @@ class ModelRenderer(Gtk.GLArea):
             self.textures.clear()
             self.vertex_arrays.clear()
             self.buffer = C.c_uint()
-            self.program = 0
+            self.program = self.shadow_program = 0
+            self.shadow_vao = C.c_uint()
             self.ready = False
             self.gl = None
 

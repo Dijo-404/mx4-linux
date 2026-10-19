@@ -146,7 +146,7 @@ class ReferenceShell:
         self.utility_buttons = []
         menu_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
                                margin_start=8, margin_end=8, margin_top=8, margin_bottom=8)
-        for text, route, icon in [('Smart Actions', 'smart-actions', 'emblem-ok-symbolic'),
+        for text, route, icon in [('Smart Actions', 'smart-actions', 'view-list-ordered-symbolic'),
                                   ('Actions Ring', 'ring', 'view-grid-symbolic'),
                                   ('Application Settings', 'application', 'emblem-system-symbolic')]:
             item = button(text, lambda route=route: window.navigate(route), icon=icon)
@@ -237,6 +237,8 @@ class ReferenceShell:
         home = page_box()
         home.add_css_class('mx4-home')
         self.add_device_button = button('Add device', self.window.add_device)
+        self.add_device_button.set_child(Adw.ButtonContent(icon_name='list-add-symbolic', label='Add device'))
+        self.add_device_button.add_css_class('mx4-secondary')
         self.header.pack_end(self.add_device_button)
         self.updating_devices = False
         self.device_result = {'devices': [], 'diagnostics': []}
@@ -246,55 +248,70 @@ class ReferenceShell:
         self.device_chooser_row.append(label('Mouse'))
         self.device_chooser_row.append(self.device_selector)
         home.append(self.device_chooser_row)
-        if self.window.demo:
-            preview = label('[preview]  Simulated device controls', 'mx4-preview-badge')
-            preview.set_halign(Gtk.Align.START)
-            home.append(preview)
-        grid = Gtk.Box(spacing=32, vexpand=True, valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER)
-        self.device_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        grid = Gtk.Box(spacing=48, vexpand=True, valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER)
+        # The one dark surface: a product "terminal" with a status line and key hints.
+        self.device_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.device_card.add_css_class('device-card')
         self.device_card.update_property([Gtk.AccessibleProperty.LABEL], ['MX Master 4'])
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        top = Gtk.Box(spacing=12)
+        self.home_name = label('MX Master 4', 'mx4-card-title')
+        self.home_name.set_hexpand(True)
+        self.home_name.set_wrap(False)
+        self.home_name.set_ellipsize(Pango.EllipsizeMode.END)
+        top.append(self.home_name)
+        self.home_battery = label('Reading battery…', 'mx4-card-meta')
+        self.home_battery.set_wrap(False)
+        top.append(self.home_battery)
+        self.device_card.append(top)
         image = ModelPicture(interactive=True)
         self.home_picture = image
         image.set_filename(str(ASSETS / 'overview.png'))
-        image.set_size_request(320, 320)
-        self.home_name = label('MX Master 4', 'title-3')
-        self.home_name.set_halign(Gtk.Align.CENTER)
-        card.append(self.home_name)
-        card.append(image)
-        model_hint = label('Drag to rotate · Scroll to zoom', 'mx4-subtle')
-        model_hint.set_halign(Gtk.Align.CENTER)
-        card.append(model_hint)
+        image.set_size_request(380, 330)
+        self.device_card.append(image)
+        status = Gtk.Box(spacing=12)
+        status.add_css_class('mx4-prompt')
+        self.home_connection = label('', 'mx4-prompt-text')
+        self.home_connection.set_hexpand(True)
+        self.home_connection.set_wrap(False)
+        self.home_connection.set_ellipsize(Pango.EllipsizeMode.END)
+        status.append(self.home_connection)
+        self.home_integration = label('', 'mx4-prompt-token')
+        self.home_integration.set_wrap(False)
+        status.append(self.home_integration)
+        self.device_card.append(status)
+        hints = Gtk.Box(spacing=16)
+        hints.add_css_class('mx4-hints')
+        for key, action in (('drag', 'rotate'), ('scroll', 'zoom')):
+            pair = Gtk.Box(spacing=6)
+            pair.append(label(key, 'mx4-key'))
+            pair.append(label(action, 'mx4-key-hint'))
+            hints.append(pair)
+        hints.append(Gtk.Box(hexpand=True))
         reset = button('Reset view', image.reset_view)
-        reset.add_css_class('flat')
-        reset.set_halign(Gtk.Align.CENTER)
-        card.append(reset)
-        self.home_battery = label('Reading battery…', 'battery-chip')
-        self.home_battery.set_halign(Gtk.Align.CENTER)
-        card.append(self.home_battery)
-        self.home_integration = label('', 'mx4-subtle')
-        self.home_integration.set_halign(Gtk.Align.CENTER)
-        card.append(self.home_integration)
-        hint = button('Customize mouse ->', lambda: self.window.navigate('buttons'))
-        hint.add_css_class('mx4-card-link')
-        hint.add_css_class('flat')
-        hint.set_halign(Gtk.Align.CENTER)
-        card.append(hint)
-        self.device_card.append(card)
+        reset.set_child(Adw.ButtonContent(icon_name='view-refresh-symbolic', label='Reset'))
+        reset.set_tooltip_text('Reset view · Home or 0')
+        reset.add_css_class('mx4-hint-button')
+        hints.append(reset)
+        self.device_card.append(hints)
         grid.append(self.device_card)
-        note = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER)
+        note = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20, valign=Gtk.Align.CENTER)
         note.add_css_class('mx4-home-note')
-        note.append(label('[ your setup ]', 'mx4-eyebrow'))
+        note.append(label('[ preview ]  simulated device' if self.window.demo else '[ your setup ]', 'mx4-eyebrow'))
         note.append(label('Make every\nmove yours.', 'mx4-hero-title'))
-        detail = label('Fine-tune the feel. Personalize each button.\nBring your everyday actions closer.', 'mx4-subtle')
-        detail.set_max_width_chars(34)
+        detail = label('Fine-tune the feel. Personalize each button. Bring your everyday actions closer.', 'mx4-lede')
+        detail.set_max_width_chars(38)
         note.append(detail)
-        start = button('Explore your mouse', lambda: self.window.navigate('guide'))
+        # Equal halves keep both edges flush with the shortcut list below.
+        actions = Gtk.Box(spacing=12, homogeneous=True)
+        start = button('Customize mouse', lambda: self.window.navigate('buttons'))
         start.add_css_class('suggested-action')
-        start.set_halign(Gtk.Align.START)
-        note.append(start)
-        shortcuts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        actions.append(start)
+        guide = button('Feature guide', lambda: self.window.navigate('guide'))
+        guide.add_css_class('mx4-secondary')
+        actions.append(guide)
+        note.append(actions)
+        shortcuts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        shortcuts.add_css_class('mx4-quick-links')
         for title, detail, route in [
             ('Actions Ring', 'Your shortcuts, one gesture away', 'ring'),
             ('Smart Actions', 'Make a routine out of repeat tasks', 'smart-actions'),
@@ -307,7 +324,9 @@ class ReferenceShell:
             copy.append(label(title, 'heading'))
             copy.append(label(detail, 'mx4-subtle'))
             content.append(copy)
-            content.append(label('->', 'mx4-nav-marker'))
+            arrow = label('->', 'mx4-nav-marker')
+            arrow.add_css_class('mx4-arrow')
+            content.append(arrow)
             shortcut.set_child(content)
             shortcuts.append(shortcut)
         note.append(shortcuts)
@@ -396,6 +415,94 @@ class ReferenceShell:
         body.append(button('All set · Home', lambda: self.window.navigate('home')))
         self.stack.add_named(scroll(Adw.Clamp(child=body, maximum_size=760)), 'guide')
 
+    def build_connect_page(self, kind, diagnostics=''):
+        """Disconnected states keep the home card's language: a live model, a status line and next steps."""
+        title, eyebrow, lede, status, token, steps = {
+            'missing': ('Connect your\nMX Master 4', '[ no device ]',
+                        'MX4 Linux looks for the mouse through a Logi Bolt receiver or Bluetooth. '
+                        'Checking never changes a setting.',
+                        'No MX Master 4 found', '○ not connected',
+                        [('Switch it on', 'The power switch is on the underside.'),
+                         ('Pair it', 'Use your Bluetooth settings, or plug in a Logi Bolt receiver.'),
+                         ('Wake it', 'Move or click the mouse, then check again.')]),
+            'denied': ('Allow access to\nyour mouse', '[ access needed ]',
+                       'The mouse is connected, but this account cannot open its device node yet.',
+                       'Device access denied', '○ no access',
+                       [('Install access', './scripts/install-udev-rule.sh'),
+                        ('Reconnect', 'Replug the receiver or toggle Bluetooth so the rule applies.'),
+                        ('Check again', 'Settings are read only; nothing is written.')]),
+            'offline': ('Wake your\nmouse', '[ asleep ]',
+                        'The mouse is paired but not responding. It sleeps after a few idle minutes.',
+                        (self.window.current or {}).get('name', 'MX Master 4'), '○ asleep',
+                        [('Wake it', 'Move or click the mouse.'),
+                         ('Charge it', 'Connect the USB-C cable if the battery may be empty.'),
+                         ('Check again', 'Settings appear as soon as the mouse answers.')]),
+        }[kind]
+        if getattr(self, 'connect_picture', None):
+            self.connect_picture.dispose_art()
+        page = Gtk.Box(spacing=48, valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER,
+                       margin_start=24, margin_end=24, margin_top=24, margin_bottom=24)
+        page.set_orientation(Gtk.Orientation.VERTICAL if self.narrow else Gtk.Orientation.HORIZONTAL)
+        self.connect_grid = page
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, valign=Gtk.Align.CENTER)
+        card.add_css_class('device-card')
+        card.add_css_class('mx4-waiting')
+        picture = ModelPicture(interactive=True)
+        picture.set_filename(str(ASSETS / 'overview.png'))
+        picture.set_size_request(300, 280)
+        picture.set_motion_enabled(self.motion_enabled)
+        self.connect_picture = picture
+        card.append(picture)
+        line = Gtk.Box(spacing=12)
+        line.add_css_class('mx4-prompt')
+        text = label(status, 'mx4-prompt-text')
+        text.set_wrap(False)
+        text.set_hexpand(True)
+        text.set_ellipsize(Pango.EllipsizeMode.END)
+        line.append(text)
+        line.append(label(token, 'mx4-prompt-token'))
+        card.append(line)
+        page.append(card)
+        note = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20, valign=Gtk.Align.CENTER)
+        note.append(label(eyebrow, 'mx4-eyebrow'))
+        note.append(label(title, 'mx4-hero-title'))
+        lede = label(lede, 'mx4-lede')
+        lede.set_max_width_chars(40)
+        note.append(lede)
+        rows = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        rows.add_css_class('mx4-quick-links')
+        for number, (step, detail) in enumerate(steps, 1):
+            row = Gtk.Box(spacing=12)
+            row.add_css_class('mx4-step')
+            marker = label(f'[{number}]', 'mx4-nav-marker')
+            marker.set_valign(Gtk.Align.START)
+            marker.set_margin_top(2)  # Optical baseline with the larger step title.
+            row.append(marker)
+            copy = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3, hexpand=True)
+            copy.append(label(step, 'heading'))
+            detail_label = label(detail, 'mx4-subtle')
+            detail_label.set_selectable(detail.startswith('./'))
+            copy.append(detail_label)
+            row.append(copy)
+            rows.append(row)
+        note.append(rows)
+        actions = Gtk.Box(spacing=12, homogeneous=True)
+        retry = button('Check again', self.window.reload)
+        retry.add_css_class('suggested-action')
+        actions.append(retry)
+        help_button = button('Setup guide', self.window.open_support)
+        help_button.add_css_class('mx4-secondary')
+        actions.append(help_button)
+        note.append(actions)
+        if diagnostics:
+            details = Gtk.Expander(label='Details')
+            report = label(diagnostics, 'mx4-diagnostics')
+            report.set_selectable(True)
+            details.set_child(report)
+            note.append(details)
+        page.append(note)
+        return scroll(page)
+
     def update_context(self):
         config = self.window.desktop.config or {}
         app_ids = sorted({p['app_id'] for p in config.get('assignment_profiles', {}).values() if p['app_id'] != '*'})
@@ -477,7 +584,9 @@ class ReferenceShell:
     def update_battery(self):
         device = self.window.current or {}
         text = device.get('battery') or 'Battery unavailable'
-        self.home_battery.set_text(f'{text}  ·  {self.connection_summary()}')
+        self.home_battery.set_text(text)
+        self.home_connection.set_text(self.connection_summary())
+        self.home_connection.set_tooltip_text(self.connection_summary())
         if hasattr(self, 'device_battery'):
             self.device_battery.set_text(text)
 
@@ -488,11 +597,19 @@ class ReferenceShell:
         if not device:
             self.home_name.set_text('Connect an MX Master 4')
             self.home_battery.set_text('No device available')
+            self.home_connection.set_text('Waiting for a mouse')
         else:
             self.home_name.set_text(device['name'])
             self.update_battery()
         self.device_selector.set_sensitive(len(self.window.devices) > 1 and not self.window.busy and not self.window.pending_hardware)
-        self.home_integration.set_text('Integration enabled' if self.window.desktop.session.running else 'Integration off')
+        running = self.window.desktop.session.running
+        self.home_integration.set_text('● integration on' if running else '○ integration off')
+        self.home_integration.update_property([Gtk.AccessibleProperty.LABEL],
+                                              ['Integration enabled' if running else 'Integration off'])
+        if running:
+            self.home_integration.add_css_class('on')
+        else:
+            self.home_integration.remove_css_class('on')
 
     def build_workspace(self):
         window = self.window
@@ -538,7 +655,15 @@ class ReferenceShell:
             nav.append(item)
             self.nav_buttons[route] = item
         nav.append(Gtk.Box(vexpand=True))
-        nav.append(button('Feature guide', lambda: window.navigate('guide')))
+        guide = button('Feature guide', lambda: window.navigate('guide'))
+        content = Gtk.Box(spacing=9)
+        marker = label('[?]', 'mx4-nav-marker')
+        marker.update_state([Gtk.AccessibleState.HIDDEN], [True])
+        content.append(marker)
+        content.append(label('Feature guide'))
+        guide.set_child(content)
+        guide.add_css_class('mx4-nav-secondary')
+        nav.append(guide)
         self.sidebar.set_child(nav)
         workspace.append(self.sidebar)
         art_column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True, vexpand=True)
@@ -564,6 +689,7 @@ class ReferenceShell:
         foot.append(self.device_battery)
         foot.append(Gtk.Box(hexpand=True))
         self.art_preview = button('Preview wheel', self.preview_art)
+        self.art_preview.add_css_class('mx4-secondary')
         foot.append(self.art_preview)
         art_column.append(foot)
         workspace.append(art_column)
@@ -797,8 +923,7 @@ class ReferenceShell:
         self.add_device_button.set_visible(route == 'home')
         self.heading.set_text('MX Master 4' if route in DEVICE_ROUTES else TITLES[route])
         self.stack.set_visible_child_name('device' if route in DEVICE_ROUTES else 'actions' if route in ('ring', 'smart-actions') else route)
-        self.context_reveal.set_reveal_child(self.narrow and route in ('buttons', 'point', 'haptics'))
-        self.header_context_reveal.set_reveal_child(not self.narrow and route in ('buttons', 'point', 'haptics'))
+        self.sync_context_reveal()
         if self.inspector is None or not window.current:
             return
         for key, item in self.nav_buttons.items():
@@ -870,11 +995,11 @@ class ReferenceShell:
                 self.add_device_button.set_icon_name('list-add-symbolic')
                 self.add_device_button.set_tooltip_text('Add device')
             else:
-                self.add_device_button.set_label('Add device')
+                self.add_device_button.set_child(Adw.ButtonContent(icon_name='list-add-symbolic', label='Add device'))
         if hasattr(self, "home_grid"):
             self.home_grid.set_orientation(Gtk.Orientation.VERTICAL if narrow else Gtk.Orientation.HORIZONTAL)
-            self.home_grid.set_spacing(20 if narrow else 32)
-            self.home_picture.set_size_request(260 if narrow else 320, 260 if narrow else 320)
+            self.home_grid.set_spacing(32 if narrow else 48)
+            self.home_picture.set_size_request(280 if narrow else 380, 260 if narrow else 330)
         if hasattr(self, "home_note"):
             self.home_note.set_visible(True)
         for item in self.utility_buttons:
@@ -884,8 +1009,16 @@ class ReferenceShell:
             self.compact_nav.set_visible(narrow)
             self.sidebar.set_reveal_child(not narrow and not bool(self.window.selected_target))
         if hasattr(self, 'compact_context'):
-            self.context_reveal.set_reveal_child(narrow and self.window.route in ('buttons', 'point', 'haptics'))
-            self.header_context_reveal.set_reveal_child(not narrow and self.window.route in ('buttons', 'point', 'haptics'))
+            self.sync_context_reveal()
+        if getattr(self, 'connect_grid', None):
+            self.connect_grid.set_orientation(Gtk.Orientation.VERTICAL if narrow else Gtk.Orientation.HORIZONTAL)
+
+    def sync_context_reveal(self):
+        # Assignment contexts only apply while an awake mouse is on screen.
+        current = self.window.current or {}
+        shown = bool(current.get('online')) and self.window.route in ('buttons', 'point', 'haptics')
+        self.context_reveal.set_reveal_child(self.narrow and shown)
+        self.header_context_reveal.set_reveal_child(not self.narrow and shown)
 
     def compact_navigate(self, dropdown, _property):
         index = dropdown.get_selected()
@@ -914,6 +1047,8 @@ class ReferenceShell:
         self.home_picture.set_motion_enabled(self.motion_enabled)
         if self.art:
             self.art.set_motion_enabled(self.motion_enabled)
+        if getattr(self, 'connect_picture', None):
+            self.connect_picture.set_motion_enabled(self.motion_enabled)
 
     def sync_local_preferences(self):
         if self.window.desktop.config is None:
@@ -942,6 +1077,8 @@ class ReferenceShell:
 
     def close(self):
         self.home_picture.dispose_art()
+        if getattr(self, 'connect_picture', None):
+            self.connect_picture.dispose_art()
         if self.art:
             self.art.dispose_art()
         self.animation_settings.disconnect(self.animation_handler)

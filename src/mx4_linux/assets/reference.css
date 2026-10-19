@@ -1,95 +1,153 @@
 /* Native interpretation of the supplied mono / warm-ink design reference.
- * GTK 4.12 compatible. JetBrains Mono ships with its OFL in assets/fonts. */
+ * GTK 4.12 compatible. JetBrains Mono ships with its OFL in assets/fonts.
+ *
+ * Metrics: every text control is 36px tall and every icon control a 36px
+ * square (32px in the header bar). GTK min sizes exclude padding and border,
+ * so all buttons carry a 1px border (transparent unless outlined) and filled,
+ * outlined and flat variants line up exactly. */
 window { font-family: "JetBrains Mono", "Berkeley Mono", "IBM Plex Mono", "Adwaita Mono", monospace; }
 .mx4-shell { background: #201d1d; color: #fdfcfc; font-size: 14px; }
-.mx4-shell button:not(.preview-ring-action):not(.surface-marker) { min-height: 30px; padding: 4px 12px; border-radius: 4px; }
-.mx4-shell button.image-button:not(.preview-ring-action):not(.surface-marker) { min-width: 30px; padding: 4px; }
-.mx4-shell dropdown > button { min-height: 30px; padding: 4px 10px; }
+
+/* Controls */
+/* Deliberately low specificity: every class-specific button rule overrides it. */
+.mx4-shell button { min-height: 26px; padding: 4px 14px; border: 1px solid transparent; border-radius: 4px; font-weight: 500; }
+.mx4-shell button.image-button { min-width: 26px; padding: 4px; }
+.mx4-shell dropdown > button { min-height: 26px; padding: 4px 10px; }
 .mx4-shell dropdown popover contents { padding: 6px; }
 .mx4-shell dropdown popover listview row { padding: 8px 10px; border-radius: 4px; }
 .mx4-shell dropdown popover searchentry { min-height: 32px; margin-bottom: 6px; }
-.mx4-shell headerbar { background: #201d1d; border: none; border-bottom: 1px solid #fdfcfc1f; box-shadow: none; padding: 4px 8px; }
-.mx4-shell headerbar button { min-height: 32px; min-width: 28px; border-radius: 4px; }
-.mx4-shell .mx4-heading { font-size: 22px; font-weight: 700; letter-spacing: 0; }
-.mx4-shell .mx4-inspector-heading { font-size: 18px; font-weight: 700; }
-.mx4-shell .mx4-hero-title { font-size: 36px; font-weight: 700; letter-spacing: -1px; }
-.mx4-shell.mx4-compact .mx4-hero-title { font-size: 28px; letter-spacing: 0; }
-.mx4-shell .mx4-eyebrow { color: #b9b5b5; font-size: 12px; font-weight: 500; letter-spacing: 0; }
-.mx4-shell .mx4-subtle, .mx4-shell .dim-label { color: #b9b5b5; opacity: 1; }
-.mx4-shell .mx4-context { border-bottom: 1px solid #fdfcfc1f; padding: 10px 18px; background: #201d1d; }
-.mx4-shell .mx4-sidebar { padding: 22px 12px 18px 18px; border-right: 1px solid #fdfcfc1f; }
-.mx4-shell .mx4-sidebar button { border-radius: 4px; padding: 14px 12px; font-weight: 500; background: transparent; box-shadow: none; }
-.mx4-shell .mx4-sidebar button:hover { background: #302c2c; }
-.mx4-shell .mx4-sidebar button.active { background: #f1eeee; color: #201d1d; border-color: transparent; }
-.mx4-shell .mx4-sidebar button.active:hover { background: #fdfcfc; }
-.mx4-shell .mx4-nav-marker { font-size: 12px; font-weight: 400; }
-.mx4-shell .mx4-stage { background: #201d1d; }
-.mx4-shell .mx4-inspector { background: #201d1d; border-left: 1px solid #fdfcfc26; }
-.mx4-shell .mx4-inspector-header { background: #302c2c; padding: 18px; border-bottom: 1px solid #fdfcfc1f; }
-.mx4-shell .mx4-inspector .preferences-group { margin-top: 12px; }
-.mx4-shell .mouse-callout { min-height: 30px; min-width: 0; padding: 4px 10px; border: 1px solid #777171; border-radius: 4px; background: #201d1df5; color: #fdfcfc; font-size: 12px; font-weight: 500; box-shadow: none; }
-.mx4-shell .mouse-callout:hover { background: #302c2c; border-color: #f1eeee; }
-.mx4-shell .mouse-callout.selected { background: #f1eeee; color: #201d1d; border-color: #77acdf; }
-.mx4-shell button, .mx4-shell dropdown { transition: background-color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms ease-out, color 160ms ease-out; }
+.mx4-shell dropdown button, .mx4-shell entry, .mx4-shell textview { border-radius: 4px; }
+.mx4-shell button, .mx4-shell dropdown {
+    transition: background-color 160ms cubic-bezier(.2,.8,.2,1), border-color 160ms ease-out, color 160ms ease-out;
+}
 /* Zoom the content within each stable native hit target. Keeping the button
  * allocation unchanged avoids moving neighboring controls or callout anchors. */
-.mx4-shell button:not(.device-card):not(.surface-marker):not(.preview-ring-action) > * {
+.mx4-shell button:not(.device-card):not(.surface-marker):not(.preview-ring-action):not(.mx4-quick-link) > * {
     transform: scale(1);
     transform-origin: center;
     transition: transform 160ms cubic-bezier(.2,.8,.2,1);
 }
-.mx4-shell button:not(.device-card):not(.surface-marker):not(.preview-ring-action):hover > * { transform: scale(1.035); }
-.mx4-shell button:focus-visible, .mx4-shell dropdown:focus-visible,
+.mx4-shell button:not(.device-card):not(.surface-marker):not(.preview-ring-action):not(.mx4-quick-link):hover > * { transform: scale(1.035); }
+.mx4-shell button:focus-visible, .mx4-shell dropdown:focus-visible, .mx4-shell .mouse-model:focus-visible,
 .mx4-shell entry:focus-within, .mx4-shell textview:focus-within { outline: 2px solid #77acdf; outline-offset: 3px; }
-.mx4-shell .device-card { background: #201d1d; color: #fdfcfc; border: 1px solid #777171; border-radius: 0; padding: 24px; box-shadow: none; }
-.mx4-shell .device-card:hover { border-color: #f1eeee; background: #242121; }
-.mx4-shell .device-card:active { background: #302c2c; border-color: #77acdf; }
-.mx4-shell .mx4-card-link { color: #f1eeee; font-weight: 500; margin-top: 8px; }
-.mx4-shell .battery-chip { background: transparent; color: #d4cece; border: 1px solid #646262; border-radius: 4px; padding: 7px 10px; font-size: 12px; font-weight: 400; }
-.mx4-shell .mx4-preview-badge { color: #b9b5b5; font-size: 12px; padding: 8px 0; }
-.mx4-shell .mx4-home-note { padding: 18px 0; }
-.mx4-shell .mx4-quick-link { padding: 14px 0; border-radius: 0; border: none; border-top: 1px solid #fdfcfc26; background: transparent; box-shadow: none; }
-.mx4-shell .mx4-quick-link:hover { background: #302c2c; }
-.mx4-shell .mx4-quick-link .mx4-subtle { font-size: 12px; font-weight: 400; }
-.mx4-shell .suggested-action { background: #f1eeee; color: #201d1d; font-weight: 500; border-radius: 4px; padding: 4px 14px; box-shadow: none; }
+.mx4-shell .suggested-action { background: #f1eeee; color: #201d1d; box-shadow: none; }
 .mx4-shell .suggested-action:hover { background: #fdfcfc; }
 .mx4-shell .suggested-action:active { background: #d4cece; }
 .mx4-shell .suggested-action:disabled { background: #302c2c; color: #9a9898; }
-.mx4-shell .mx4-status { border-top: 1px solid #fdfcfc1f; font-size: 12px; padding-top: 4px; }
+.mx4-shell .mx4-secondary { background: transparent; color: #fdfcfc; border-color: #646262; box-shadow: none; }
+.mx4-shell .mx4-secondary:hover { background: #302c2c; border-color: #9a9898; }
+.mx4-shell .mx4-secondary:active { background: #3a3535; }
+
+/* Header */
+.mx4-shell headerbar { background: #201d1d; border: none; border-bottom: 1px solid #fdfcfc1f; box-shadow: none; padding: 4px 8px; }
+.mx4-shell headerbar button:not(.mx4-secondary) { background: transparent; }
+.mx4-shell headerbar button:not(.mx4-secondary):hover { background: #302c2c; }
+.mx4-shell headerbar button { min-height: 22px; padding: 4px 12px; }
+.mx4-shell headerbar button.image-button { min-width: 22px; padding: 4px; }
+.mx4-shell .mx4-heading { font-size: 22px; font-weight: 700; letter-spacing: 0; }
+.mx4-shell .mx4-inspector-heading { font-size: 18px; font-weight: 700; }
+.mx4-shell .mx4-subtle, .mx4-shell .dim-label { color: #b9b5b5; opacity: 1; }
+.mx4-shell .mx4-context { border-bottom: 1px solid #fdfcfc1f; padding: 10px 18px; background: #201d1d; }
+
+/* Home */
+.mx4-shell .mx4-home { margin-top: 24px; }
+.mx4-shell .mx4-eyebrow { color: #9a9898; font-size: 12px; font-weight: 500; letter-spacing: 0; }
+.mx4-shell .mx4-hero-title { font-size: 38px; font-weight: 700; letter-spacing: -1px; }
+.mx4-shell.mx4-compact .mx4-hero-title { font-size: 30px; letter-spacing: 0; }
+.mx4-shell .mx4-lede { color: #b9b5b5; font-size: 16px; }
+.mx4-shell .device-card { background: #171414; color: #fdfcfc; border: 1px solid #fdfcfc1f; border-radius: 0; padding: 20px 24px 16px; }
+.mx4-shell .mx4-card-title { font-size: 16px; font-weight: 700; }
+.mx4-shell .mx4-card-meta { color: #9a9898; font-size: 12px; }
+.mx4-shell .mx4-prompt { background: #302c2c; border-left: 2px solid #9a9898; border-radius: 4px; padding: 9px 12px; }
+.mx4-shell .mx4-prompt-text { color: #fdfcfc; font-size: 13px; }
+.mx4-shell .mx4-prompt-token { color: #9a9898; font-size: 12px; }
+.mx4-shell .mx4-prompt-token.on { color: #30d158; }
+.mx4-shell .mx4-key { color: #fdfcfc; font-size: 12px; font-weight: 500; }
+.mx4-shell .mx4-key-hint { color: #9a9898; font-size: 12px; }
+.mx4-shell .device-card button.mx4-hint-button { min-height: 20px; padding: 3px 8px; background: transparent; color: #9a9898; font-size: 12px; box-shadow: none; }
+.mx4-shell .device-card button.mx4-hint-button:hover { background: #302c2c; color: #fdfcfc; }
+.mx4-shell .mx4-hint-button image { -gtk-icon-size: 12px; }
+.mx4-shell .mx4-quick-links { border-bottom: 1px solid #fdfcfc1f; }
+.mx4-shell .mx4-quick-link { padding: 14px 4px; border-radius: 0; border: none; border-top: 1px solid #fdfcfc1f; background: transparent; box-shadow: none; }
+.mx4-shell .mx4-quick-link:hover { background: #2a2626; }
+.mx4-shell .mx4-quick-link .mx4-subtle { font-size: 12px; font-weight: 400; }
+.mx4-shell .mx4-arrow { transition: transform 200ms cubic-bezier(.2,.8,.2,1); }
+.mx4-shell .mx4-quick-link:hover .mx4-arrow { transform: translateX(4px); }
+
+.mx4-shell .mx4-step { padding: 12px 4px; border-top: 1px solid #fdfcfc1f; }
+.mx4-shell .mx4-waiting .mouse-model { opacity: .82; }
+.mx4-shell .mx4-diagnostics { color: #b9b5b5; font-size: 12px; padding-top: 8px; }
+.mx4-shell banner > revealer > widget { background: #302c2c; color: #fdfcfc; border-left: 2px solid #ff9f0a; border-bottom: 1px solid #fdfcfc1f; padding: 6px 12px; }
+.mx4-shell banner button { background: transparent; border-color: #646262; }
+.mx4-shell banner button:hover { background: #3a3535; border-color: #9a9898; }
+
+/* Device workspace */
+.mx4-shell .mx4-sidebar { padding: 20px 12px 16px 16px; border-right: 1px solid #fdfcfc1f; }
+.mx4-shell .mx4-sidebar button { min-height: 22px; padding: 8px 12px; font-weight: 500; background: transparent; box-shadow: none; }
+.mx4-shell .mx4-sidebar button:hover { background: #302c2c; }
+.mx4-shell .mx4-sidebar button.active { background: #f1eeee; color: #201d1d; }
+.mx4-shell .mx4-sidebar button.active:hover { background: #fdfcfc; }
+.mx4-shell .mx4-sidebar button.mx4-nav-secondary { color: #b9b5b5; font-weight: 400; }
+.mx4-shell .mx4-nav-marker { font-size: 12px; font-weight: 400; }
+.mx4-shell .mx4-stage { background: #201d1d; }
+.mx4-shell .mx4-inspector { background: #201d1d; border-left: 1px solid #fdfcfc26; }
+.mx4-shell .mx4-inspector-header { background: #302c2c; padding: 14px 16px; border-bottom: 1px solid #fdfcfc1f; }
+.mx4-shell .mx4-inspector-header button { background: transparent; border-color: #646262; }
+.mx4-shell .mx4-inspector-header button:hover { background: #3a3535; }
+.mx4-shell .mx4-inspector .preferences-group { margin-top: 12px; }
+.mx4-shell .battery-chip { background: transparent; color: #d4cece; border: 1px solid #646262; border-radius: 4px; min-height: 24px; padding: 5px 10px; font-size: 12px; font-weight: 400; }
+.mx4-shell .mouse-callout { min-height: 30px; min-width: 0; padding: 4px 10px; border: 1px solid #777171; border-radius: 4px; background: #201d1df5; color: #fdfcfc; font-size: 12px; font-weight: 500; box-shadow: none; }
+.mx4-shell .mouse-callout:hover { background: #302c2c; border-color: #f1eeee; }
+.mx4-shell .mouse-callout.selected { background: #f1eeee; color: #201d1d; border-color: #77acdf; }
 .mx4-shell .surface-marker { min-height: 0; min-width: 0; padding: 0; border: none; border-radius: 999px; background: transparent; box-shadow: none; }
 .mx4-shell .surface-marker:hover { background: #77acdf33; }
 .mx4-shell .surface-marker:checked { background: #77acdf33; }
-.mx4-shell.mx4-editor stackswitcher button { border-radius: 4px; min-height: 34px; }
+.mx4-shell .mx4-status { border-top: 1px solid #fdfcfc1f; font-size: 12px; padding-top: 4px; }
+
+/* Editor and lists */
+.mx4-shell.mx4-editor stackswitcher button { border-radius: 4px; min-height: 26px; }
 .mx4-shell.mx4-editor .mx4-editor-page { padding: 0; }
 .mx4-shell.mx4-editor .mx4-editor-intro { margin-bottom: 8px; }
 .mx4-shell.mx4-editor .mx4-editor-toolbar { margin-top: 4px; margin-bottom: 4px; }
 .mx4-shell.mx4-editor .error { color: #ffb4a5; }
 .mx4-shell.mx4-editor .card, .mx4-shell list.boxed-list { border-radius: 4px; border: 1px solid #fdfcfc1f; box-shadow: none; }
-.mx4-shell dropdown button, .mx4-shell entry, .mx4-shell textview { border-radius: 4px; }
 
+/* Light */
 .mx4-shell.mx4-light { background: #fdfcfc; color: #201d1d; }
 .mx4-shell.mx4-light headerbar { background: #fdfcfc; color: #201d1d; border-color: #0f00001f; }
+.mx4-shell.mx4-light headerbar button:not(.mx4-secondary):hover { background: #f1eeee; }
 .mx4-shell.mx4-light .mx4-subtle, .mx4-shell.mx4-light .dim-label { color: #646262; }
 .mx4-shell.mx4-light .mx4-eyebrow { color: #646262; }
+.mx4-shell.mx4-light .mx4-lede { color: #424245; }
 .mx4-shell.mx4-light .mx4-context { background: #fdfcfc; border-color: #0f00001f; }
 .mx4-shell.mx4-light .mx4-sidebar { border-color: #0f00001f; }
 .mx4-shell.mx4-light .mx4-sidebar button:hover { background: #f1eeee; }
 .mx4-shell.mx4-light .mx4-sidebar button.active { background: #201d1d; color: #fdfcfc; }
 .mx4-shell.mx4-light .mx4-sidebar button.active:hover { background: #302c2c; }
-.mx4-shell.mx4-light button:focus-visible, .mx4-shell.mx4-light dropdown:focus-visible,
+.mx4-shell.mx4-light .mx4-sidebar button.mx4-nav-secondary { color: #646262; }
+.mx4-shell.mx4-light button:focus-visible, .mx4-shell.mx4-light dropdown:focus-visible, .mx4-shell.mx4-light .mouse-model:focus-visible,
 .mx4-shell.mx4-light entry:focus-within, .mx4-shell.mx4-light textview:focus-within { outline-color: #0056b3; }
+.mx4-shell.mx4-light .device-card .mouse-model:focus-visible { outline-color: #77acdf; }
 .mx4-shell.mx4-light .mx4-stage { background: #fdfcfc; }
 .mx4-shell.mx4-light .mx4-inspector { background: #fdfcfc; border-color: #0f00001f; }
 .mx4-shell.mx4-light .mx4-inspector-header { background: #f8f7f7; border-color: #0f00001f; }
-.mx4-shell.mx4-light .device-card { background: #201d1d; color: #fdfcfc; border-color: #201d1d; }
-.mx4-shell.mx4-light .device-card:hover { background: #302c2c; border-color: #646262; }
-.mx4-shell.mx4-light .device-card .mx4-card-link { color: #fdfcfc; }
-.mx4-shell.mx4-light .device-card .mx4-subtle { color: #b9b5b5; }
+.mx4-shell.mx4-light .mx4-inspector-header button { border-color: #0f000033; }
+.mx4-shell.mx4-light .mx4-inspector-header button:hover { background: #f1eeee; }
+.mx4-shell.mx4-light .device-card { background: #201d1d; border-color: #201d1d; }
 .mx4-shell.mx4-light .battery-chip { color: #424245; border-color: #0f000033; }
-.mx4-shell.mx4-light .device-card .battery-chip { color: #d4cece; border-color: #646262; }
-.mx4-shell.mx4-light .mx4-preview-badge { color: #646262; }
-.mx4-shell.mx4-light .mx4-quick-link { border-color: #0f00001f; }
+.mx4-shell.mx4-light .mx4-quick-links, .mx4-shell.mx4-light .mx4-quick-link { border-color: #0f00001f; }
 .mx4-shell.mx4-light .mx4-quick-link:hover { background: #f8f7f7; }
+.mx4-shell.mx4-light .mx4-step { border-color: #0f00001f; }
+.mx4-shell.mx4-light .mx4-diagnostics { color: #646262; }
+.mx4-shell.mx4-light .mx4-prompt { background: #f1eeee; border-left-color: #646262; }
+.mx4-shell.mx4-light .mx4-prompt-text { color: #201d1d; }
+.mx4-shell.mx4-light .mx4-prompt-token { color: #646262; }
+.mx4-shell.mx4-light .device-card .mx4-prompt { background: #302c2c; border-left-color: #9a9898; }
+.mx4-shell.mx4-light .device-card .mx4-prompt-text { color: #fdfcfc; }
+.mx4-shell.mx4-light .device-card .mx4-prompt-token { color: #9a9898; }
+.mx4-shell.mx4-light .device-card .mx4-prompt-token.on { color: #30d158; }
+.mx4-shell.mx4-light banner > revealer > widget { background: #f1eeee; color: #201d1d; border-bottom-color: #0f00001f; }
+.mx4-shell.mx4-light banner button:hover { background: #e9e5e5; border-color: #201d1d; }
 .mx4-shell.mx4-light .mouse-callout { background: #fdfcfcf5; color: #201d1d; border-color: #9a9898; }
 .mx4-shell.mx4-light .mouse-callout:hover { background: #f1eeee; border-color: #201d1d; }
 .mx4-shell.mx4-light .mouse-callout.selected { background: #201d1d; border-color: #0056b3; color: #fdfcfc; }
@@ -97,8 +155,13 @@ window { font-family: "JetBrains Mono", "Berkeley Mono", "IBM Plex Mono", "Adwai
 .mx4-shell.mx4-light .suggested-action:hover { background: #302c2c; }
 .mx4-shell.mx4-light .suggested-action:active { background: #0f0000; }
 .mx4-shell.mx4-light .suggested-action:disabled { background: #f1eeee; color: #646262; }
+.mx4-shell.mx4-light .mx4-secondary { color: #201d1d; border-color: #646262; }
+.mx4-shell.mx4-light .mx4-secondary:hover { background: #f1eeee; border-color: #201d1d; }
+.mx4-shell.mx4-light .mx4-secondary:active { background: #e9e5e5; }
 .mx4-shell.mx4-light .mx4-status { border-color: #0f00001f; }
 .mx4-shell.mx4-light.mx4-editor .error { color: #a32524; }
 .mx4-shell.mx4-light.mx4-editor .card, .mx4-shell.mx4-light list.boxed-list { border-color: #0f00001f; }
+
 .mx4-shell.reduced-motion *, .mx4-shell.reduced-motion { transition-duration: 0s; animation-duration: 0s; }
-.mx4-shell.reduced-motion button:not(.device-card):not(.surface-marker):not(.preview-ring-action) > * { transform: none; }
+.mx4-shell.reduced-motion button:not(.device-card):not(.surface-marker):not(.preview-ring-action) > *,
+.mx4-shell.reduced-motion .mx4-quick-link:hover .mx4-arrow { transform: none; }
