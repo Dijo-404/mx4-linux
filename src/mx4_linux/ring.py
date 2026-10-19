@@ -308,6 +308,7 @@ class ActionsRing(Gtk.Window):
             self.icons[index].set_from_icon_name(action_icon(action, grouped=grouped))
             text = f"{index + 1}. {action['label']}" + (". Open action group" if grouped else self.adjustment_hint(action))
             self.buttons[index].set_tooltip_text(text)
+            self.buttons[index].set_has_tooltip(False)
             self.buttons[index].update_property([Gtk.AccessibleProperty.LABEL], [text])
             if grouped:
                 self.expanded_state(self.buttons[index], False)
@@ -454,6 +455,7 @@ class ActionsRing(Gtk.Window):
                     self.child_icons[i].set_from_icon_name(action_icon(action))
                     label = f"{i + 1}. {action['label']}" + self.adjustment_hint(action)
                     button.set_tooltip_text(label)
+                    button.set_has_tooltip(False)
                     button.update_property([Gtk.AccessibleProperty.LABEL], [label])
             self.group_reveal.move(0, animate=False)
             self.group_reveal.move(1, animate=self.animations_enabled())
