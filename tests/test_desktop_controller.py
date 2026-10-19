@@ -1068,25 +1068,22 @@ def test_manual_stop_while_reconnect_probe_pending_prevents_recovery_replay_star
     assert not runtime._reconnect_busy
 
 
-def test_reconnect_budget_and_preference_are_bounded(runtime, monkeypatch):
+def test_enabled_integration_reconnects_without_preference_and_caps_backoff(runtime, monkeypatch):
     runtime.restoration_confirmed = True
     scheduled = []
     runtime.requested_enabled = True
     runtime.hardware_paused = False
     monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda delay, fn: scheduled.append((delay, fn)) or len(scheduled))
-    runtime._schedule_reconnect()
-    assert scheduled == []  # Opt in is required.
-    runtime.config['resume_integration'] = True
-    for index, seconds in enumerate((1, 2, 5, 10, 20, 30)):
+    for index, seconds in enumerate((1, 2, 5, 10, 20, 30, 30, 30)):
         runtime.reconnect_source = 0
         runtime.reconnect_attempt = index
         runtime._schedule_reconnect()
         assert scheduled[-1][0] == seconds * 1000
     runtime.reconnect_source = 0
-    runtime.reconnect_attempt = 6
+    runtime.reconnect_attempt = 500
     runtime._schedule_reconnect()
-    assert len(scheduled) == 6
-    assert 'enable integration to retry' in runtime.notify.call_args.args[0]
+    assert len(scheduled) == 9
+    assert scheduled[-1][0] == 30000
 
 
 def test_explicit_recovery_can_clear_prior_unknown_stop_for_next_operation(runtime):
@@ -1100,18 +1097,115 @@ def test_explicit_recovery_can_clear_prior_unknown_stop_for_next_operation(runti
 
 
 @pytest.mark.parametrize('restored', [False, None])
-def test_unconfirmed_stop_blocks_new_and_already_queued_automatic_reconnect(runtime, monkeypatch, restored):
+def test_unconfirmed_disconnect_recovers_same_unit_before_resuming(runtime, monkeypatch, restored):
     scheduled = []
     runtime.requested_enabled = True
-    runtime.config['resume_integration'] = True
-    runtime.window.backend = SimpleNamespace(scan=Mock())
-    runtime.window.job = Mock()
+    runtime.target_identity = 'unit:a1b2c3d4'
+    runtime.session.running = runtime.session.stopping = False
+    runtime.window.busy = False
+    device = {'id': 'reconnected', 'online': True, 'stable_id': runtime.target_identity, 'settings': []}
+    order = []
+    runtime.window.backend = SimpleNamespace(
+        scan=Mock(return_value={'devices': [device]}),
+        recover=Mock(side_effect=lambda *_args: order.append('recover')))
+    runtime.window.render = Mock()
+    runtime.window.job = lambda work, done, _msg, failed: done(work())
+    runtime.start = Mock(side_effect=lambda **_kwargs: order.append('start'))
+    replay = Mock(side_effect=lambda *_args, **_kwargs: order.append('replay'))
+    monkeypatch.setattr('mx4_linux.profiles.replay_remembered', replay)
     monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda delay, fn: scheduled.append((delay, fn)) or len(scheduled))
     runtime.event({'type': 'stopped', 'restored': restored})
-    assert scheduled == []
+    assert runtime.restoration_confirmed is restored
+    assert [delay for delay, _fn in scheduled] == [1000]
+    scheduled.pop()[1]()
+    runtime.window.backend.recover.assert_called_once_with('reconnected', runtime.target_identity)
+    assert order == ['recover', 'replay', 'start']
+    assert runtime.restoration_confirmed is True
+    runtime.start.assert_called_once_with(automatic=True)
+
+
+def test_reconnect_recovery_failure_retries_without_replaying_or_starting(runtime, monkeypatch):
+    runtime.requested_enabled = True
+    runtime.target_identity = 'unit:a1b2c3d4'
+    runtime.session.running = runtime.session.stopping = False
+    runtime.window.busy = False
+    device = {'id': 'mouse', 'online': True, 'stable_id': runtime.target_identity, 'settings': []}
+    runtime.window.backend = SimpleNamespace(scan=Mock(return_value={'devices': [device]}),
+                                           recover=Mock(side_effect=RuntimeError('Recovery not confirmed')))
+    def job(work, done, _message, failed):
+        try:
+            result = work()
+        except RuntimeError as error:
+            failed(str(error))
+        else:
+            done(result)
+    runtime.window.job = job
+    runtime.start = Mock()
+    replay = Mock()
+    monkeypatch.setattr('mx4_linux.profiles.replay_remembered', replay)
+    timers = []
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda ms, fn: timers.append((ms, fn)) or len(timers))
     runtime._reconnect(runtime._intent_generation)
-    runtime.window.job.assert_not_called()
-    runtime.window.backend.scan.assert_not_called()
+    runtime.window.backend.recover.assert_called_once_with('mouse', runtime.target_identity)
+    replay.assert_not_called()
+    runtime.start.assert_not_called()
+    assert runtime.restoration_confirmed is None
+    assert not runtime._reconnect_busy
+    assert [ms for ms, _fn in timers] == [2000]
+
+
+def test_reconnect_keeps_waiting_for_original_mouse_after_long_disconnect(runtime, monkeypatch):
+    runtime.requested_enabled = True
+    runtime.target_identity = 'unit:a1b2c3d4'
+    runtime.session.running = runtime.session.stopping = False
+    runtime.reconnect_attempt = 500
+    runtime.window.busy = False
+    other = {'id': 'other-mouse', 'online': True, 'stable_id': 'unit:d1e2f3a4', 'settings': []}
+    runtime.window.backend = SimpleNamespace(scan=Mock(return_value={'devices': [other]}), recover=Mock())
+    def job(work, done, _message, failed):
+        try:
+            result = work()
+        except RuntimeError as error:
+            failed(str(error))
+        else:
+            done(result)
+    runtime.window.job = job
+    runtime.start = Mock()
+    timers = []
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda ms, fn: timers.append((ms, fn)) or len(timers))
+    runtime._reconnect(runtime._intent_generation)
+    runtime.window.backend.recover.assert_not_called()
+    runtime.start.assert_not_called()
+    assert runtime.target_identity == 'unit:a1b2c3d4'
+    assert [ms for ms, _fn in timers] == [30000]
+
+
+@pytest.mark.parametrize('disconnected_during_focus_query', [False, True])
+def test_automatic_start_failure_keeps_reconnecting(runtime, monkeypatch, disconnected_during_focus_query):
+    from concurrent.futures import Future
+    runtime.requested_enabled = True
+    runtime.target_identity = 'unit:a1b2c3d4'
+    runtime.session.running = runtime.session.ready = False
+    runtime.session.start = Mock(side_effect=OSError('Device disappeared'))
+    runtime.window.busy = False
+    runtime.reload_config = Mock()
+    future = Future()
+    runtime.executor = SimpleNamespace(submit=Mock(return_value=future))
+    callbacks, timers = [], []
+    monkeypatch.setattr('mx4_linux.desktop.GLib.idle_add', lambda fn: callbacks.append(fn))
+    monkeypatch.setattr('mx4_linux.desktop.GLib.timeout_add', lambda ms, fn: timers.append((ms, fn)) or len(timers))
+    runtime.start(automatic=True)
+    if disconnected_during_focus_query:
+        runtime.window.current = None
+    future.set_result(None)
+    callbacks.pop()()
+    assert runtime.requested_enabled
+    assert not runtime.starting
+    assert [ms for ms, _fn in timers] == [1000]
+    if disconnected_during_focus_query:
+        runtime.session.start.assert_not_called()
+    else:
+        runtime.session.start.assert_called_once()
 
 
 def test_worker_conflict_followed_by_confirmed_cleanup_inhibits_auto_acquisition(runtime, monkeypatch, tmp_path):

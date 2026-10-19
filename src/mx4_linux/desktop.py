@@ -199,6 +199,8 @@ class DesktopController:
             if (self.window.busy or not self.window.current or not self.window.current.get("online")
                     or self.window.current["id"] != device_id or self.window.current.get("stable_id") != identity):
                 self.notify("The selected mouse changed; refresh and enable integration again.")
+                if automatic:
+                    self._schedule_reconnect()
                 return GLib.SOURCE_REMOVE
             try:
                 self.context = future.result()
@@ -215,6 +217,8 @@ class DesktopController:
                 self.notify("Enabling configured mouse assignments…")
             except (RuntimeError, OSError) as exc:
                 self.notify(str(exc))
+                if automatic:
+                    self._schedule_reconnect()
             return GLib.SOURCE_REMOVE
         future.add_done_callback(lambda _: GLib.idle_add(begin))
 
@@ -359,9 +363,7 @@ class DesktopController:
             self._stop_waiters = []
             for callback in waiters:
                 callback(self.restoration_confirmed)
-            if self.restoration_confirmed is not True:
-                self._cancel_reconnect()
-            elif getattr(self, "requested_enabled", False):
+            if getattr(self, "requested_enabled", False):
                 self._schedule_reconnect()
         elif kind == "button" and event.get("cancelled"):
             self._cancel_adjustments()
@@ -432,23 +434,23 @@ class DesktopController:
                      else getattr(self.session, "restored", None))
 
     def _schedule_reconnect(self):
+        # An enabled integration remains requested while the mouse is away.
+        # Disconnecting can prevent cleanup; the reconnect job must recover
+        # that same unit before it can replay settings or start a listener.
         if (self.closed or not getattr(self, "requested_enabled", False)
-                or self.restoration_confirmed is not True or self.reacquire_blocked
-                or not self.config.get("resume_integration", False)
+                or self.reacquire_blocked
                 or getattr(self, "hardware_paused", False) or self.reconnect_source or self._reconnect_busy):
             return
         delays = (1, 2, 5, 10, 20, 30)
-        if self.reconnect_attempt >= len(delays):
-            self.notify("Mouse unavailable; wake this mouse and enable integration to retry.")
-            return
         generation = self._intent_generation
-        self.reconnect_source = GLib.timeout_add(delays[self.reconnect_attempt] * 1000,
+        delay = delays[min(self.reconnect_attempt, len(delays) - 1)]
+        self.reconnect_source = GLib.timeout_add(delay * 1000,
                                                  lambda: self._reconnect(generation))
 
     def _reconnect(self, generation):
         self.reconnect_source = 0
         if (self.closed or generation != self._intent_generation or not self.requested_enabled
-                or self.restoration_confirmed is not True or self.reacquire_blocked):
+                or self.reacquire_blocked):
             return GLib.SOURCE_REMOVE
         if self.session.running and not self.session.stopping:
             return GLib.SOURCE_REMOVE
@@ -460,7 +462,7 @@ class DesktopController:
         identity = self.target_identity
         def cancelled():
             return (self.closed or generation != self._intent_generation or not self.requested_enabled
-                    or self.restoration_confirmed is not True or self.reacquire_blocked)
+                    or self.reacquire_blocked)
         def work():
             from .profiles import replay_remembered
             result = self.window.backend.scan()
