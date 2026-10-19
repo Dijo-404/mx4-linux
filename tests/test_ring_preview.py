@@ -14,7 +14,7 @@ except ValueError as exc:
 from mx4_linux.actions import default_config
 from mx4_linux.gtk_support import Adw, Gdk, Gtk
 from mx4_linux.ring_icons import action_icon
-from mx4_linux.ring_model import BUTTON_RADIUS, button_center
+from mx4_linux.ring_preview import BUTTON_RADIUS, button_center
 from mx4_linux.ring_preview import RingPreview
 
 

@@ -7,7 +7,14 @@ from .gtk_support import Gdk, Gtk
 from gi.repository import GObject, Graphene, Gsk, Pango
 from .motion import Transition
 from .ring_icons import action_icon
-from .ring_model import BUTTON_RADIUS, CENTER_RADIUS, RingGeometry, button_center
+from .ring_model import RingGeometry
+
+# The editor diagram keeps its roomier labeled layout; the popup ring is compact.
+ORBIT_RADIUS, BUTTON_RADIUS, CENTER_RADIUS = 116, 26, 16
+
+
+def button_center(index):
+    return ORBIT_RADIUS * math.sin(index * math.pi / 4), -ORBIT_RADIUS * math.cos(index * math.pi / 4)
 
 
 class RingPreview(Gtk.Box):
