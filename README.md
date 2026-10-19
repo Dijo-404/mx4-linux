@@ -35,7 +35,7 @@ MX4 Linux is a GTK 4 / Libadwaita application and CLI for MX Master 4 owners on 
 ### Features
 
 - **Control supported mouse settings.** Adjust DPI, wheel modes and direction, SmartShift, haptic strength, panel force and built-in button assignments when reported by the device.
-- **Choose from eight ring actions.** Use compact icon buttons, outward labels and a center close control. Hold the haptic panel, move and release, or select with a click or keyboard.
+- **Choose from eight ring actions.** Press the haptic panel once to open the ring at the pointer, then select an action with a click or keyboard. A second panel press, or a right click outside the circles, closes it.
 - **Group related actions.** Turn a position into a side menu of up to six existing routines. The editor shows a live ring preview and keeps labels and assignments together.
 - **Build Smart Actions.** Combine shortcuts, application launches, text, delays and Niri commands, with optional exact application conditions.
 - **Find controls quickly.** Mouse, Actions and Profiles have separate views; the wheel preview and ring respond with finite animations and respect the desktop animation preference.
@@ -369,7 +369,7 @@ The optional shortcut fallback rule is installed with `./scripts/install-input-a
 
 - Flow is deferred for a later Linux, Windows and macOS implementation. Options+ plugins and automatic per-application hardware profiles are not implemented.
 - Desktop integration targets Niri on Wayland. Other compositors are unverified; the ring may fall back to a normal window and Niri actions require Niri.
-- The ring opens at screen center and does not reposition the pointer. Ring/button-triggered input requires a valid target and refuses shortcuts/text when an MX4 configuration window is focused; direct CLI routine execution uses the current focus without this GUI guard.
+- The ring opens at the pointer on supported Wayland desktops and stays inside screen edges, with a centered fallback if pointer location is unavailable. Ring/button-triggered input requires a valid target and refuses shortcuts/text when an MX4 configuration window is focused; direct CLI routine execution uses the current focus without this GUI guard.
 - Hardware settings may reset after power loss or reconnect. Profiles apply manually; no daemon or automatic reapplication is installed.
 - Physical DPI, wheel, button and haptic changes, panel press/move/release, feedback ticks, reconnect while holding and Bluetooth still need interactive validation.
 
