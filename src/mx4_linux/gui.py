@@ -460,7 +460,7 @@ class ControlWindow(Adw.ApplicationWindow):
         self.desktop_toggle.connect("clicked", lambda *_: self.desktop.stop() if self.desktop.session.running else self.desktop.start())
         self.desktop_status.add_suffix(self.desktop_toggle)
         group.add(self.desktop_status)
-        ring_row = Adw.ActionRow(use_markup=False, title="Actions Ring", subtitle="Hold the haptic panel, move and release, or click then select. Escape closes the ring.")
+        ring_row = Adw.ActionRow(use_markup=False, title="Actions Ring", subtitle="Press the haptic panel once, then click an action. Escape closes the ring.")
         preview = Gtk.Button(label="Try the ring", valign=Gtk.Align.CENTER,
                               tooltip_text="Explore the ring without running actions")
         preview.connect("clicked", lambda *_: self.desktop.open_ring(preview=True))

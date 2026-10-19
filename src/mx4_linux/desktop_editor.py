@@ -350,8 +350,7 @@ class DesktopEditor(Adw.Window):
         page, scroll = _page()
         self.page_boxes.append(page)
         page.append(_intro("Your shortcuts, one gesture away",
-                           "Hold the haptic panel, move toward an action, then release. "
-                           "A short click opens the ring for point-and-click selection. "
+                           "Press the haptic panel once, then click an action in the ring. "
                            "Choose what each position does below."))
         if self.integration is not None:
             integration_group = Adw.PreferencesGroup()
