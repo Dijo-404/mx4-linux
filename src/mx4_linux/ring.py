@@ -26,7 +26,7 @@ CENTER_X, CENTER_Y = 390, 220
 CHILD_RADIUS = 20
 # Group children fan along an outer arc, centered on their parent's angle.
 CHILD_ORBIT, CHILD_SPACING = 160, math.radians(21)
-DOT_RADIUS, ICON_SIZE, LABEL_GAP = 11, 20, 8
+DOT_RADIUS, DOT_ICON_SIZE, ICON_SIZE, LABEL_GAP = 11, 16, 20, 8
 
 # Motion is paint only. Faces travel between the center and slots that are
 # already their hit regions, so a quick click never chases a moving target.
@@ -147,11 +147,11 @@ class ActionsRing(Gtk.Window):
                 }
                 /* Red while releasing or clicking would choose nothing. */
                 .mx4-ring .ring-dot {
-                    background: #b3c1f5; border-radius: 9999px;
+                    background: #b3c1f5; color: #26262e; border-radius: 9999px;
                     box-shadow: 0 1px 2px rgba(0,0,0,.3);
-                    transition: background-color 120ms ease-out;
+                    transition: background-color 120ms ease-out, color 120ms ease-out;
                 }
-                .mx4-ring button.ring-close.cancel .ring-dot { background: #e8486b; }
+                .mx4-ring button.ring-close.cancel .ring-dot { background: #e8486b; color: #ffffff; }
                 .mx4-ring button:focus-visible { outline: 2px solid #8cabca; outline-offset: 2px; }
                 .mx4-ring.reduced-motion button, .mx4-ring.reduced-motion .ring-dot { transition: none; }
                 .mx4-ring .ring-callout {
@@ -198,6 +198,9 @@ class ActionsRing(Gtk.Window):
                            width_request=DOT_RADIUS * 2, height_request=DOT_RADIUS * 2)
         self.dot.add_css_class("ring-dot")
         self.dot.set_can_target(False)
+        self.dot_icon = Gtk.Image(icon_name="window-close-symbolic", pixel_size=DOT_ICON_SIZE,
+                                  hexpand=True, halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
+        self.dot.append(self.dot_icon)
         self.close_button.set_child(self.dot)
         self.labels.put(self.close_button, CENTER_X - CENTER_RADIUS, CENTER_Y - CENTER_RADIUS)
         # Opacity alone hides the pill: a hidden widget measures 0 x 0, and the
@@ -292,6 +295,7 @@ class ActionsRing(Gtk.Window):
             icon.set_pixel_size(geometry.size(ICON_SIZE))
         self.close_button.set_size_request(geometry.size(CENTER_RADIUS * 2), geometry.size(CENTER_RADIUS * 2))
         self.dot.set_size_request(geometry.size(DOT_RADIUS * 2), geometry.size(DOT_RADIUS * 2))
+        self.dot_icon.set_pixel_size(geometry.size(DOT_ICON_SIZE))
         scale = geometry.scale
         self.scale_css.load_from_string(f"""
             .ring-callout {{ padding: {4 * scale}px {11 * scale}px; }}

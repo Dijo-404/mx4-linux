@@ -748,3 +748,12 @@ def test_label_pill_is_allocated_its_full_text_width(preview):
     label = window.callout_label
     assert label.get_layout().is_ellipsized() is False
     assert label.get_width() >= label.measure(Gtk.Orientation.HORIZONTAL, -1).natural
+
+
+@pytest.mark.parametrize("scale", [75, 150])
+def test_center_dot_carries_a_close_mark_that_scales(preview, scale):
+    window = preview.window
+    window.show_ring(default_config() | {"ring_scale": scale}, preview=True)
+    assert window.dot_icon.get_icon_name() == "window-close-symbolic"
+    assert window.dot_icon.get_pixel_size() == round(ring.DOT_ICON_SIZE * scale / 100)
+    assert window.dot_icon.get_pixel_size() < window.geometry.size(ring.DOT_RADIUS * 2)
