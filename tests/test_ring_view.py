@@ -739,3 +739,12 @@ def test_left_side_labels_end_before_their_face(preview, index):
     assert ok and bounds.get_width() > 0
     assert bounds.get_x() + bounds.get_width() <= face_x - BUTTON_RADIUS
     assert bounds.get_y() < face_y < bounds.get_y() + bounds.get_height()
+
+
+def test_label_pill_is_allocated_its_full_text_width(preview):
+    window = preview.window
+    window.pointer_motion(None, *main_position(window, 3))
+    window.allocate(ring.WIDTH, ring.HEIGHT, -1, None)
+    label = window.callout_label
+    assert label.get_layout().is_ellipsized() is False
+    assert label.get_width() >= label.measure(Gtk.Orientation.HORIZONTAL, -1).natural

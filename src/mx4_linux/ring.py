@@ -561,7 +561,11 @@ class ActionsRing(Gtk.Window):
 
     def place_callout(self, x, y, radius):
         """Put the pill on the outward side of its face, inside the popup."""
+        # Gtk.Fixed allocates minimum sizes, which for an ellipsizing label is
+        # just the ellipsis; pin the pill to the label's natural width.
+        self.callout.set_size_request(-1, -1)
         natural = self.callout.measure(Gtk.Orientation.HORIZONTAL, -1).natural
+        self.callout.set_size_request(natural, -1)
         width = natural / self.geometry.scale
         height = self.callout.measure(Gtk.Orientation.VERTICAL, natural).natural / self.geometry.scale
         if abs(x - CENTER_X) < 1:
