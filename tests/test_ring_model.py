@@ -89,9 +89,9 @@ def test_button_centers_match_clockwise_orbit(index):
     assert sector(x, y) == index
 
 
-@pytest.mark.parametrize("offset,expected", [(-26.01, None), (-26, 2), (0, 2), (26, 2), (26.01, None)])
+@pytest.mark.parametrize("offset,expected", [(-1.0005, None), (-1, 2), (0, 2), (1, 2), (1.0005, None)])
 def test_pointer_hit_area_stops_at_circle_boundary(offset, expected):
-    assert button_at(ORBIT_RADIUS + offset, 0) == expected
+    assert button_at(ORBIT_RADIUS + offset * BUTTON_RADIUS, 0) == expected
 
 
 @pytest.mark.parametrize("index", range(8))
@@ -125,7 +125,7 @@ def test_pointer_tracks_painted_button_positions_during_entry():
     assert ring.point(x * spread, y * spread, spread=spread) == 0
     assert ring.point(x * spread, y * spread + BUTTON_RADIUS - 1, spread=spread) == 0
     assert ring.point(x, y - BUTTON_RADIUS, spread=spread) is None
-    assert ring.point(x * spread + BUTTON_RADIUS, y * spread + BUTTON_RADIUS, spread=spread) is None
+    assert ring.point(x * spread, y * spread - BUTTON_RADIUS - .01, spread=spread) is None
 
 
 @pytest.mark.parametrize("spread", [0, -1, float("nan"), float("inf")])

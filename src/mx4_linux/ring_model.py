@@ -3,8 +3,9 @@
 import math
 
 
-ORBIT_RADIUS = 116
-BUTTON_RADIUS = 26
+# A compact ring: faces nearly touch, leaving only narrow inert gaps.
+ORBIT_RADIUS = 70
+BUTTON_RADIUS = 22
 CENTER_RADIUS = 16
 _BUTTON_CENTERS = tuple(
     (ORBIT_RADIUS * math.sin(index * math.pi / 4), -ORBIT_RADIUS * math.cos(index * math.pi / 4))

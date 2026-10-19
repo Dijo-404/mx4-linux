@@ -16,7 +16,7 @@ except ValueError as exc:
 from mx4_linux import ring
 from mx4_linux.actions import default_config
 from mx4_linux.gtk_support import Adw, Gdk, Gtk
-from mx4_linux.ring_model import BUTTON_RADIUS, button_center
+from mx4_linux.ring_model import BUTTON_RADIUS, ORBIT_RADIUS, button_center
 
 
 @pytest.fixture
@@ -50,6 +50,15 @@ def controllers(widget, kind):
 def main_position(window, index):
     dx, dy = button_center(index)
     return ring.CENTER_X + dx * window.spread, ring.CENTER_Y + dy * window.spread
+
+
+def placed(window, widget):
+    """Allocated logical center; Gtk.Fixed.get_child_position reports 0, 0 here."""
+    window.allocate(window.geometry.size(ring.WIDTH), window.geometry.size(ring.HEIGHT), -1, None)
+    ok, bounds = widget.compute_bounds(window.labels)
+    assert ok
+    return window.geometry.logical(bounds.get_x() + bounds.get_width() / 2,
+                                   bounds.get_y() + bounds.get_height() / 2)
 
 
 def settle(window):
@@ -93,19 +102,20 @@ def test_native_faces_have_the_same_diameter_as_pointer_hit_geometry(preview):
     assert preview.window.close_button.get_allocated_height() == ring.CENTER_RADIUS * 2
 
 
-def test_group_heading_does_not_cover_the_six_child_targets(preview):
+def test_open_group_fans_children_on_an_outer_arc_and_leaves_them_unlabeled(preview):
     window = preview.window
     config = default_config()
     config["ring_groups"] = {"2": list(config["actions"])[:6]}
-    config["actions"][config["ring"][2]]["label"] = "An action group with a longer name"
     window.show_ring(config, preview=True)
     settle(window)
     window.pointer_motion(None, *main_position(window, 2))
     settle(window)
-    window.update_labels()
-    window.allocate(ring.WIDTH, ring.HEIGHT, -1, None)
-    heading = window.callout.get_allocation()
-    assert heading.y + heading.height < min(y - ring.CHILD_RADIUS for _x, y in window.child_positions)
+    assert window.callout.get_opacity() == 0
+    angles = [math.atan2(x - ring.CENTER_X, ring.CENTER_Y - y) for x, y in window.child_positions]
+    for (x, y), angle in zip(window.child_positions, angles):
+        assert math.hypot(x - ring.CENTER_X, y - ring.CENTER_Y) == pytest.approx(ring.CHILD_ORBIT)
+    assert sum(angles) / len(angles) == pytest.approx(math.pi / 2)  # Centered on the parent at three o'clock.
+    assert all(b - a == pytest.approx(ring.CHILD_SPACING) for a, b in zip(angles, angles[1:]))
 
 
 def test_ring_has_no_bottom_instruction_bar(preview):
@@ -223,6 +233,9 @@ def test_escape_returns_to_group_parent_then_closes(preview, back_key):
     assert window.state.selected == 2
     assert window.get_focus() == window.buttons[2]
     assert not window.child_positions
+    # Closing children shrink away in place but can no longer be hit.
+    assert not any(button.get_visible() and button.get_can_target() for button in window.child_buttons)
+    settle(window)
     assert not any(button.get_visible() for button in window.child_buttons)
     window.key_pressed(None, Gdk.KEY_Escape, 0, 0)
     assert preview.dismissed == [True]
@@ -329,8 +342,8 @@ def test_scaled_faces_hit_geometry_and_motion_share_logical_space(preview, scale
     settle(window)
     window.allocate(round(ring.WIDTH * scale / 100), round(ring.HEIGHT * scale / 100), -1, None)
     for button in window.buttons:
-        assert button.get_allocated_width() == round(52 * scale / 100)
-    x, y = window.geometry.point(ring.CENTER_X, ring.CENTER_Y - 116)
+        assert button.get_allocated_width() == round(BUTTON_RADIUS * 2 * scale / 100)
+    x, y = window.geometry.point(ring.CENTER_X, ring.CENTER_Y - ORBIT_RADIUS)
     window.pointer_motion(None, x, y)
     assert window.state.selected == 0
     window.pointer_click(None, 1, x, y)
@@ -578,7 +591,7 @@ def test_switching_group_cancels_captured_child_before_more_adjustment(preview):
 @pytest.mark.parametrize("elapsed", [0, .03, .10, .22])
 def test_opening_targets_are_visible_and_stay_at_their_final_positions(preview, elapsed):
     window = preview.window
-    positions = [window.labels.get_child_position(button) for button in window.buttons]
+    positions = [placed(window, button) for button in window.buttons]
     window.apply_frame(window.reveal.started + elapsed)
     assert window.surface.get_opacity() == 1
     for index, button in enumerate(window.buttons):
@@ -586,63 +599,122 @@ def test_opening_targets_are_visible_and_stay_at_their_final_positions(preview, 
         x, y = ring.CENTER_X + dx, ring.CENTER_Y + dy
         assert window.pointer_target(x, y) == ("root", index)
         assert .72 <= button.get_opacity() <= 1
-        assert window.labels.get_child_position(button) == positions[index]
-    window.pointer_click(None, 1, ring.CENTER_X, ring.CENTER_Y - 116)
+        assert placed(window, button) == pytest.approx(positions[index])
+        assert placed(window, button) == pytest.approx((x, y), abs=1)  # Allocations are whole pixels.
+    window.pointer_click(None, 1, ring.CENTER_X, ring.CENTER_Y - ORBIT_RADIUS)
     assert preview.selected == [("overview", True)]
 
 
-def test_pointer_and_keyboard_share_the_traveling_orbit_marker(preview):
+def test_center_dot_is_red_only_while_nothing_would_be_chosen(preview):
     window = preview.window
+    assert window.close_button.has_css_class("cancel")
     window.pointer_motion(None, *main_position(window, 0))
-    settle(window)
-    assert window.orbit.selected == 0
+    assert not window.close_button.has_css_class("cancel")
+    assert window.buttons[0].has_css_class("selected")
+    window.pointer_motion(None, ring.CENTER_X, ring.CENTER_Y)
+    assert window.close_button.has_css_class("cancel")
     window.key_pressed(None, Gdk.KEY_Left, 0, 0)
-    assert window.orbit.selected == 7
-    assert window.orbit.angle.target == pytest.approx(-math.pi / 4)
-    window.pointer_motion(None, *main_position(window, 6))
-    assert window.orbit.selected == 6
-    assert window.orbit.angle.active()
+    assert window.state.selected is not None and not window.close_button.has_css_class("cancel")
 
 
 def test_captured_press_feedback_clears_on_cancel_and_never_moves_targets(preview):
     window = preview.window
     settle(window)
     position = main_position(window, 1)
-    before = window.labels.get_child_position(window.buttons[1])
+    before = placed(window, window.buttons[1])
     window.pointer_press(None, 1, *position)
     assert window.buttons[1].has_css_class("pressed")
     window.apply_frame(monotonic())
-    assert window.labels.get_child_position(window.buttons[1]) == before
+    assert placed(window, window.buttons[1]) == pytest.approx(before)
+    assert placed(window, window.buttons[1]) == pytest.approx(position, abs=1)
     assert window.pointer_target(*position) == ("root", 1)
     window.cancel_pointer()
     assert not window.buttons[1].has_css_class("pressed")
     assert not preview.selected
 
 
-def test_held_motion_tracks_selection_and_hiding_clears_orbit_and_callbacks(preview):
+def test_held_motion_tracks_selection_and_hiding_stops_frames(preview):
     window = preview.window
     window.show_ring(default_config(), held=True, preview=True)
     window.motion(100, 0)
-    assert window.orbit.selected == window.state.selected == 2
+    assert window.state.selected == 2 and window.buttons[2].has_css_class("selected")
     assert window.state.x > 0
     window.hide_ring()
-    assert window.orbit.selected is None
-    assert window.orbit.opacity.value() == 0
+    assert not window.state.visible
     assert not window.tick_id
 
 
-def test_child_selection_keeps_orbit_pointing_to_its_group_parent(preview):
+def test_child_selection_keeps_its_group_parent_filled(preview):
     window = show_group(preview)
     window.commit(2)
     settle(window)
     window.focus_child(1)
-    assert window.orbit.selected == 2
-    assert not window.orbit.angle.active()
+    assert window.state.selected == 2
+    assert window.buttons[2].has_css_class("selected") and window.child_buttons[1].has_css_class("selected")
     window.key_pressed(None, Gdk.KEY_Escape, 0, 0)
-    assert window.orbit.selected == 2
+    assert window.state.selected == 2 and window.buttons[2].has_css_class("selected")
 
 
-def test_tick_caps_paint_work_at_sixty_fps_without_extending_duration(preview, monkeypatch):
+def test_opening_faces_burst_from_the_center_while_hit_regions_stay_final(preview):
+    window = preview.window
+    start = window.reveal.started
+    window.apply_frame(start)
+    for index, button in enumerate(window.buttons):
+        dx, dy = button_center(index)
+        assert window.labels.poses[button].shift == pytest.approx((-dx, -dy))
+        assert window.pointer_target(ring.CENTER_X + dx, ring.CENTER_Y + dy) == ("root", index)
+    window.apply_frame(start + ring.OPEN_DURATION)
+    assert all(window.labels.poses[button].shift == pytest.approx((0, 0)) for button in window.buttons)
+
+
+def test_choosing_flashes_the_face_collapses_then_hides_after_running(preview, monkeypatch):
+    window = preview.window
+    settle(window)
+    window.pointer_click(None, 1, *main_position(window, 3))
+    # The action is handed over at once; only the paint lingers, without input.
+    assert preview.selected == [("workspace-next", True)]
+    assert not window.state.visible and window._exiting
+    assert window.buttons[3].has_css_class("chosen")
+    start = window.exit.started
+    window.apply_frame(start + ring.EXIT_DURATION / 2)
+    dx, dy = button_center(3)
+    shift = window.labels.poses[window.buttons[3]].shift
+    assert 0 < shift[0] / -dx < 1 and 0 < shift[1] / -dy < 1
+    assert not window.pointer_target(*main_position(window, 3))
+    monkeypatch.setattr(ring, "monotonic", lambda: start + ring.EXIT_DURATION + .01)
+    window.stop_animation()
+    assert window.tick(None, None) is False
+    assert not window._exiting and not window.get_visible()
+    assert not window.buttons[3].has_css_class("chosen")
+
+
+def test_reduced_motion_dismisses_without_a_collapse(preview):
+    preview.settings.set_property("gtk-enable-animations", False)
+    window = preview.window
+    window.show_ring(default_config(), preview=True)
+    window.dismiss()
+    assert preview.dismissed == [True]
+    assert not window._exiting and not window.tick_id
+
+
+def test_labels_wait_before_fading_in_on_the_outward_side(preview):
+    window = preview.window
+    window.pointer_motion(None, *main_position(window, 2))
+    assert window.callout_label.get_text() == window.config["actions"][window.config["ring"][2]]["label"]
+    started = window.label_reveal.started
+    assert started > monotonic() + ring.LABEL_DELAY / 2
+    window.apply_frame(started - .01)
+    assert window.callout.get_opacity() == 0
+    window.apply_frame(started + ring.LABEL_FADE)
+    assert window.callout.get_opacity() == 1
+    window.allocate(ring.WIDTH, ring.HEIGHT, -1, None)
+    ok, bounds = window.callout.compute_bounds(window.labels)
+    face_x, face_y = main_position(window, 2)
+    assert ok and bounds.get_x() >= face_x + BUTTON_RADIUS
+    assert bounds.get_y() < face_y < bounds.get_y() + bounds.get_height()
+
+
+def test_tick_paints_every_display_frame_and_stops_once_settled(preview, monkeypatch):
     window = preview.window
     start = window.reveal.started
     painted = []
@@ -651,7 +723,19 @@ def test_tick_caps_paint_work_at_sixty_fps_without_extending_duration(preview, m
     for elapsed in (0, .005, .010, .017):
         monkeypatch.setattr(ring, "monotonic", lambda elapsed=elapsed: start + elapsed)
         assert window.tick(None, None)
-    assert painted == [start, start + .017]
-    monkeypatch.setattr(ring, "monotonic", lambda: start + 1)
+    assert painted == [start, start + .005, start + .010, start + .017]
+    monkeypatch.setattr(ring, "monotonic", lambda: start + 5)
     assert not window.tick(None, None)
-    assert painted[-1] == start + 1
+    assert painted[-1] == start + 5
+
+
+@pytest.mark.parametrize("index", [6, 7])
+def test_left_side_labels_end_before_their_face(preview, index):
+    window = preview.window
+    window.pointer_motion(None, *main_position(window, index))
+    window.allocate(ring.WIDTH, ring.HEIGHT, -1, None)
+    ok, bounds = window.callout.compute_bounds(window.labels)
+    face_x, face_y = main_position(window, index)
+    assert ok and bounds.get_width() > 0
+    assert bounds.get_x() + bounds.get_width() <= face_x - BUTTON_RADIUS
+    assert bounds.get_y() < face_y < bounds.get_y() + bounds.get_height()
