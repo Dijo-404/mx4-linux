@@ -232,6 +232,10 @@ class ActionsRing(Gtk.Window):
         click.connect("released", self.pointer_click)
         click.connect("cancel", lambda *_: self.cancel_pointer())
         self.surface.add_controller(click)
+        secondary = Gtk.GestureClick(button=3)
+        secondary.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        secondary.connect("pressed", self.secondary_press)
+        self.surface.add_controller(secondary)
         drag = Gtk.GestureDrag(button=1)
         drag.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         drag.connect("drag-begin", lambda gesture, x, y: self.pointer_press(gesture, 1, x, y))
@@ -733,6 +737,17 @@ class ActionsRing(Gtk.Window):
         self.press_style(self._press_target, True)
         action = self.adjustment_at(x, y)
         self._drag = (HorizontalDrag(*self.geometry.logical(x, y)), action) if action else None
+
+    def secondary_press(self, gesture, _count, x, y):
+        """Right-clicking the background closes without activating a face."""
+        if gesture is not None:
+            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        if (not self.state.visible
+                or any(type(v) not in (int, float) or not math.isfinite(v) for v in (x, y))):
+            return
+        target = self.pointer_target(x, y)
+        if target is None or target[0] == "center":
+            self.dismiss()
 
     def pointer_drag(self, _gesture, dx, dy):
         if (self._primary_start is None or self._drag is None or not self.state.visible

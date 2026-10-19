@@ -77,7 +77,7 @@ def show_group(preview, *, held=False):
 
 def test_pointer_capture_selects_only_the_painted_circular_button(preview):
     window = preview.window
-    gestures = controllers(window.surface, Gtk.GestureClick)
+    gestures = [gesture for gesture in controllers(window.surface, Gtk.GestureClick) if gesture.get_button() == 1]
     assert len(gestures) == 1
     assert gestures[0].get_propagation_phase() == Gtk.PropagationPhase.CAPTURE
     window.pointer_click(None, 1, *main_position(window, 0))
@@ -90,6 +90,61 @@ def test_corner_of_native_button_allocation_cannot_run_an_action(preview):
     window = preview.window
     x, y = main_position(window, 0)
     window.pointer_click(None, 1, x + BUTTON_RADIUS, y + BUTTON_RADIUS)
+    assert preview.dismissed == [True]
+    assert not preview.selected
+
+
+@pytest.mark.parametrize("coordinate", [(0, 0), (ring.CENTER_X, ring.CENTER_Y),
+                                         (ring.WIDTH - 1, ring.HEIGHT - 1)])
+def test_right_click_on_background_or_close_dot_dismisses_without_selecting(preview, coordinate):
+    window = preview.window
+    gestures = [gesture for gesture in controllers(window.surface, Gtk.GestureClick) if gesture.get_button() == 3]
+    assert len(gestures) == 1
+    assert gestures[0].get_propagation_phase() == Gtk.PropagationPhase.CAPTURE
+    gestures[0].emit("pressed", 1, *coordinate)
+    window.secondary_press(None, 1, *coordinate)
+    assert preview.dismissed == [True]
+    assert not preview.selected
+    assert not window.state.visible
+
+
+@pytest.mark.parametrize("scale", [75, 100, 150])
+def test_right_click_preserves_action_circle_but_dismisses_its_square_corner(preview, scale):
+    window = preview.window
+    window.show_ring(default_config() | {"ring_scale": scale}, preview=True)
+    settle(window)
+    x, y = main_position(window, 0)
+    window.secondary_press(None, 1, *window.geometry.point(x, y))
+    assert window.state.visible and not preview.dismissed
+    assert not preview.selected
+    window.secondary_press(None, 1, *window.geometry.point(x + BUTTON_RADIUS, y + BUTTON_RADIUS))
+    assert preview.dismissed == [True]
+    assert not preview.selected
+
+
+def test_right_click_on_group_parent_or_child_does_not_run_or_close(preview):
+    window = show_group(preview)
+    window.commit(2)
+    settle(window)
+    for coordinate in [main_position(window, 2), window.child_positions[1]]:
+        window.secondary_press(None, 1, *coordinate)
+        assert window.state.visible and window.group_slot == 2
+        assert not preview.dismissed and not preview.selected
+    window.secondary_press(None, 1, ring.CENTER_X, ring.CENTER_Y - ring.CHILD_ORBIT)
+    assert preview.dismissed == [True]
+    assert not preview.selected
+
+
+def test_right_click_outside_cancels_captured_primary_press(preview):
+    window = preview.window
+    x, y = main_position(window, 0)
+    window.pointer_press(None, 1, x, y)
+    assert window.buttons[0].has_css_class("pressed")
+    window.secondary_press(None, 1, 0, 0)
+    window.pointer_click(object(), 1, x, y)
+    window.buttons[0].emit("clicked")
+    assert window._primary_start is None
+    assert not window.buttons[0].has_css_class("pressed")
     assert preview.dismissed == [True]
     assert not preview.selected
 
