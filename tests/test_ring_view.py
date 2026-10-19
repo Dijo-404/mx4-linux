@@ -93,7 +93,7 @@ def test_native_faces_have_the_same_diameter_as_pointer_hit_geometry(preview):
     assert preview.window.close_button.get_allocated_height() == ring.CENTER_RADIUS * 2
 
 
-def test_group_heading_and_footer_do_not_cover_the_six_child_targets(preview):
+def test_group_heading_does_not_cover_the_six_child_targets(preview):
     window = preview.window
     config = default_config()
     config["ring_groups"] = {"2": list(config["actions"])[:6]}
@@ -105,10 +105,14 @@ def test_group_heading_and_footer_do_not_cover_the_six_child_targets(preview):
     window.update_labels()
     window.allocate(ring.WIDTH, ring.HEIGHT, -1, None)
     heading = window.callout.get_allocation()
-    footer = window.instructions.get_allocation()
     assert heading.y + heading.height < min(y - ring.CHILD_RADIUS for _x, y in window.child_positions)
-    assert footer.y > max(y + ring.CHILD_RADIUS for _x, y in window.child_positions)
-    assert footer.y + footer.height <= ring.HEIGHT
+
+
+def test_ring_has_no_bottom_instruction_bar(preview):
+    window = preview.window
+    assert not hasattr(window, "instructions")
+    assert window.key_pressed(None, Gdk.KEY_Escape, 0, 0)
+    assert preview.dismissed == [True]
 
 
 def test_native_action_button_runs_once_in_preview(preview):
@@ -150,7 +154,7 @@ def test_hover_opens_group_and_keeps_parent_action_inert(preview):
     assert window.children == ["copy", "paste"]
     assert len(window.child_positions) == 2
     assert not window.child_buttons[2].get_visible()
-    assert "group action" in window.instructions.get_text()
+    assert window.buttons[2].get_tooltip_text().endswith("Open action group")
     assert not preview.selected
     settle(window)
     window.pointer_motion(None, *window.child_positions[1])
@@ -396,7 +400,7 @@ def test_adjusted_hold_release_latches_and_next_open_restores_normal_release(pre
     assert preview.selected == [('copy', False)]
 
 @pytest.mark.parametrize('scale', [75, 150])
-def test_scaled_group_heading_footer_and_faces_fit_allocation(preview, scale):
+def test_scaled_group_heading_and_faces_fit_allocation(preview, scale):
     window = preview.window
     config = default_config() | {'ring_scale': scale, 'ring_groups': {'2': list(default_config()['actions'])[:6]}}
     window.show_ring(config, preview=True)
@@ -406,7 +410,7 @@ def test_scaled_group_heading_footer_and_faces_fit_allocation(preview, scale):
     window.update_labels()
     width, height = window.geometry.size(ring.WIDTH), window.geometry.size(ring.HEIGHT)
     window.allocate(width, height, -1, None)
-    for child in [window.callout, window.instructions, window.close_button] + window.child_buttons:
+    for child in [window.callout, window.close_button] + window.child_buttons:
         allocation = child.get_allocation()
         assert allocation.x >= 0 and allocation.y >= 0
         assert allocation.x + allocation.width <= width

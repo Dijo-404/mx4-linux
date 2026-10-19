@@ -109,10 +109,6 @@ class ActionsRing(Gtk.Window):
                     border-radius: 4px; padding: 7px 10px; box-shadow: none;
                 }
                 .mx4-ring .ring-shortcut { color: #536d8a; font-size: 11px; font-weight: 700; }
-                .mx4-ring .ring-hint {
-                    background: #201d1d; color: #d9d5d5; border: 1px solid #787474; border-radius: 4px;
-                    padding: 6px 12px; font-size: 12px;
-                }
             """)
             Gtk.StyleContext.add_provider_for_display(display, css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
             self._style_providers[display] = css
@@ -162,11 +158,7 @@ class ActionsRing(Gtk.Window):
         self.callout_key.add_css_class("ring-shortcut")
         self.callout.append(self.callout_key)
         self.labels.put(self.callout, 0, 0)
-        self.instructions = Gtk.Label(width_request=480, ellipsize=Pango.EllipsizeMode.END, max_width_chars=1)
-        self.instructions.add_css_class("ring-hint")
-        self.instructions.set_can_target(False)
-        self.labels.put(self.instructions, 30, HEIGHT - 28)
-        for widget in (self.callout, self.callout_label, self.callout_key, self.instructions):
+        for widget in (self.callout, self.callout_label, self.callout_key):
             widget.get_style_context().add_provider(self.scale_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
         self.set_child(self.surface)
         motion = Gtk.EventControllerMotion()
@@ -253,13 +245,9 @@ class ActionsRing(Gtk.Window):
             .ring-callout {{ padding: {7 * scale}px {10 * scale}px; border-radius: {4 * scale}px; }}
             .ring-callout label {{ font-size: {13 * scale}px; }}
             .ring-shortcut {{ font-size: {11 * scale}px; }}
-            .ring-hint {{ font-size: {12 * scale}px; padding: {6 * scale}px {12 * scale}px;
-                         border-radius: {4 * scale}px; }}
         """)
         self.callout.set_spacing(geometry.size(8))
         self._move(self.close_button, CENTER_X - CENTER_RADIUS, CENTER_Y - CENTER_RADIUS)
-        self.instructions.set_size_request(geometry.size(480), -1)
-        self._move(self.instructions, 30, HEIGHT - 28)
         self.close_group()
         self.state.open(held)
         self._selection_target = None
@@ -464,17 +452,6 @@ class ActionsRing(Gtk.Window):
             self.callout.set_size_request(self.geometry.size(width), -1)
             self._move(self.callout, *position)
             self.callout.set_opacity(self.label_reveal.value())
-        if self.group_slot is not None:
-            hint = f"{'Preview · ' if self.preview else ''}Choose a group action · 1–{len(self.children)} · Esc to go back"
-        else:
-            hint = ("Preview · " if self.preview else "") + ("Hold · move · release" if self.state.held else "Choose an action · 1–8 · Esc to close")
-        if action_id and self.config["actions"][action_id].get("adjustment") and not (
-                self.group_slot is not None and child is None):
-            hint += " · Scroll or drag horizontally to adjust"
-        self.instructions.set_text(hint)
-        self.instructions.set_tooltip_text(hint)
-        footer_height = self.instructions.measure(Gtk.Orientation.VERTICAL, self.geometry.size(480)).natural
-        self.labels.move(self.instructions, self.geometry.size(30), self.geometry.size(HEIGHT) - footer_height - 1)
 
     @staticmethod
     def expanded_state(button, expanded):
