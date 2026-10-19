@@ -68,9 +68,34 @@ def test_stale_session_events_are_ignored(controller):
     controller.ring.release_button.assert_not_called()
 
 
-def test_real_release_reaches_ring(controller):
+def test_trigger_release_leaves_ring_open(controller):
     controller.event({"type": "button", "control": 416, "pressed": False, "session_id": 2})
-    controller.ring.release_button.assert_called_once()
+    controller.ring.release_button.assert_not_called()
+    controller.ring.dismiss.assert_not_called()
+
+
+def test_single_press_opens_ring_without_hold_and_ignores_repeat_packets(controller):
+    controller.ring.state.visible = False
+    controller.open_ring = Mock()
+    controller.event({"type": "button", "control": 416, "pressed": True})
+    controller.event({"type": "button", "control": 416, "pressed": True})
+    controller.open_ring.assert_called_once_with(from_button=True)
+    controller.event({"type": "button", "control": 416, "pressed": False})
+    controller.ring.release_button.assert_not_called()
+    controller.ring.dismiss.assert_not_called()
+
+
+def test_second_press_cancels_latched_ring_and_release_does_not_reopen(controller):
+    controller.ring.state.visible = False
+    controller.open_ring = Mock()
+    controller.event({"type": "button", "control": 416, "pressed": True})
+    controller.event({"type": "button", "control": 416, "pressed": False})
+    controller.ring.state.visible = True
+    controller.event({"type": "button", "control": 416, "pressed": True})
+    controller.ring.dismiss.assert_called_once()
+    controller.event({"type": "button", "control": 416, "pressed": False})
+    controller.open_ring.assert_called_once_with(from_button=True)
+    controller.ring.release_button.assert_not_called()
 
 
 def test_error_closes_ring_and_invalidates_pending_selection(controller):
@@ -88,12 +113,12 @@ def test_queued_motion_during_stop_does_not_move_preview(controller):
     controller.ring.motion.assert_not_called()
 
 
-def test_motion_and_release_while_focus_query_pending_are_preserved(controller):
+def test_trigger_release_during_focus_query_does_not_commit(controller):
     controller.opening = True
     controller.event({"type": "motion", "dx": 100, "dy": -50})
     controller.event({"type": "button", "control": 416, "pressed": False})
     assert controller._pending_motion == [100, -50]
-    assert controller._pending_released
+    assert not controller._pending_released
     controller.ring.release_button.assert_not_called()
 
 
@@ -215,7 +240,7 @@ def test_first_ring_press_after_ready_does_not_wait_for_redundant_configuration(
     runtime.event({'type': 'ready'})
     runtime.session.configure.assert_not_called()
     runtime.event({'type': 'button', 'control': 416, 'pressed': True})
-    runtime.open_ring.assert_called_once_with(held=True)
+    runtime.open_ring.assert_called_once_with(from_button=True)
 
 
 @pytest.mark.parametrize('page', ['ring', 'actions'])
@@ -282,7 +307,7 @@ def test_focus_change_with_identical_assignments_keeps_ring_and_shortcuts_ready(
     runtime.session.configure.assert_not_called()
     assert runtime._active_revision == runtime._context_revision
     runtime.event({'type': 'button', 'control': 416, 'pressed': True})
-    runtime.open_ring.assert_called_once_with(held=True)
+    runtime.open_ring.assert_called_once_with(from_button=True)
     runtime.event({'type': 'button', 'control': 82, 'pressed': True})
     runtime.execute.assert_called_once_with('copy', target={'app_id': 'browser', 'window_id': 8},
                                            config=runtime.effective_config)
@@ -646,7 +671,7 @@ def test_optional_feedback_warning_keeps_real_worker_context_transitions_alive(r
             assert runtime.execute.call_args.args == ('paste',)
             return 17, 255, bytes([INDEX, 0]) + struct.pack('!4H', 416, 0, 0, 0) + b'\0' * 8
         else:
-            runtime.open_ring.assert_called_once_with(held=True)
+            runtime.open_ring.assert_called_once_with(from_button=True)
             commands.put({'op': 'stop'})
 
     runtime.session.configure.side_effect = configure
@@ -1271,7 +1296,7 @@ def test_stale_trigger_press_is_suppressed_until_current_ack(controller):
     controller.open_ring.assert_not_called()
     controller._active_revision = 2
     controller.event({'type': 'button', 'control': 416, 'pressed': True})
-    controller.open_ring.assert_called_once_with(held=True)
+    controller.open_ring.assert_called_once_with(from_button=True)
 
 
 def test_adaptation_reconcile_keeps_open_invocation_and_intent(controller):
@@ -1325,12 +1350,12 @@ def test_preference_during_start_does_not_discard_actual_focus_query(runtime, mo
     assert runtime.session.start.call_args.args[1]['button_bindings'] == {'82': 'copy'}
 
 
-def test_held_old_trigger_release_cleans_up_after_effective_trigger_changes(controller):
+def test_old_trigger_release_is_consumed_after_effective_trigger_changes(controller):
     controller._held_ring_button = 416
     controller.config['ring_button'] = None
     controller.config['button_bindings']['416'] = 'copy'
     controller.event({'type': 'button', 'control': 416, 'pressed': False})
-    controller.ring.release_button.assert_called_once()
+    controller.ring.release_button.assert_not_called()
     controller.execute.assert_not_called()
     assert controller._held_ring_button is None
 
@@ -1409,15 +1434,15 @@ def test_observer_during_held_query_cannot_show_or_be_overwritten(runtime, monke
     runtime.execute.assert_not_called()
 
 
-def test_unchanged_held_query_keeps_release_and_detached_document(runtime, monkeypatch):
+def test_button_query_opens_latched_ring_after_trigger_release(runtime, monkeypatch):
     future, scheduled = pending_held_context_query(runtime, monkeypatch)
     runtime.event({'type': 'button', 'control': 416, 'pressed': True})
     runtime.event({'type': 'button', 'control': 416, 'pressed': False})
     future.set_result({'app_id': 'app.a', 'window_id': 1})
     scheduled.pop()()
-    assert runtime.ring.show_ring.call_args.kwargs['held'] is True
+    assert runtime.ring.show_ring.call_args.kwargs['held'] is False
     assert runtime.ring.show_ring.call_args.args[0]['ring_button'] == 416
-    runtime.ring.release_button.assert_called_once()
+    runtime.ring.release_button.assert_not_called()
     runtime.execute.assert_not_called()
 
 

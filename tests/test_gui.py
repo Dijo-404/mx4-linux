@@ -62,7 +62,7 @@ def test_close_keeps_enabled_listener_and_reopens_existing_controls(window, monk
         assert window in application.get_windows()
         window.desktop.session.stop.assert_not_called()
         window.desktop.event({"type": "button", "control": window.desktop.config["ring_button"], "pressed": True})
-        window.desktop.open_ring.assert_called_once_with(held=True)
+        window.desktop.open_ring.assert_called_once_with(from_button=True)
         assert _control_window(application, demo=True) is window
         window.present()
         assert window.get_visible()

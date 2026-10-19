@@ -320,7 +320,7 @@ class DesktopController:
             self.error = None
             trigger = (self.effective_config or self.config)["ring_button"]
             self.notify("Enabled · manual Actions Ring and configured button shortcuts." if trigger is None else
-                        f"Enabled · hold button {trigger}, move, then release. A short click opens the ring.")
+                        f"Enabled · press button {trigger} once, then click an action.")
             if self.context_available is False:
                 self.notify(self.message + " Application profiles unavailable; General assignments remain active.")
             self._configure_context()
@@ -382,27 +382,20 @@ class DesktopController:
             active = self.effective_config or self.config
             if not pressed and cid == getattr(self, "_held_ring_button", None):
                 self._held_ring_button = None
-                if self.opening:
-                    self._pending_released = True
-                elif self.ring and self.ring.state.visible:
-                    self.ring.release_button()
             elif cid == active["ring_button"]:
                 if pressed:
+                    if cid == getattr(self, "_held_ring_button", None):
+                        return GLib.SOURCE_REMOVE
                     if self._active_revision != self._context_revision:
                         return GLib.SOURCE_REMOVE
+                    self._held_ring_button = cid
                     if self.opening or (self.ring and self.ring.state.visible):
                         self._open_token += 1
                         self.opening = False
-                        self._held_ring_button = None
                         if self.ring:
                             self.ring.dismiss()
                     else:
-                        self._held_ring_button = cid
-                        self.open_ring(held=True)
-                elif self.opening:
-                    self._pending_released = True
-                elif self.ring and self.ring.state.visible:
-                    self.ring.release_button()
+                        self.open_ring(from_button=True)
             elif (pressed and self._active_revision == self._context_revision
                   and str(cid) in active["button_bindings"]):
                 self.execute(active["button_bindings"][str(cid)], target=deepcopy(self.context), config=active)
@@ -497,7 +490,7 @@ class DesktopController:
         self.window.job(work, loaded, "Looking for this mouse and recovering previous button reporting…", failed=failed)
         return GLib.SOURCE_REMOVE
 
-    def open_ring(self, preview=False, held=False):
+    def open_ring(self, preview=False, held=False, from_button=False):
         if self.closed or self.action_busy:
             self.notify("A Smart Action is running; wait or cancel it first.")
             return
@@ -510,7 +503,8 @@ class DesktopController:
         if self.error:
             self.notify(self.error)
             return
-        if held and self.session.ready and self._active_revision != self._context_revision:
+        hardware_trigger = held or from_button
+        if hardware_trigger and self.session.ready and self._active_revision != self._context_revision:
             self.notify("Assignments are updating; release and press the configured ring button again.")
             return
         self.opening = True
@@ -541,7 +535,7 @@ class DesktopController:
                     if self.session.running:
                         self._configure_context()
                 snapshot = resolve_config(document, target.get("app_id") if target else None)
-                if stale or (held and (not self.session.ready or self.session.stopping
+                if stale or (hardware_trigger and (not self.session.ready or self.session.stopping
                         or self._active_revision != self._context_revision
                         or trigger is None or snapshot["ring_button"] != trigger)):
                     self._pending_motion = [0, 0]
