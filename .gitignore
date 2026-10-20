@@ -11,3 +11,5 @@ node_modules/
 .ruff_cache/
 evidence/artifacts/
 evidence/*.png
+/videos
+
